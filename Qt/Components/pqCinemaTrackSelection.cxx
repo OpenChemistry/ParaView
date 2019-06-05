@@ -30,10 +30,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ========================================================================*/
 #include <QDebug>
+#include <QHeaderView>
 
 #include "vtkPVArrayInformation.h"
 #include "vtkPVDataInformation.h"
 #include "vtkPVDataSetAttributesInformation.h"
+#include "vtkPVLogger.h"
 #include "vtkSMSourceProxy.h"
 
 #include "pqAbstractItemSelectionModel.h"
@@ -47,7 +49,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqRenderView.h"
 #include "pqServerManagerModel.h"
 #include "pqTreeWidget.h"
-#include "pqTreeWidgetCheckHelper.h"
 #include "pqTreeWidgetItem.h"
 #include "ui_pqCinemaTrackSelection.h"
 
@@ -190,14 +191,14 @@ void pqCinemaTrackSelection::initializePipelineItemValues(QList<pqPipelineSource
 
     if (!port)
     {
-      PV_DEBUG_PANELS() << "Failed to query outputPort from index(";
+      vtkVLogF(PARAVIEW_LOG_APPLICATION_VERBOSITY(), "failed to query outputPort from index.");
       continue;
     }
 
     vtkSMSourceProxy* proxy = port->getSourceProxy();
     if (!proxy)
     {
-      PV_DEBUG_PANELS() << "Failed to query proxy!";
+      vtkVLogF(PARAVIEW_LOG_APPLICATION_VERBOSITY(), "failed to query proxy!");
       continue;
     }
 
@@ -232,8 +233,8 @@ void pqCinemaTrackSelection::onPipelineItemChanged(
 
   if (!port)
   {
-    PV_DEBUG_PANELS() << "Failed to query outputPort from index(" << current.row() << ", "
-                      << current.column() << ")";
+    vtkVLogF(PARAVIEW_LOG_APPLICATION_VERBOSITY(), "failed to query outputPort from index(%d, %d)",
+      current.row(), current.column());
 
     // TODO create a functions which sets a null model and disables the widgets
     this->Ui->viewArrayPicker->setModel(NULL);

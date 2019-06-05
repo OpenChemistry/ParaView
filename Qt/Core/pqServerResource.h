@@ -117,6 +117,8 @@ public:
 
   /**
   * Returns a compact string representation of the resource in URI format
+  * Prefer using configuration->URI() if a configuration is available
+  * and not default.
   */
   const QString toURI() const;
 
@@ -129,10 +131,16 @@ public:
   /** Returns the resource scheme -
   builtin, cs, csrc, cdsrs, cdsrsrc, or session */
   const QString scheme() const;
+
   /**
   * Sets the resource scheme
   */
   void setScheme(const QString&);
+
+  /**
+   * Returns if the connection scheme is a reverse one
+   */
+  bool isReverse() const;
 
   /** Returns the resource host, or empty string for builtin, session,
   cdsrs, and cdsrsrc schemes */

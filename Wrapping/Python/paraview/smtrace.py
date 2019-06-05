@@ -647,8 +647,11 @@ class PropertyTraceHelper(object):
                   return data[0]
             except IndexError:
                 return "None"
+        elif myobject.SMProperty.IsA("vtkSMStringVectorProperty"):
+            # handle multiline properties (see #18480)
+            return self.create_multiline_string(repr(myobject))
         else:
-            return str(myobject)
+            return repr(myobject)
 
     def has_proxy_list_domain(self):
         """Returns True if this property has a ProxyListDomain, else False."""
@@ -661,6 +664,24 @@ class PropertyTraceHelper(object):
         """Return the Property value as would be returned by
         servermanager.Proxy.GetPropertyValue()."""
         return self.ProxyAccessor.get_object().GetPropertyValue(self.get_property_name())
+
+    def create_multiline_string(self, astr):
+        """helper to convert a string representation into a multiline string"""
+        if '\\n' in astr:
+            # this happens for multiline string-vector properties.
+            # for those, we ensure that the `astr` has raw \n's rather than
+            # the escaped version. we also fix the string indicators.
+
+            # replace '\\n' with real '\n'
+            astr = astr.replace('\\n','\n')
+
+            # escape any `"""` in the script
+            astr = astr.replace('"""', '\\"\\"\\"')
+
+            # replace first and last characters with `"""`
+            astr = '"""' + astr[1:-1] + '"""'
+        return astr
+
 
 # ===================================================================================================
 # === Filters used to filter properties traced ===
@@ -881,6 +902,14 @@ class CleanupAccessor(BookkeepingItem):
         import gc
         gc.collect()
 
+class BlockTraceItems(NestableTraceItem):
+    """Item to block further creation of trace items, even
+    those that are `NestableTraceItem`. Simply create this and
+    no trace items will be created by `_create_trace_item_internal`
+    until this instance is cleaned up.
+    """
+    pass
+
 class PropertiesModified(NestableTraceItem):
     """Traces properties modified on a specific proxy."""
     def __init__(self, proxy, comment=None):
@@ -892,13 +921,6 @@ class PropertiesModified(NestableTraceItem):
         self.MTime.Modified()
         self.Comment = "#%s" % comment if not comment is None else \
             "# Properties modified on %s" % str(self.ProxyAccessor)
-        try:
-            # Hack to track ScalarOpacityFunction property changes since that proxy
-            # is shown on the same pqProxyWidget as the ColorTransferFunction proxy --
-            # which is non-standard.
-            if proxy.ScalarOpacityFunction:
-                self.ScalarOpacityFunctionHack = PropertiesModified(self.proxy.ScalarOpacityFunction)
-        except: pass
 
     def finalize(self):
         props = self.ProxyAccessor.get_properties()
@@ -908,24 +930,35 @@ class PropertiesModified(NestableTraceItem):
                 self.Comment,
                 self.ProxyAccessor.trace_properties(props_to_trace, in_ctor=False)])
 
-        # also handle properties on values for properties with ProxyListDomain.
-        for prop in [k for k in props if k.has_proxy_list_domain()]:
+        # Remember, we are monitoring a proxy to trace any properties on it that
+        # are modified. When that's the case, properties on a proxy-property on
+        # that proxy may have been modified too and it would make sense to trace
+        # those as well (e.g. ScalarOpacityFunction on a PVLookupTable proxy).
+        # This loop handles that. We explicitly skip "InputProperty"s, however
+        # since tracing properties modified on the input should not be a
+        # responsibility of this method.
+        for prop in props:
+            if not isinstance(prop.get_object(), sm.ProxyProperty) or \
+                    isinstance(prop.get_object(), sm.InputProperty) or \
+                    prop.DisableSubTrace:
+                continue
             val = prop.get_property_value()
-            if val:
+            try:
+                # val can be None or list of proxies. We are not tracing list of
+                # proxies since we don't want to trace properties like
+                # `view.Representations`.
+                if not val or not isinstance(val, sm.Proxy): continue
                 valaccessor = Trace.get_accessor(val)
-                if not prop.DisableSubTrace:
-                  props = valaccessor.get_properties()
-                  props_to_trace = [k for k in props if self.MTime.GetMTime() < k.get_object().GetMTime()]
-                  if props_to_trace:
+            except Untraceable:
+                continue
+            else:
+                props = valaccessor.get_properties()
+                props_to_trace = [k for k in props if self.MTime.GetMTime() < k.get_object().GetMTime()]
+                if props_to_trace:
                     Trace.Output.append_separated([
                         "# Properties modified on %s" % valaccessor,
                         valaccessor.trace_properties(props_to_trace, in_ctor=False)])
         TraceItem.finalize(self)
-
-        try:
-            self.ScalarOpacityFunctionHack.finalize()
-            del self.ScalarOpacityFunctionHack
-        except AttributeError: pass
 
 class ScalarBarInteraction(NestableTraceItem):
     """Traces scalar bar interactions"""
@@ -1248,12 +1281,36 @@ class RegisterLayoutProxy(TraceItem):
     def __init__(self, layout):
         TraceItem.__init__(self)
         self.Layout = sm._getPyProxy(layout)
-    def finalize(self):
+    def finalize(self, filter=None):
+        if filter is None:
+            filter = lambda x: True
         pname = Trace.get_registered_name(self.Layout, "layouts")
         accessor = ProxyAccessor(Trace.get_varname(pname), self.Layout)
         Trace.Output.append_separated([\
-            "# create new layout object",
-            "%s = CreateLayout()" % accessor])
+            "# create new layout object '%s'" % pname,
+            "%s = CreateLayout(name='%s')" % (accessor, pname)])
+
+        # Let's trace out the state for the layout.
+        def _trace_layout(layout, laccessor, location):
+            sdir = layout.GetSplitDirection(location)
+            sfraction = layout.GetSplitFraction(location)
+            if sdir == layout.SMProxy.VERTICAL:
+                Trace.Output.append([\
+                    "%s.SplitVertical(%d, %f)" % (laccessor, location, sfraction)])
+                _trace_layout(layout, laccessor, layout.GetFirstChild(location))
+                _trace_layout(layout, laccessor, layout.GetSecondChild(location))
+            elif sdir == layout.SMProxy.HORIZONTAL:
+                Trace.Output.append([\
+                    "%s.SplitHorizontal(%d, %f)" % (laccessor, location, sfraction)])
+                _trace_layout(layout, laccessor, layout.GetFirstChild(location))
+                _trace_layout(layout, laccessor, layout.GetSecondChild(location))
+            elif sdir == layout.SMProxy.NONE:
+                view = layout.GetView(location)
+                if view and filter(view):
+                    vaccessor = Trace.get_accessor(view)
+                    Trace.Output.append([\
+                        "%s.AssignView(%d, %s)" % (laccessor, location, vaccessor)])
+        _trace_layout(self.Layout, accessor, 0)
         TraceItem.finalize(self)
 
 class LoadPlugin(TraceItem):
@@ -1463,7 +1520,11 @@ def _create_trace_item_internal(key, args=None, kwargs=None):
         args = args if args else []
         kwargs = kwargs if kwargs else {}
         traceitemtype = g[key]
-        if len(__ActiveTraceItems) == 0 or issubclass(traceitemtype, NestableTraceItem):
+        if len(__ActiveTraceItems) == 0 or \
+                issubclass(traceitemtype, NestableTraceItem):
+            if len(__ActiveTraceItems) > 0 and \
+                    isinstance(__ActiveTraceItems[-1](), BlockTraceItems):
+                raise Untraceable("Not tracing since `BlockTraceItems` is active.")
             instance = traceitemtype(*args, **kwargs)
             if not issubclass(traceitemtype, BookkeepingItem):
                 __ActiveTraceItems.append(weakref.ref(instance))
@@ -1499,6 +1560,13 @@ def _stop_trace_internal():
         ])
     trace = str(Trace.Output)
     Trace.reset()
+
+    # essential to ensure any obsolete accessor don't linger can cause havoc
+    # when saving state following a Python trace session
+    # (paraview/paraview#18994)
+    import gc
+    gc.collect()
+    gc.collect()
     return trace
 
 #------------------------------------------------------------------------------

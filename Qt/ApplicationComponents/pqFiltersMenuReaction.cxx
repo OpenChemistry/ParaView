@@ -229,8 +229,24 @@ void pqFiltersMenuReaction::updateEnableState(bool updateOnlyToolbars)
   mgr->setEnabled(enabled);
 
   bool some_enabled = false;
-  const QList<QAction*>& actionsList =
-    updateOnlyToolbars ? mgr->actionsInToolbars() : mgr->actions();
+  QList<QAction*> actionsList;
+  if (updateOnlyToolbars)
+  {
+    actionsList += mgr->actionsInToolbars();
+    const QList<QAction*>& allActions = mgr->actions();
+    for (QAction* action : allActions)
+    {
+      // If the action has a keyboard shortcut it must always be updated.
+      if (action->shortcut() != QKeySequence())
+      {
+        actionsList.append(action);
+      }
+    }
+  }
+  else
+  {
+    actionsList = mgr->actions();
+  }
   foreach (QAction* action, actionsList)
   {
     vtkSMProxy* prototype = mgr->getPrototype(action);
@@ -325,16 +341,17 @@ void pqFiltersMenuReaction::updateEnableState(bool updateOnlyToolbars)
     QMenu* menu = mgr->menu();
     bool anyMenuShown = false;
     QList<QAction*> menuActions = menu->actions();
-    foreach (QAction* menuAction, menuActions)
+    for (QAction* menuAction : menuActions)
     {
-      if (menuAction->isSeparator() || !menuAction->menu())
+      if (menuAction->isSeparator() || !menuAction->menu() ||
+        menuAction->menu() == mgr->getFavoritesMenu())
       {
         continue;
       }
       bool anySubMenuShown = false;
       QList<QAction*> subMenuActions = menuAction->menu()->actions();
 
-      foreach (QAction* subMenuAction, subMenuActions)
+      for (QAction* subMenuAction : subMenuActions)
       {
         if (subMenuAction->isVisible())
         {

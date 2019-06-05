@@ -32,7 +32,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "pqDoubleRangeWidget.h"
 
-#include "pqLineEdit.h"
 #include "vtkPVConfig.h"
 
 // Qt includes
@@ -129,7 +128,7 @@ void pqDoubleRangeWidget::updateValidator()
 //-----------------------------------------------------------------------------
 bool pqDoubleRangeWidget::strictRange() const
 {
-  const QDoubleValidator* dv = validator();
+  const QDoubleValidator* dv = this->validator();
   return dv->bottom() == this->minimum() && dv->top() == this->maximum();
 }
 

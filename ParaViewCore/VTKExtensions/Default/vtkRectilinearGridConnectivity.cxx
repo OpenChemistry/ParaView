@@ -1645,7 +1645,7 @@ void vtkRectilinearGridConnectivity::ExtractFragmentPolyhedra(
   double dataBbox[6];
   double acumVols[8]; // accumulated volume a vertex scatters
   double lastFrcs[8]; // to reuse quad scalars (1, 2, 5, 6 only)
-  double nodeFrcs[8]; // fractions of the ORIGINAL hexas (noe nodes)
+  double nodeFrcs[8]; // fractions of the ORIGINAL hexas (now nodes)
   double lastVols[8]; // to reuse --- similar to lastFrcs
   double nodeVols[8]; // volumes of the ORIGINAL hexas (now nodes)
   double lastCord[3];
@@ -2920,7 +2920,7 @@ void vtkRectilinearGridConnectivity::AddPolygonsToFaceHash(
   vtkRectilinearGridConnectivityFace** newFaces = NULL;
 
   // determine the number of integrated components (including the material
-  // volume) to be saved to the global fragment attributs array and allocate a
+  // volume) to be saved to the global fragment attributes array and allocate a
   // buffer for a tuple
   tupleSiz = this->Internal->NumberIntegralComponents + 1;
   tupleBuf = new double[tupleSiz];
@@ -3296,7 +3296,7 @@ void vtkRectilinearGridConnectivity::GenerateOutputFromSingleProcess(
       // be rejected. This rejection does not affect the fragment extraction
       // result at all while guaranteeing the generation of cell normals.
       //
-      // It is assumed that polygon degenration seldom ocurs and therefore
+      // It is assumed that polygon degeneration seldom ocurs and therefore
       // the lack of early exit (when evaluating an if-statement) does not
       // cause a negative effect while the use of a single comparison can
       // speed up the whole check.
@@ -3971,7 +3971,7 @@ void vtkRectilinearGridConnectivity::GenerateOutputFromMultiProcesses(
       // does not affect the fragment extraction result while guaranteeing
       // the generation of cell normals.
       //
-      // It is assumed that polygon degenration seldom ocurs and therefore
+      // It is assumed that polygon degeneration seldom ocurs and therefore
       // the lack of early exit (when evaluating an if-statement) does not
       // cause a negative effect while the use of a single comparison can
       // speed up the whole check.

@@ -73,6 +73,9 @@ class PQCOMPONENTS_EXPORT pqMultiBlockInspectorWidget : public QWidget
   Q_PROPERTY(QList<QVariant> blockOpacities READ blockOpacities WRITE setBlockOpacities NOTIFY
       blockOpacitiesChanged);
 
+  Q_PROPERTY(QList<QVariant> visibleBlocks READ visibleBlocks WRITE setVisibleBlocks NOTIFY
+      blockOpacitiesChanged);
+
 public:
   pqMultiBlockInspectorWidget(
     QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags(), bool autotracking = true);
@@ -94,6 +97,15 @@ public:
    */
   QList<QVariant> blockVisibilities() const;
   void setBlockVisibilities(const QList<QVariant>& bvs);
+  //@}
+
+  //@{
+  /**
+   * Get/Set the visible blocks. Unlike blockVisibilities, this is compact list
+   * of visible blocks given the current hierarchy.
+   */
+  QList<QVariant> visibleBlocks() const;
+  void setVisibleBlocks(const QList<QVariant>& vbs);
   //@}
 
   //@{
@@ -174,6 +186,23 @@ signals:
   void blockColorsChanged();
   void blockOpacitiesChanged();
   void requestRender();
+
+private:
+  //@{
+  /**
+   * Methods to change block colors or opacity ensemble.
+   *
+   * If the index is valid and identifies an item that is part of the current selection,
+   * then all selected items get updated similarly. If not, only the chosen item is
+   * updated. If the index is invalid, then all items part of the current
+   * selection are updated.
+   *
+   * For setColor, if `newcolor` is invalid, then it acts as "reset color".
+   * For setOpacity, if `opacity` is < 0, then it acts as "reset opacity".
+   */
+  void setColor(const QModelIndex& idx, const QColor& newcolor);
+  void setOpacity(const QModelIndex& idx, double opacity);
+  //@}
 
 private:
   Q_DISABLE_COPY(pqMultiBlockInspectorWidget);

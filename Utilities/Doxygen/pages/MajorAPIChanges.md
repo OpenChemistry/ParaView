@@ -4,8 +4,72 @@ Major API Changes             {#MajorAPIChanges}
 This page documents major API/design changes between different versions since we
 started tracking these (starting after version 4.2).
 
+Changes in 5.7
+--------------
+
+###vtkSMFieldDataDomain in array selection properties###
+
+Previously, `vtkSMFieldDataDomain` was added to `vtkSMStringVectorProperty`
+instances that allowed user to choose the array to process. This is no longer needed
+or supported. Simply remove the `vtkSMFieldDataDomain` from the XML for such properties.
+Typically such properties have `vtkSMArrayListDomain` and that domain alone is
+sufficient to enable selection of array name and its association.
+
+###Changes to vtkSMFieldDataDomain###
+
+vtkSMFieldDataDomain no longer updates the domain based on the type of the
+input. The domain will always list the attribute types known to VTK/ParaView. As
+a result, XML attributes `force_point_cell_data` and
+`disable_update_domain_entries` for the XML definition of vtkSMFieldDataDomain
+have been deprecated and should simply be removed from the XML as they are no
+longer relevant.
+
+##pqDoubleLineEdit API changes##
+
+`pqDoubleLineEdit` now is simply a `pqLineEdit` with no signficant API differences
+as far as setting and getting text values is concerned. This implies, however, that
+tests that were updated in ParaView 5.6 to use `set_full_precision_text` instead of
+`set_string` must now be reverted back to use `set_string`.
+
+The following command was adequate for ParaView test changes:
+`git grep -l set_full_ | xargs sed -i 's/set_full_precision_text/set_string/g'`.
+
+##Views and Layouts##
+
+Previously, when a new view is created ParaView automatically associated it with
+a layout. This is no longer the case. Associating a view with a layout is now an
+explicit action.
+`vtkSMParaViewPipelineControllerWithRendering::AssignViewToLayout` may be used
+to help assign a view to an available layout (or create a new one, if none
+exists). This was essential for addressing several layout related issues such
+as paraview/paraview#18964, and paraview/paraview#18963.
+
+
+Changes in 5.6
+--------------
+
+###vtkPVDataInformation and vtkTable###
+
+Previously, `vtkPVDataInformation` would accumulate row and column counts when
+gathering information from a vtkTable in the `vtkPVDataInformation::NumberOfCells`
+variable. This was incorrect and PraView 5.6 fixes this. For `vtkTable`,
+`vtkPVDataInformation::GetNumberOfCells` will now return 0.
+
 Changes in 5.5
 --------------
+
+
+###Replace pqLineEdit with pqDoubleLineEdit for viewing and editing double properties###
+
+Tests recorded prior to this version need to be updated to:
+
+* reference `DoubleLineEdit` instead of `LineEdit`
+* use `set_full_precision_text` command instead of `set_string`
+
+Note that the changes must only be applied to properties of type double. This means
+that systematic search and replace can not be directly used.
+
+See #17966
 
 ###Changes to Python shell###
 

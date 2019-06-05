@@ -37,7 +37,9 @@
 #include "vtkSMRepresentationProxy.h"
 #include "vtkView.h"
 
-#define MULTI_SLICE_AXIS_THIKNESS 80
+#include <cassert>
+
+#define MULTI_SLICE_AXIS_THICKNESS 80
 #define MULTI_SLICE_AXIS_ACTIVE_SIZE 20
 #define MULTI_SLICE_AXIS_EDGE_MARGIN 10
 
@@ -94,7 +96,7 @@ QWidget* pqMultiSliceView::createWidget()
   this->AxisX->setTitle("X");
   this->AxisX->SetEdgeMargin(MULTI_SLICE_AXIS_EDGE_MARGIN);
   this->AxisX->SetActiveSize(MULTI_SLICE_AXIS_ACTIVE_SIZE);
-  this->AxisX->setFixedWidth(MULTI_SLICE_AXIS_THIKNESS);
+  this->AxisX->setFixedWidth(MULTI_SLICE_AXIS_THICKNESS);
   this->AxisX->renderView();
 
   this->AxisY = new pqMultiSliceAxisWidget(container);
@@ -103,7 +105,7 @@ QWidget* pqMultiSliceView::createWidget()
   this->AxisY->setTitle("Y");
   this->AxisY->SetEdgeMargin(MULTI_SLICE_AXIS_EDGE_MARGIN);
   this->AxisY->SetActiveSize(MULTI_SLICE_AXIS_ACTIVE_SIZE);
-  this->AxisY->setFixedHeight(MULTI_SLICE_AXIS_THIKNESS - 4);
+  this->AxisY->setFixedHeight(MULTI_SLICE_AXIS_THICKNESS - 4);
   this->AxisY->renderView();
 
   this->AxisZ = new pqMultiSliceAxisWidget(container);
@@ -112,7 +114,7 @@ QWidget* pqMultiSliceView::createWidget()
   this->AxisZ->setTitle("Z");
   this->AxisZ->SetEdgeMargin(MULTI_SLICE_AXIS_EDGE_MARGIN);
   this->AxisZ->SetActiveSize(MULTI_SLICE_AXIS_ACTIVE_SIZE);
-  this->AxisZ->setFixedWidth(MULTI_SLICE_AXIS_THIKNESS);
+  this->AxisZ->setFixedWidth(MULTI_SLICE_AXIS_THICKNESS);
   this->AxisZ->renderView();
 
   this->AxisXYZ[0] = this->AxisX;
@@ -143,7 +145,7 @@ QWidget* pqMultiSliceView::createWidget()
   vtkSMRenderViewProxy* renModule = this->getRenderViewProxy();
   if (this->InternalWidget && renModule)
   {
-    this->InternalWidget->SetRenderWindow(renModule->GetRenderWindow());
+    this->InternalWidget->setRenderWindow(renModule->GetRenderWindow());
   }
 
   for (int cc = 0; cc < 3; cc++)
@@ -168,7 +170,7 @@ void pqMultiSliceView::updateAxisBounds()
 {
   double bounds[6];
   vtkSMMultiSliceViewProxy* viewPxy = vtkSMMultiSliceViewProxy::SafeDownCast(this->getProxy());
-  Q_ASSERT(viewPxy);
+  assert(viewPxy);
 
   viewPxy->GetDataBounds(bounds);
   if (vtkMath::AreBoundsInitialized(bounds))
@@ -235,7 +237,7 @@ void pqMultiSliceView::onSliceAdded(int activeSliceIndex)
   QObject* aSender = this->sender();
   int axisIndex = this->getAxisIndex(aSender);
 
-  Q_ASSERT(axisIndex >= 0 && axisIndex <= 2);
+  assert(axisIndex >= 0 && axisIndex <= 2);
   this->updateSlices();
 
   // Notify that the slices location have changed
@@ -247,7 +249,7 @@ void pqMultiSliceView::onSliceRemoved(int activeSliceIndex)
 {
   QObject* aSender = this->sender();
   int axisIndex = this->getAxisIndex(aSender);
-  Q_ASSERT(axisIndex >= 0 && axisIndex <= 2);
+  assert(axisIndex >= 0 && axisIndex <= 2);
   this->updateSlices();
 
   // Notify that the slices location have changed
@@ -259,7 +261,7 @@ void pqMultiSliceView::onSliceModified(int activeSliceIndex)
 {
   QObject* aSender = this->sender();
   int axisIndex = this->getAxisIndex(aSender);
-  Q_ASSERT(axisIndex >= 0 && axisIndex <= 2);
+  assert(axisIndex >= 0 && axisIndex <= 2);
   this->updateSlices();
 
   // Notify that the slices location have changed

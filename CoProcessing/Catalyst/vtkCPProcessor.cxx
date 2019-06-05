@@ -21,8 +21,9 @@
 #include "vtkCPInputDataDescription.h"
 #include "vtkCPPipeline.h"
 #include "vtkDataObject.h"
+#include "vtkDoubleArray.h"
 #include "vtkFieldData.h"
-#ifdef PARAVIEW_USE_MPI
+#if VTK_MODULE_ENABLE_VTK_ParallelMPI
 #include "vtkMPI.h"
 #include "vtkMPICommunicator.h"
 #include "vtkMPIController.h"
@@ -30,6 +31,7 @@
 #include "vtkMultiProcessController.h"
 #include "vtkNew.h"
 #include "vtkObjectFactory.h"
+#include "vtkPassArrays.h"
 #include "vtkSMIntVectorProperty.h"
 #include "vtkSMProxy.h"
 #include "vtkSMProxyManager.h"
@@ -38,6 +40,7 @@
 #include "vtkStringArray.h"
 
 #include <list>
+#include <vtksys/SystemTools.hxx>
 
 struct vtkCPProcessorInternals
 {
@@ -47,12 +50,13 @@ struct vtkCPProcessorInternals
 };
 
 vtkStandardNewMacro(vtkCPProcessor);
-vtkMultiProcessController* vtkCPProcessor::Controller = NULL;
+vtkMultiProcessController* vtkCPProcessor::Controller = nullptr;
 //----------------------------------------------------------------------------
 vtkCPProcessor::vtkCPProcessor()
 {
   this->Internal = new vtkCPProcessorInternals;
-  this->InitializationHelper = NULL;
+  this->InitializationHelper = nullptr;
+  this->WorkingDirectory = nullptr;
 }
 
 //----------------------------------------------------------------------------
@@ -61,14 +65,15 @@ vtkCPProcessor::~vtkCPProcessor()
   if (this->Internal)
   {
     delete this->Internal;
-    this->Internal = NULL;
+    this->Internal = nullptr;
   }
 
   if (this->InitializationHelper)
   {
     this->InitializationHelper->Delete();
-    this->InitializationHelper = NULL;
+    this->InitializationHelper = nullptr;
   }
+  this->SetWorkingDirectory(nullptr);
 }
 
 //----------------------------------------------------------------------------
@@ -95,7 +100,7 @@ vtkCPPipeline* vtkCPProcessor::GetPipeline(int which)
 {
   if (which < 0 || which >= this->GetNumberOfPipelines())
   {
-    return NULL;
+    return nullptr;
   }
   int counter = 0;
   vtkCPProcessorInternals::PipelineListIterator iter = this->Internal->Pipelines.begin();
@@ -108,7 +113,7 @@ vtkCPPipeline* vtkCPProcessor::GetPipeline(int which)
     counter++;
     iter++;
   }
-  return NULL;
+  return nullptr;
 }
 
 //----------------------------------------------------------------------------
@@ -130,25 +135,49 @@ vtkObject* vtkCPProcessor::NewInitializationHelper()
 }
 
 //----------------------------------------------------------------------------
-int vtkCPProcessor::Initialize()
+int vtkCPProcessor::Initialize(const char* workingDirectory)
 {
-  if (this->InitializationHelper == NULL)
+  if (this->InitializationHelper == nullptr)
   {
     this->InitializationHelper = this->NewInitializationHelper();
+  }
+  // make sure the directory exists here so that we only do it once
+  if (workingDirectory)
+  {
+    vtkMultiProcessController* controller = vtkMultiProcessController::GetGlobalController();
+    int success = 1;
+    if (controller == nullptr || controller->GetLocalProcessId() == 0)
+    {
+      success = vtksys::SystemTools::MakeDirectory(workingDirectory) == true ? 1 : 0;
+      if (success == 0)
+      {
+        vtkWarningMacro("Could not make "
+          << workingDirectory << " directory. "
+          << "Results will be generated in current working directory instead.");
+      }
+    }
+    if (controller)
+    {
+      controller->Broadcast(&success, 1, 0);
+    }
+    if (success)
+    {
+      this->SetWorkingDirectory(workingDirectory);
+    }
   }
   return 1;
 }
 
 //----------------------------------------------------------------------------
-int vtkCPProcessor::Initialize(vtkMPICommunicatorOpaqueComm& comm)
+int vtkCPProcessor::Initialize(vtkMPICommunicatorOpaqueComm& comm, const char* workingDirectory)
 {
-#ifdef PARAVIEW_USE_MPI
+#if VTK_MODULE_ENABLE_VTK_ParallelMPI
   if (vtkCPProcessor::Controller)
   {
     vtkErrorMacro("Can only initialize with a communicator once per process.");
     return 0;
   }
-  if (this->InitializationHelper == NULL)
+  if (this->InitializationHelper == nullptr)
   {
     vtkMPICommunicator* communicator = vtkMPICommunicator::New();
     communicator->InitializeExternal(&comm);
@@ -157,12 +186,12 @@ int vtkCPProcessor::Initialize(vtkMPICommunicatorOpaqueComm& comm)
     this->Controller = controller;
     this->Controller->SetGlobalController(controller);
     communicator->Delete();
-    return this->Initialize();
+    return this->Initialize(workingDirectory);
   }
   return 1;
 #else
   static_cast<void>(&comm); // get rid of variable not used warning
-  return this->Initialize();
+  return this->Initialize(workingDirectory);
 #endif
 }
 
@@ -173,15 +202,6 @@ int vtkCPProcessor::RequestDataDescription(vtkCPDataDescription* dataDescription
   {
     vtkWarningMacro("DataDescription is NULL.");
     return 0;
-  }
-  if (dataDescription->GetForceOutput() == true)
-  {
-    for (unsigned int i = 0; i < dataDescription->GetNumberOfInputDescriptions(); i++)
-    {
-      dataDescription->GetInputDescription(i)->GenerateMeshOn();
-      dataDescription->GetInputDescription(i)->AllFieldsOn();
-    }
-    return 1;
   }
 
   // first set all inputs to be off and set to on as needed.
@@ -215,6 +235,13 @@ int vtkCPProcessor::CoProcess(vtkCPDataDescription* dataDescription)
     return 0;
   }
   int success = 1;
+  // We need to add in information like channel name and time value here to the
+  // field data. The channel name is used to automatically keep track of which
+  // channel things are happening with so we can hide that complexity from the user.
+  // The time value needs to be added here since the XML writers will add that
+  // information in and if the user tries to create a Catalyst Python script
+  // pipeline that uses that field data (e.g. Annotate Field Data filter) from those
+  // files they'll get failures.
   for (unsigned int i = 0; i < dataDescription->GetNumberOfInputDescriptions(); i++)
   {
     if (vtkDataObject* input = dataDescription->GetInputDescription(i)->GetGrid())
@@ -223,30 +250,72 @@ int vtkCPProcessor::CoProcess(vtkCPDataDescription* dataDescription)
       catalystChannel->SetName(this->GetInputArrayName());
       catalystChannel->InsertNextValue(dataDescription->GetInputDescriptionName(i));
       input->GetFieldData()->AddArray(catalystChannel);
+
+      vtkNew<vtkDoubleArray> time;
+      time->SetNumberOfTuples(1);
+      time->SetTypedComponent(0, 0, dataDescription->GetTime());
+      time->SetName("TimeValue");
+      input->GetFieldData()->AddArray(time);
     }
+  }
+
+  std::string originalWorkingDirectory;
+  if (this->WorkingDirectory)
+  {
+    originalWorkingDirectory = vtksys::SystemTools::GetCurrentWorkingDirectory();
+    vtksys::SystemTools::ChangeDirectory(this->WorkingDirectory);
   }
   for (vtkCPProcessorInternals::PipelineListIterator iter = this->Internal->Pipelines.begin();
        iter != this->Internal->Pipelines.end(); iter++)
   {
-    if (dataDescription->GetForceOutput() == false)
+    // Reset dataDescription so that we can check each pipeline again
+    // before calling CoProcess to make sure which pipelines should
+    // be executing.
+    for (unsigned int i = 0; i < dataDescription->GetNumberOfInputDescriptions(); i++)
     {
-      // Reset dataDescription so that we can check each pipeline again
-      // before calling CoProcess to make sure which pipelines should
-      // be executing.
-      for (unsigned int i = 0; i < dataDescription->GetNumberOfInputDescriptions(); i++)
-      {
-        dataDescription->GetInputDescription(i)->GenerateMeshOff();
-        dataDescription->GetInputDescription(i)->AllFieldsOff();
-      }
+      dataDescription->GetInputDescription(i)->Reset();
     }
-    if (dataDescription->GetForceOutput() == true ||
-      iter->GetPointer()->RequestDataDescription(dataDescription))
+    if (iter->GetPointer()->RequestDataDescription(dataDescription))
     {
-      if (!iter->GetPointer()->CoProcess(dataDescription))
+      // now we need to filter out arrays that are not needed by this pipeline
+      // but were requested by other pipelines at this time step
+      vtkSmartPointer<vtkCPDataDescription> dataDescriptionCopy = dataDescription;
+      if (this->Internal->Pipelines.size() > 1)
+      {
+        // if there's only one pipeline we don't have to worry about getting
+        // more arrays than we requesting arrays
+        dataDescriptionCopy = vtkSmartPointer<vtkCPDataDescription>::New();
+        dataDescriptionCopy->Copy(dataDescription);
+        for (unsigned int i = 0; i < dataDescription->GetNumberOfInputDescriptions(); i++)
+        {
+          vtkCPInputDataDescription* idd = dataDescriptionCopy->GetInputDescription(i);
+          if (idd->GetIfGridIsNecessary() == true && idd->GetAllFields() == false)
+          {
+            vtkNew<vtkPassArrays> passArrays;
+            passArrays->UseFieldTypesOn();
+            passArrays->AddFieldType(vtkDataObject::FIELD);
+            passArrays->AddFieldType(vtkDataObject::POINT);
+            passArrays->AddFieldType(vtkDataObject::CELL);
+            passArrays->SetInputData(idd->GetGrid());
+            for (unsigned int j = 0; j < idd->GetNumberOfFields(); j++)
+            {
+              int type = idd->GetFieldType(j);
+              passArrays->AddArray(type, idd->GetFieldName(j));
+            }
+            passArrays->Update();
+            idd->SetGrid(passArrays->GetOutput());
+          }
+        }
+      }
+      if (!iter->GetPointer()->CoProcess(dataDescriptionCopy))
       {
         success = 0;
       }
     }
+  }
+  if (originalWorkingDirectory.empty() == false)
+  {
+    vtksys::SystemTools::ChangeDirectory(originalWorkingDirectory);
   }
   // we want to reset everything here to make sure that new information
   // is properly passed in the next time.
@@ -259,7 +328,7 @@ int vtkCPProcessor::Finalize()
 {
   if (this->Controller)
   {
-    this->Controller->SetGlobalController(NULL);
+    this->Controller->SetGlobalController(nullptr);
     this->Controller->Finalize(1);
     this->Controller->Delete();
   }

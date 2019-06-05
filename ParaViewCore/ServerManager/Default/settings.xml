@@ -237,6 +237,7 @@
         <EnumerationDomain name="enum">
           <Entry text="Grow and update on 'Apply'" value="0" />
           <Entry text="Grow and update every timestep" value="1" />
+          <Entry text="Update on 'Apply'" value="2" />
           <Entry text="Clamp and update every timestep" value="3" />
         </EnumerationDomain>
       </IntVectorProperty>
@@ -319,6 +320,22 @@
         </Hints>
       </IntVectorProperty>
 
+      <IntVectorProperty name="AnimationTimeNotation"
+        number_of_elements="1"
+        default_values="0"
+        command="SetAnimationTimeNotation"
+        panel_visibility="advanced">
+        <Documentation>
+          Set the display notation for the time in the animation toolbar. 'Mixed' will automatically
+          choose the shortest display.
+        </Documentation>
+        <EnumerationDomain name="enum">
+          <Entry text="Mixed" value="0" />
+          <Entry text="Scientific" value="1" />
+          <Entry text="Fixed" value="2" />
+        </EnumerationDomain>
+      </IntVectorProperty>
+
       <IntVectorProperty name="AnimationTimePrecision"
         number_of_elements="1"
         default_values="6"
@@ -326,7 +343,7 @@
         panel_visibility="advanced">
         <Documentation>
           Set the number of significant digits displayed for the time in the animation
-          toolbar.
+          toolbar. Should be in the range [1,17].
         </Documentation>
         <IntRangeDomain min="1" max="17" />
       </IntVectorProperty>
@@ -341,6 +358,45 @@
           on ranged scalar property.
         </Documentation>
         <BooleanDomain name="bool" />
+      </IntVectorProperty>
+
+      <IntVectorProperty name="ResetDisplayEmptyViews"
+        number_of_elements="1"
+        default_values="1"
+        command="SetResetDisplayEmptyViews"
+        panel_visibility="advanced">
+        <Documentation>
+          When showing a representation in an empty view, set whether or not to reset
+          the view display.
+        </Documentation>
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+
+      <IntVectorProperty name="RealNumberDisplayedNotation"
+        number_of_elements="1"
+        default_values="0"
+        command="SetRealNumberDisplayedNotation"
+        panel_visibility="advanced">
+        <Documentation>
+          Set the notation used to display real numbers.
+        </Documentation>
+        <EnumerationDomain name="enum">
+          <Entry text="Mixed" value="0" />
+          <Entry text="Scientific" value="1" />
+          <Entry text="Fixed" value="2" />
+        </EnumerationDomain>
+      </IntVectorProperty>
+
+      <IntVectorProperty name="RealNumberDisplayedPrecision"
+        number_of_elements="1"
+        default_values="6"
+        command="SetRealNumberDisplayedPrecision"
+        panel_visibility="advanced">
+        <Documentation>
+          Set the number of significant digits to display in real numbers.
+          This does NOT affect the values used in computation.
+        </Documentation>
+        <IntRangeDomain min="1" max="17" />
       </IntVectorProperty>
 
       <IntVectorProperty name="InheritRepresentationProperties"
@@ -395,6 +451,18 @@
           Internal setting: automatically color by **vtkBlockColors** if array is present.
         </Documentation>
       </IntVectorProperty>
+      <IntVectorProperty name="IgnoreNegativeLogAxisWarning"
+        command="SetIgnoreNegativeLogAxisWarning"
+        number_of_elements="1"
+        default_values="0"
+        panel_visibility="advanced">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          When plotting data with nonpositive values using logarithmic axes, ignore the
+	  standard warning and draw only the data with positive values. Changes will take
+	  effect for all charts created after this option is changed.
+        </Documentation>
+      </IntVectorProperty>
 
       <PropertyGroup label="General Options">
         <Property name="ShowWelcomeDialog" />
@@ -443,13 +511,18 @@
         <Property name="CacheGeometryForAnimation" />
         <Property name="AnimationGeometryCacheLimit" />
         <Property name="AnimationTimePrecision" />
+        <Property name="AnimationTimeNotation" />
         <Property name="ShowAnimationShortcuts" />
       </PropertyGroup>
 
       <PropertyGroup label="Miscellaneous">
+        <Property name="ResetDisplayEmptyViews" />
+        <Property name="RealNumberDisplayedNotation" />
+        <Property name="RealNumberDisplayedPrecision" />
         <Property name="InheritRepresentationProperties" />
         <Property name="DefaultTimeStep" />
         <Property name="MaximumNumberOfDataRepresentationLabels" />
+        <Property name="IgnoreNegativeLogAxisWarning" />
       </PropertyGroup>
       <Hints>
         <UseDocumentationForLabels />
@@ -467,7 +540,7 @@
       <IntVectorProperty name="ResolveCoincidentTopology"
         command="SetResolveCoincidentTopology"
         number_of_elements="1"
-        default_values="3"
+        default_values="1"
         panel_visibility="advanced">
         <Documentation>
           Set the mode to use to overcome the OpenGL rendering issue when faces
@@ -487,12 +560,46 @@
       <DoubleVectorProperty name="PolygonOffsetParameters"
         command="SetPolygonOffsetParameters"
         number_of_elements="2"
-        default_values="1.0 1.0"
+        default_values="0.8 6.0"
         panel_visibility="advanced">
         <DoubleRangeDomain name="range" />
         <Documentation>
-          Set the polygon offset parameters. Refer to the OpenGL manual,
-          glPolygonOffset for details on how to use these parameters.
+          Set the polygon offset parameters to control how polygon depths are shifted
+          in the depth buffer. Change these parameters to change how coincident lines,
+          points, and polygons are resolved when rendering. The first parameter controls
+          how much the angle of the polygon relative to the camera view plane contributes
+          to the depth offset of pixels in the rendered polygon. The second parameter is
+          a constant offset to add to the depth buffer. Refer to the OpenGL manual on
+          glPolygonOffset for further details on these parameters.
+        </Documentation>
+        <Hints>
+          <RestartRequired />
+        </Hints>
+      </DoubleVectorProperty>
+
+      <DoubleVectorProperty name="LineOffsetParameters"
+        command="SetLineOffsetParameters"
+        number_of_elements="2"
+        default_values="0.0 0.0"
+        panel_visibility="advanced">
+        <DoubleRangeDomain name="range" />
+        <Documentation>
+          Parameters used the same way as the parameters in **Polygon Offset Parameters**,
+          but applied when lines are rendered.
+        </Documentation>
+        <Hints>
+          <RestartRequired />
+        </Hints>
+      </DoubleVectorProperty>
+
+      <DoubleVectorProperty name="PointOffsetParameter"
+        command="SetPointOffsetParameter"
+        number_of_elements="1"
+        default_values="-6.0"
+        panel_visibility="advanced">
+        <DoubleRangeDomain name="range" />
+        <Documentation>
+        Specifies a constant depth offset to apply when points are rendered.
         </Documentation>
         <Hints>
           <RestartRequired />
@@ -511,6 +618,10 @@
         </Documentation>
         <Hints>
           <RestartRequired />
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="ResolveCoincidentTopology"
+                                   value="3" />
         </Hints>
       </DoubleVectorProperty>
 
@@ -582,7 +693,7 @@
         </Hints>
       </DoubleVectorProperty>
       <!-- The hard contrast threshold is reduced to 0.045 by default. This
-           ensures that the the red arrow of the orientation axes is
+           ensures that the red arrow of the orientation axes is
            antialiased. -->
       <DoubleVectorProperty name="FXAAHardContrastThreshold"
                             default_values="0.045"
@@ -781,6 +892,21 @@
         </Documentation>
       </IntVectorProperty>
 
+      <IntVectorProperty name="DefaultInteractionMode"
+        command="SetDefaultInteractionMode"
+        number_of_elements="1"
+        default_values="0"
+        panel_visibility="advanced">
+        <Documentation>
+          When opening a dataset, set the initial interaction mode.
+        </Documentation>
+        <EnumerationDomain name="enum">
+          <Entry text="Automatic, based on the first time step" value="0" />
+          <Entry text="Always 2D" value="1" />
+          <Entry text="Always 3D" value="2" />
+        </EnumerationDomain>
+      </IntVectorProperty>
+
       <IntVectorProperty name="ShowAnnotation"
                          default_values="0"
                          number_of_elements="1"
@@ -860,6 +986,7 @@
 
       <PropertyGroup label="Miscellaneous">
         <Property name="OutlineThreshold" />
+        <Property name="DefaultInteractionMode" />
         <Property name="ShowAnnotation" />
         <Property name="PointPickingRadius" />
         <Property name="DisableIceT" />

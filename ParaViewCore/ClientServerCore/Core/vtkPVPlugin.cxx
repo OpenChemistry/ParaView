@@ -14,6 +14,7 @@
 =========================================================================*/
 #include "vtkPVPlugin.h"
 
+#include "vtkPVLogger.h"
 #include "vtkPVPluginTracker.h"
 #include "vtkProcessModule.h"
 #include <vtksys/SystemTools.hxx>
@@ -26,36 +27,60 @@ vtkPVPlugin::EULAConfirmationCallback vtkPVPlugin::EULAConfirmationCallbackPtr =
 //-----------------------------------------------------------------------------
 bool vtkPVPlugin::ImportPlugin(vtkPVPlugin* plugin)
 {
-  // If plugin has an EULA, confirm it before proceeding.
-  if (plugin && (plugin->GetEULA() == nullptr || vtkPVPlugin::ConfirmEULA(plugin)))
+  std::ostringstream msg;
+  bool status = false;
+  if (plugin)
   {
-    // Register the plugin with the plugin manager on the current process. That
-    // will kick in the code to process the plugin e.g. initialize CSInterpreter,
-    // load XML etc.
-    vtkPVPluginTracker::GetInstance()->RegisterPlugin(plugin);
-    return true;
+
+    auto indent = vtkIndent().GetNextIndent();
+    msg << "----------------------------------------------------------" << endl
+        << "Importing plugin: **" << plugin->GetPluginName() << "**" << endl
+        << indent << "name: " << plugin->GetPluginName() << endl
+        << indent << "version: " << plugin->GetPluginVersionString() << endl
+        << indent << "filename: " << (plugin->GetFileName() ? plugin->GetFileName() : "(nullptr)")
+        << endl
+        << indent << "required-on-server: " << plugin->GetRequiredOnServer() << endl
+        << indent << "required-on-client: " << plugin->GetRequiredOnClient() << endl
+        << indent << "has-eula: " << (plugin->GetEULA() != nullptr) << endl;
+
+    // If plugin has an EULA, confirm it before proceeding.
+    if ((plugin->GetEULA() == nullptr || vtkPVPlugin::ConfirmEULA(plugin)))
+    {
+      // Register the plugin with the plugin manager on the current process. That
+      // will kick in the code to process the plugin e.g. initialize CSInterpreter,
+      // load XML etc.
+      vtkPVPluginTracker::GetInstance()->RegisterPlugin(plugin);
+      status = true;
+    }
+    else
+    {
+      msg << "  Plugin has EULA and was not accepted. Plugin won't be imported." << endl;
+    }
   }
-  return false;
+
+  vtkVLogIfF(PARAVIEW_LOG_PLUGIN_VERBOSITY(), (msg.str().size() > 0), "Import status: %s \n%s",
+    (status ? "success" : "failure"), msg.str().c_str());
+  return status;
 }
 
 //-----------------------------------------------------------------------------
 vtkPVPlugin::vtkPVPlugin()
 {
-  this->FileName = NULL;
+  this->FileName = nullptr;
 }
 
 //-----------------------------------------------------------------------------
 vtkPVPlugin::~vtkPVPlugin()
 {
   delete[] this->FileName;
-  this->FileName = NULL;
+  this->FileName = nullptr;
 }
 
 //-----------------------------------------------------------------------------
 void vtkPVPlugin::SetFileName(const char* filename)
 {
   delete[] this->FileName;
-  this->FileName = NULL;
+  this->FileName = nullptr;
   this->FileName = vtksys::SystemTools::DuplicateString(filename);
 }
 

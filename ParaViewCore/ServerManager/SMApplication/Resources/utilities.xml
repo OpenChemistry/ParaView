@@ -11,6 +11,7 @@
           <Entry value="-1" text="Never"/>
           <Entry value="0" text="Grow and update on 'Apply'"/>
           <Entry value="1" text="Grow and update every timestep"/>
+          <Entry value="2" text="Update on 'Apply'"/>
           <Entry value="3" text="Clamp and update every timestep"/>
         </EnumerationDomain>
         <Documentation>
@@ -36,6 +37,16 @@
         </Documentation>
       </IntVectorProperty>
 
+      <IntVectorProperty default_values="0"
+                         name="AnnotationsInitialized"
+                         number_of_elements="1"
+                         panel_visibility="never" >
+        <Documentation>
+         Set to 1 to indicate that the annotations have been initialized.
+        </Documentation>
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+
       <IntVectorProperty name="ShowIndexedColorActiveValues"
                          command="SetUseActiveValues"
                          default_values="0"
@@ -49,7 +60,7 @@
           </PropertyWidgetDecorator>
         </Hints>
         <Documentation>
-          When interpretting values as categories, enabling this
+          When interpreting values as categories, enabling this
           option results in the display of only the 'active'
           categorical colors for values in the data range, i.e.,
           values that exist in the source. You may need to click the
@@ -119,6 +130,7 @@
           <Entry text="Lab" value="2" />
           <Entry text="Diverging" value="3" />
           <Entry text="Lab/CIEDE2000" value="4" />
+          <Entry text="Step" value="5" />
         </EnumerationDomain>
         <Documentation>
           The color space used for interpolation: RGB, HSV, Lab (CIELAB), or
@@ -130,6 +142,8 @@
           interpolating between two saturated colors.
           In Lab/CIEDE2000 mode, it will take the shortest path in the Lab color
           space with respect to the CIE Delta E 2000 color distance measure.
+          In Step mode, the color of an interval is the color of the second point
+          of the interval.
         </Documentation>
       </IntVectorProperty>
       <IntVectorProperty command="SetUseBelowRangeColor"
@@ -189,6 +203,16 @@
                             panel_widget="color_selector" >
         <Documentation>
           Set the color to use when NaN (not-a-number) is encountered.
+        </Documentation>
+      </DoubleVectorProperty>
+
+      <DoubleVectorProperty command="SetNanOpacity"
+                         default_values="1"
+                         name="NanOpacity"
+                         number_of_elements="1" >
+        <DoubleRangeDomain min="0" max="1" name="range" />
+        <Documentation>
+          Set the opacity to use when NaN (not-a-number) is encountered.
         </Documentation>
       </DoubleVectorProperty>
 
@@ -302,7 +326,7 @@
                             repeat_command="1"
                             set_number_command="SetNumberOfIndexedOpacitiesInFullSet"
                             use_index="1"
-                            panel_visibility="advanced">
+                            panel_visibility="never">
         <Documentation>
           Opacities used when using IndexedLookup is true.
         </Documentation>
@@ -318,6 +342,7 @@
       <PropertyGroup label="Color Mapping Parameters">
         <Property name="ColorSpace" />
         <Property name="NanColor" />
+        <Property name="NanOpacity" />
       </PropertyGroup>
 
       <PropertyGroup label="Color Discretization">
@@ -682,16 +707,35 @@
     </Proxy>
     <Proxy class="vtkPVBox" name="Box">
       <InputProperty is_internal="1" name="Input" />
-      <DoubleVectorProperty command="SetBounds"
+      <IntVectorProperty name="UseReferenceBounds"
+        command="SetUseReferenceBounds"
+        number_of_elements="1"
+        default_values="0">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <DoubleVectorProperty command="SetReferenceBounds"
                             default_values="0 1 0 1 0 1"
                             name="Bounds"
-                            number_of_elements="6"></DoubleVectorProperty>
+                            number_of_elements="6">
+        <BoundsDomain mode="data_bounds" name="range">
+          <RequiredProperties>
+            <Property function="Input" name="Input" />
+          </RequiredProperties>
+        </BoundsDomain>
+        <Hints>
+          <NoDefault />
+        </Hints>
+      </DoubleVectorProperty>
       <DoubleVectorProperty animateable="1"
                             command="SetPosition"
                             default_values="0.0 0.0 0.0"
                             name="Position"
                             number_of_elements="3">
-        <DoubleRangeDomain name="range" />
+        <BoundsDomain default_mode="min" mode="normal" name="range">
+          <RequiredProperties>
+            <Property function="Input" name="Input" />
+          </RequiredProperties>
+        </BoundsDomain>
         <Documentation>
           Set the position of the box.
         </Documentation>
@@ -709,9 +753,13 @@
       <DoubleVectorProperty animateable="1"
                             command="SetScale"
                             default_values="1.0 1.0 1.0"
-                            name="Scale"
+                            name="Length"
                             number_of_elements="3">
-        <DoubleRangeDomain name="range" />
+        <BoundsDomain default_mode="max" mode="component_magnitude" name="range">
+          <RequiredProperties>
+            <Property function="Input" name="Input" />
+          </RequiredProperties>
+        </BoundsDomain>
         <Documentation>
           Set the size of the box via a scale factor.
         </Documentation>
@@ -719,9 +767,10 @@
       <PropertyGroup label="Box Parameters" panel_widget="InteractiveBox">
         <Property function="Position" name="Position" />
         <Property function="Rotation" name="Rotation" />
-        <Property function="Scale" name="Scale" />
-        <Property function="PlaceWidget" name="Bounds" />
+        <Property function="Scale" name="Length" />
         <Property function="Input" name="Input" />
+        <Property function="UseReferenceBounds" name="UseReferenceBounds" />
+        <Property function="ReferenceBounds" name="Bounds" />
       </PropertyGroup>
       <Hints>
         <ProxyList>
@@ -962,6 +1011,8 @@
                  value="3" />
           <Entry text="Lab/CIEDE2000"
                  value="4" />
+          <Entry text="Step"
+                 value="5" />
         </EnumerationDomain>
       </IntVectorProperty>
       <IntVectorProperty animateable="0"
@@ -1069,6 +1120,17 @@
           horizontal or vertical, respectively.
         </Documentation>
       </DoubleVectorProperty>
+      <IntVectorProperty animateable="0"
+                         command="SetReverseLegend"
+                         default_values="0"
+                         name="ReverseLegend"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          When on, the color bar and all associated ticks and notations will be reversed,
+          from high to low instead of low to high.
+        </Documentation>
+      </IntVectorProperty>
       <IntVectorProperty command="SetAutomaticLabelFormat"
                          default_values="1"
                          name="AutomaticLabelFormat"
@@ -1250,6 +1312,67 @@
       </SubProxy>
     </Proxy>
 
+    <Proxy class="vtkFlagpoleLabel"
+           name="FlagpoleLabel"
+           processes="client|dataserver|renderserver"
+           >
+      <Documentation>FlagpoleLabel is a 3D representation for a text
+     source.</Documentation>
+      <DoubleVectorProperty name="BasePosition"
+                            command="SetBasePosition"
+                            number_of_elements="3"
+                            default_values="0.0 0.0 0.0"
+                            >
+        <DoubleRangeDomain name="range" />
+        <Documentation>
+          The world coordinate position of the base of the flagpole.
+        </Documentation>
+      </DoubleVectorProperty>
+
+      <DoubleVectorProperty name="TopPosition"
+                            command="SetTopPosition"
+                            number_of_elements="3"
+                            default_values="0.0 1.0 0.0"
+                            >
+        <DoubleRangeDomain name="range" />
+        <Documentation>
+          The world coordinate position of the top of the flagpole.
+        </Documentation>
+      </DoubleVectorProperty>
+
+      <DoubleVectorProperty name="FlagSize"
+                            command="SetFlagSize"
+                            number_of_elements="1"
+                            default_values="1.0"
+                            >
+        <DoubleRangeDomain  min="0.001" name="range" />
+        <Documentation>
+          The size of the flag. 1.0 is the default size which corresponds to
+          a preset texels/window value. Adjust this to increase or decrease
+          the default size.The world coordinate position of the top of the
+          flagpole.
+        </Documentation>
+      </DoubleVectorProperty>
+
+      <SubProxy command="SetTextProperty">
+        <Proxy name="TextProperty"
+               proxygroup="properties"
+               proxyname="TextProperty"></Proxy>
+        <ExposedProperties>
+          <Property name="Color"/>
+          <Property name="Opacity"/>
+          <Property name="FontFamily"/>
+          <Property name="FontFile"/>
+          <Property name="Bold"/>
+          <Property name="Italic"/>
+          <Property name="Shadow"/>
+          <Property name="FontSize"/>
+          <Property name="Justification"/>
+        </ExposedProperties>
+      </SubProxy>
+      <!-- End of FlagpoleLabel -->
+    </Proxy>
+
     <!-- ================================================================== -->
     <Proxy name="GridAxes3DActor"
            class="vtkPVGridAxes3DActor"
@@ -1315,7 +1438,7 @@
         </ExposedProperties>
       </SubProxy>
 
-      <PropertyGroup label="X Title Font Properties" panel_widget="FontEditor">
+      <PropertyGroup label="X Title Font Properties" panel_widget="FontEditor" panel_visibility="advanced">
         <Property name="XTitleColor" function="Color"/>
         <Property name="XTitleFontFamily" function="Family"/>
         <Property name="XTitleFontFile" function="File"/>
@@ -1340,7 +1463,7 @@
         </ExposedProperties>
       </SubProxy>
 
-      <PropertyGroup label="Y Title Font Properties" panel_widget="FontEditor">
+      <PropertyGroup label="Y Title Font Properties" panel_widget="FontEditor" panel_visibility="advanced">
         <Property name="YTitleColor" function="Color"/>
         <Property name="YTitleFontFamily" function="Family"/>
         <Property name="YTitleFontFile" function="File"/>
@@ -1365,7 +1488,7 @@
         </ExposedProperties>
       </SubProxy>
 
-      <PropertyGroup label="Z Title Font Properties" panel_widget="FontEditor">
+      <PropertyGroup label="Z Title Font Properties" panel_widget="FontEditor" panel_visibility="advanced">
         <Property name="ZTitleColor" function="Color"/>
         <Property name="ZTitleFontFamily" function="Family"/>
         <Property name="ZTitleFontFile" function="File"/>
@@ -1544,7 +1667,7 @@
         </ExposedProperties>
       </SubProxy>
 
-      <PropertyGroup label="X Axis Label Font Properties" panel_widget="FontEditor">
+      <PropertyGroup label="X Axis Label Font Properties" panel_widget="FontEditor" panel_visibility="advanced">
         <Property name="XLabelColor" function="Color"/>
         <Property name="XLabelFontFamily" function="Family"/>
         <Property name="XLabelFontFile" function="File"/>
@@ -1569,7 +1692,7 @@
         </ExposedProperties>
       </SubProxy>
 
-      <PropertyGroup label="Y Axis Label Font Properties" panel_widget="FontEditor">
+      <PropertyGroup label="Y Axis Label Font Properties" panel_widget="FontEditor" panel_visibility="advanced">
         <Property name="YLabelColor" function="Color"/>
         <Property name="YLabelFontFamily" function="Family"/>
         <Property name="YLabelFontFile" function="File"/>
@@ -1594,7 +1717,7 @@
         </ExposedProperties>
       </SubProxy>
 
-      <PropertyGroup label="Z Axis Label Font Properties" panel_widget="FontEditor">
+      <PropertyGroup label="Z Axis Label Font Properties" panel_widget="FontEditor" panel_visibility="advanced">
         <Property name="ZLabelColor" function="Color"/>
         <Property name="ZLabelFontFamily" function="Family"/>
         <Property name="ZLabelFontFile" function="File"/>
@@ -1782,6 +1905,38 @@
         <Property name="ZAxisLabels" />
       </PropertyGroup>
 
+      <IntVectorProperty name="UseCustomBounds"
+                         command="SetUseCustomTransformedBounds"
+                         number_of_elements="1"
+                         default_values="0">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          If set, the axes will use explicitly specified bounds rather than using the bounds
+          computed from datasets currently visible in the view.
+        </Documentation>
+      </IntVectorProperty>
+
+      <DoubleVectorProperty name="CustomBounds"
+                            command="SetCustomTransformedBounds"
+                            number_of_elements="6"
+                            default_values="0 1 0 1 0 1 0 1">
+        <DoubleRangeDomain name="range" />
+        <Documentation>
+          Specify the explicit bounds to use when **UseCustomBounds** is checked.
+        </Documentation>
+        <Hints>
+          <!-- show only when UseCustomBounds is true -->
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="UseCustomBounds"
+                                   value="1"/>
+          <DoubleVectorPropertyWidget>
+            <!-- add buttons to reset using active bounds -->
+            <Button type="use_active_source_bounds" />
+          </DoubleVectorPropertyWidget>
+        </Hints>
+      </DoubleVectorProperty>
+
       <DoubleVectorProperty name="DataScale"
                             command="SetDataScale"
                             number_of_elements="3"
@@ -1843,8 +1998,13 @@
                                    value="0"/>
           <!-- disable this when UseModelTransform is true -->
         </Hints>
-
       </DoubleVectorProperty>
+
+      <PropertyGroup label="Bounds">
+        <Property name="UseCustomBounds" />
+        <Property name="CustomBounds" />
+      </PropertyGroup>
+
       <PropertyGroup label="Data Transform">
         <Property name="DataScale" />
         <Property name="DataPosition" />
@@ -2435,7 +2595,6 @@
                             default_values="0"
                             name="Time"
                             number_of_elements="1"
-                            precision="17"
                             state_ignored="1">
         <!-- state-ignored simply makes this property not be saved in the UndoRedo state -->
         <DoubleRangeDomain name="range" />
@@ -2451,7 +2610,6 @@
                             information_only="1"
                             name="TimeRange"
                             number_of_elements="2"
-                            precision="17"
                             state_ignored="1">
         <!-- state-ignored simply makes this property not be saved in the UndoRedo state -->
         <Documentation>This is the time range. It's possible that there are no
@@ -2742,7 +2900,8 @@
       <!-- End of TimerLog -->
     </Proxy>
     <ViewLayoutProxy name="ViewLayout"
-                     processes="client">
+                     class="vtkViewLayout"
+                     processes="client|renderserver">
       <Documentation>Proxy used to manage layout for multiple views.</Documentation>
       <IntVectorProperty name="PreviewMode"
         number_of_elements="2"
@@ -2753,6 +2912,7 @@
         </Documentation>
       </IntVectorProperty>
       <IntVectorProperty name="SeparatorWidth"
+        command="SetSeparatorWidth"
         number_of_elements="1"
         default_values="1">
         <IntRangeDomain name="range" min="0" max="10" />
@@ -2761,6 +2921,7 @@
         </Documentation>
       </IntVectorProperty>
       <DoubleVectorProperty name="SeparatorColor"
+        command="SetSeparatorColor"
         number_of_elements="3"
         default_values="0.937 0.922 0.906">
         <DoubleRangeDomain name="range" min="0 0 0" max="1 1 1" />
@@ -2769,12 +2930,6 @@
         </Documentation>
       </DoubleVectorProperty>
     </ViewLayoutProxy>
-    <Proxy class="vtkViewLayout"
-           name="InternalViewLayoutHelper"
-           processes="renderserver">
-      <Documentation>Proxy used to manage layout for multiple
-      views.</Documentation>
-    </Proxy>
     <Proxy class="vtkPVRayCastPickingHelper"
            name="PickingHelper"
            processes="dataserver">
@@ -2811,6 +2966,35 @@
         <Documentation>The selection that is used to reduced the
         input.</Documentation>
       </ProxyProperty>
+    </Proxy>
+    <!-- ================================================================= -->
+    <Proxy name="CatalystOptions">
+      <Documentation>Common XML for Catalyst Specific Properties</Documentation>
+      <IntVectorProperty name="WriteFrequency"
+                       label="Write Frequency"
+                       default_values="1"
+                       number_of_elements="1">
+        <Documentation>Set how often Catalyst runs will export this data product. Zero is OK and means only when output is forced by the simulation.
+        </Documentation>
+        <IntRangeDomain min="0"
+                        name="range" />
+      </IntVectorProperty>
+      <StringVectorProperty name="CatalystFilePattern"
+                          label="File Pattern"
+                          default_values="filename_%t.ext"
+                          number_of_elements="1">
+        <Documentation>Set the filename pattern Catalyst runs will use to export this data product.
+        </Documentation>
+      </StringVectorProperty>
+      <IntVectorProperty name="CatalystFitToScreen"
+                       label="Fit To Screen"
+                       default_values="0"
+                       number_of_elements="1">
+        <Documentation>Causes Catalyst to reset the camera with each screenshot to keep all objects in view.
+        </Documentation>
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+
     </Proxy>
     <!-- End of group "misc" -->
   </ProxyGroup>
@@ -3002,6 +3186,20 @@
         <ExporterFactory extensions="vtp" />
       </Hints>
     </RenderViewExporterProxy>
+    <RenderViewExporterProxy class="vtkGLTFExporter"
+                             name="GLTFExporter">
+      <Documentation>Exporter to export a single render view to gltf.
+      </Documentation>
+      <StringVectorProperty command="SetFileName"
+                            name="FileName"
+                            panel_visibility="never"
+                            number_of_elements="1">
+        <Documentation>Name of the file to be written.</Documentation>
+      </StringVectorProperty>
+      <Hints>
+        <ExporterFactory extensions="gltf" />
+      </Hints>
+    </RenderViewExporterProxy>
     <RenderViewExporterProxy class="vtkVRMLExporter"
                              name="VRMLExporter">
       <Documentation>Exporter to export a single render view to an VRML
@@ -3028,12 +3226,6 @@
                             number_of_elements="1">
         <Documentation>Name of the file to be written.</Documentation>
       </StringVectorProperty>
-      <IntVectorProperty command="SetFilterColumnsByVisibility"
-                         default_values="0"
-                         name="FilterColumnsByVisibility"
-                         number_of_elements="1">
-        <BooleanDomain name="bool" />
-      </IntVectorProperty>
       <Hints>
         <ExporterFactory extensions="csv tsv txt" />
       </Hints>
@@ -3460,13 +3652,20 @@
       <!-- End of GL2PSContextViewExporterSVG -->
     </GL2PSExporterProxy>
 
-    <RenderViewExporterProxy name="WebGLExporter" class="vtkPVWebGLExporter">
+    <RenderViewExporterProxy name="WebExporter" class="vtkPVWebExporter">
        <StringVectorProperty name="FileName" command="SetFileName"
                              number_of_elements="1">
           <Documentation>Name of the file to write into</Documentation>
        </StringVectorProperty>
+       <StringVectorProperty name="ParaViewGlanceHTML"
+                             command="SetParaViewGlanceHTML"
+                             number_of_elements="1"
+                             panel_visibility="advanced">
+          <Documentation>Filepath to the HTML viewer to embed data in</Documentation>
+          <FileListDomain name="files" />
+       </StringVectorProperty>
       <Hints>
-        <ExporterFactory extensions="webgl" />
+        <ExporterFactory extensions="vtkjs" />
       </Hints>
       <!-- End of WebGLExporter -->
     </RenderViewExporterProxy>
@@ -3547,21 +3746,6 @@
            class="vtkPolygonalSurfaceContourLineInterpolator"
            name="PolygonalSurfaceContourLineInterpolator"></Proxy>
   </ProxyGroup>
-  <ProxyGroup name="tile_helper">
-    <Proxy class="vtkTileDisplayHelper"
-           name="TileDisplayHelper"
-           processes="renderserver">
-      <Documentation>Helper proxy used to enable/disable server side tile image
-      dump.</Documentation>
-      <StringVectorProperty command="SetDumpImagePath"
-                            default_values=""
-                            name="DumpImagePath"
-                            number_of_elements="1">
-        <Documentation>Full Path + prefix file name. The image full path will
-        be: ${DumpImagePath}-Tile${processId}.png</Documentation>
-      </StringVectorProperty>
-    </Proxy>
-  </ProxyGroup>
   <ProxyGroup name="coprocessing">
     <LiveInsituLinkProxy name="LiveInsituLink" class="vtkLiveInsituLink"
       processes="dataserver">
@@ -3606,6 +3790,127 @@
       <Property name="LiveChanged" command="LiveChanged" />
 
     </LiveInsituLinkProxy>
+
+    <Proxy name="CatalystGlobalOptions">
+      <Documentation>
+        A proxy used to maintain global Catalyst state. This, combined with the pipeline shape and a choice of writers and screenshots define what Catalyst will do with and produce from the data that the simulation gives to it.
+      </Documentation>
+
+      <IntVectorProperty name="EnableLive"
+                         label="Enable Live Connections"
+                         default_values="0"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Makes the generated Catalyst Script check for Live connections.
+        </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty name="LiveFrequency"
+                         label="Live Frequency"
+                         default_values="1"
+                         number_of_elements="1"
+                         panel_visibility="advanced">
+        <IntRangeDomain name="range" min="1" />
+        <Documentation>
+          Catalyst will update live connections only every N'th timestep.
+        </Documentation>
+      </IntVectorProperty>
+
+      <StringVectorProperty name="RootDirectory"
+                         number_of_elements="1"
+                         default_values="">
+        <Documentation>
+          Defines a top level directory where Catalyst output files are placed under.
+        </Documentation>
+      </StringVectorProperty>
+
+      <IntVectorProperty name="FileNamePadding"
+                         label="File Padding"
+                         default_values="0"
+                         number_of_elements="1">
+        <IntRangeDomain name="range" min="0" max="16"/>
+        <Documentation>
+          Pads numerical filenames with leading zeros to be a consistent width.
+        </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty name="RequestSpecificArrays"
+                         default_values="0"
+                         number_of_elements="1"
+                         panel_visibility="advanced">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Tells Catalyst to ask for only those arrays that are currently enabled on the source rather than all of them.
+        </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty name="WriteStart"
+                         label="Write Start"
+                         default_values="0"
+                         number_of_elements="1"
+                         panel_visibility="advanced">
+        <IntRangeDomain name="range" min="0" />
+        <Documentation>
+          Catalyst will skip this many startup cycles (possibly excepting ForceFirstOutput) before starting to write files.
+        </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty name="ForceFirstOutput"
+                         default_values="0"
+                         number_of_elements="1"
+                         panel_visibility="advanced">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Tells Catalyst to always dump the first timestep it gets because it may take a long time to wait for WriteStart iterations.
+        </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty name="RescaleToDataRange"
+                         label="Rescale to Data Range"
+                         default_values="0"
+                         number_of_elements="1"
+                         panel_visibility="advanced">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Adjusts the lookup table dynamically as the simulation progresses.
+        </Documentation>
+      </IntVectorProperty>
+
+      <IntVectorProperty name="SaveDTable"
+                         label="Save Cinema D Table"
+                         default_values="0"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Creates a Cinema table that indexes all output files.
+        </Documentation>
+      </IntVectorProperty>
+
+      <StringVectorProperty name="TimeInputFilePattern"
+                         label="Input File Pattern"
+                         number_of_elements="1"
+                         default_values="infile_*.vti"
+                         panel_visibility="advanced">
+        <Documentation>
+          A regular expression to that tells spatio-temporal scripts where to search for input files.
+        </Documentation>
+      </StringVectorProperty>
+
+      <IntVectorProperty name="TimeCompartmentSize"
+                         default_values="1"
+                         number_of_elements="1"
+                         panel_visibility="advanced">
+        <IntRangeDomain name="range" min="1" max="1000" />
+        <Documentation>
+          The number of processes working together on a specific time step in a spatio-temporal style batch script.
+        </Documentation>
+      </IntVectorProperty>
+      <PropertyGroup label="Spatio-Temporal Controls">
+        <Property name="TimeInputFilePattern" />
+        <Property name="TimeCompartmentSize" />
+      </PropertyGroup>
+    </Proxy>
   </ProxyGroup>
 
   <!-- Catalyst client only proxies, used to generate a coprocessing script
@@ -4038,6 +4343,48 @@
       </Hints>
       <!-- End of ExodusIIWriter -->
     </SourceProxy>
+
+    <SourceProxy name="HyperTreeGridWriter" class="vtkPVNullSource"
+      label="Parallel HyperTreeGrid Writer">
+      <InputProperty name="Input">
+          <ProxyGroupDomain name="groups">
+            <Group name="sources" />
+            <Group name="filters" />
+          </ProxyGroupDomain>
+          <DataTypeDomain name="input_type">
+            <DataType value="vtkHyperTreeGrid" />
+          </DataTypeDomain>
+          <Documentation>
+            The input.
+          </Documentation>
+      </InputProperty>
+
+      <StringVectorProperty name="FileName"
+        number_of_elements="1"
+        default_values="filename_%t.htg">
+     </StringVectorProperty>
+
+      <IntVectorProperty name="WriteFrequency"
+        number_of_elements="1"
+        default_values="1">
+        <IntRangeDomain name="range" min="1" />
+      </IntVectorProperty>
+
+      <IntVectorProperty name="PaddingAmount"
+        number_of_elements="1"
+        default_values="0">
+        <IntRangeDomain name="range" min="0" />
+      </IntVectorProperty>
+
+     <Hints>
+      <!-- TODO: this doesn't work yet -->
+      <PipelineIcon name=":pqComponents/pqSave32.png" />
+
+      <!-- This will help us when exporting the script state -->
+      <WriterProxy group="writers" name="HyperTreeGridWriter" />
+     </Hints>
+     <!-- End of HyperTreeGridWriter -->
+    </SourceProxy>
   </ProxyGroup>
 
   <ProxyGroup name="pythontracing">
@@ -4207,8 +4554,47 @@
         </Documentation>
       </IntVectorProperty>
       <Hints>
-        <FormatOptions extensions="jpg"
+        <FormatOptions extensions="jpeg jpg"
           file_description="JPEG images" />
+      </Hints>
+    </Proxy>
+
+    <Proxy name="TIFF" class="vtkTIFFWriter" processes="client">
+      <Documentation>
+        Writer for saving screenshots as TIFF files.
+      </Documentation>
+      <IntVectorProperty name="Compression"
+        command="SetCompression"
+        number_of_elements="1"
+        default_values="1">
+        <Documentation>
+          Specify compression type.
+        </Documentation>
+        <EnumerationDomain name="enum">
+          <Entry text="None" value="0" />
+          <Entry text="PackBits" value="1" />
+          <Entry text="Deflate" value="3" />
+          <!--
+               JPEG is disabled since it raised errors about color space when
+               using it.
+
+               LZW is disabled since its not available (as per docs in vtkTIFFWriter
+          -->
+        </EnumerationDomain>
+      </IntVectorProperty>
+      <Hints>
+        <FormatOptions extensions="tiff tif"
+          file_description="TIFF images" />
+      </Hints>
+    </Proxy>
+
+    <Proxy name="BMP" class="vtkBMPWriter" processes="client">
+      <Documentation>
+        Writer for saving screenshots as BMP files.
+      </Documentation>
+      <Hints>
+        <FormatOptions extensions="bmp"
+          file_description="Bitmap images" />
       </Hints>
     </Proxy>
   </ProxyGroup>
@@ -4352,7 +4738,7 @@
         </Hints>
       </ProxyProperty>
 
-      <!-- FIXME:: depreacated
+      <!-- FIXME:: deprecated
       <IntVectorProperty name="ImageQuality"
         number_of_elements="1"
         default_values="100"
@@ -4385,7 +4771,6 @@
       <PropertyGroup label="Image Options">
         <Property name="Format" />
       </PropertyGroup>
-
     </SaveScreenshotProxy>
   </ProxyGroup>
 
@@ -4436,4 +4821,159 @@
       </IntVectorProperty>
     </LoadStateOptionsProxy>
   </ProxyGroup>
+
+
+  <!-- ================================================================= -->
+  <ProxyGroup name="insitu2_misc">
+    <Proxy name="CDB" processes="client">
+      <Documentation>
+        Global setup for Cinema Image Database output.
+      </Documentation>
+      <IntVectorProperty name="DeferredRendering"
+        number_of_elements="1"
+        default_values="0">
+        <Documentation>
+          Deferred rendering cabability level of this database. None means that static images are created at each viewpoint (aka 'SpecA'). Composeable (aka 'SpecC') adds ability to hide/show individual objects. Recolorable adds colormap editability.
+        </Documentation>
+        <EnumerationDomain name="enum">
+          <Entry text="None" value="0" />
+          <Entry text="Composable" value="1" />
+          <Entry text="Composable+Recolorable" value="2" />
+        </EnumerationDomain>
+      </IntVectorProperty>
+      <IntVectorProperty name="CameraModel"
+        number_of_elements="1"
+        default_values="0">
+        <Documentation>
+          Specify camera capability level for this database. Static means the camera is fixed, phi-theta is an inward facing rectilinear sampling of the sphere, the pose cameras sparsely sample and maintain an orientation matrix.
+        </Documentation>
+        <EnumerationDomain name="enum">
+          <Entry text="Static" value="0" />
+          <Entry text="Phi-Theta" value="1" />
+          <Entry text="Inward Pose" value="2" />
+          <Entry text="Outward Pose" value="3" />
+        </EnumerationDomain>
+      </IntVectorProperty>
+      <StringVectorProperty name="TrackObject"
+        number_of_elements="1"
+        default_values="None">
+        <Documentation>
+          Name of a pipeline object to orient the camera with. Only meaningful for Inward and Outward Pose Cameras.
+        </Documentation>
+        <Hints>
+          <PropertyWidgetDecorator type="CompositeDecorator">
+            <Expression type="and">
+              <Expression type="or">
+                <PropertyWidgetDecorator type="GenericDecorator" mode="visibility" property="DeferredRendering" value="1" />
+                <PropertyWidgetDecorator type="GenericDecorator" mode="visibility" property="DeferredRendering" value="2" />
+              </Expression>
+              <Expression type="or">
+                <PropertyWidgetDecorator type="GenericDecorator" mode="visibility" property="CameraModel" value="2" />
+                <PropertyWidgetDecorator type="GenericDecorator" mode="visibility" property="CameraModel" value="3" />
+              </Expression>
+            </Expression>
+          </PropertyWidgetDecorator>
+        </Hints>
+      </StringVectorProperty>
+      <IntVectorProperty name="Camera Phi Divisions"
+        number_of_elements="1"
+        default_values="12">
+        <Documentation>
+          Specify number of longitudinal divisions. Only meaningful for Phi-Theta and Pose Cameras.
+        </Documentation>
+        <IntRangeDomain name="range" min="1" max="64" />
+      </IntVectorProperty>
+      <IntVectorProperty name="Camera Theta Divisions"
+        number_of_elements="1"
+        default_values="7">
+        <Documentation>
+          Specify number of latitudinal divisions. Only meaningful for Phi-Theta and Pose Cameras.
+        </Documentation>
+        <IntRangeDomain name="range" min="1" max="32" />
+      </IntVectorProperty>
+      <IntVectorProperty name="Camera Roll Divisions"
+        number_of_elements="1"
+        default_values="1">
+        <Documentation>
+          Specify number of roll divisions. Only meaningful for Inward and Outward Pose Cameras.
+        </Documentation>
+        <IntRangeDomain name="range" min="1" max="64" />
+        <Hints>
+          <PropertyWidgetDecorator type="CompositeDecorator">
+            <Expression type="and">
+              <Expression type="or">
+                <PropertyWidgetDecorator type="GenericDecorator" mode="visibility" property="DeferredRendering" value="1" />
+                <PropertyWidgetDecorator type="GenericDecorator" mode="visibility" property="DeferredRendering" value="2" />
+              </Expression>
+              <Expression type="or">
+                <PropertyWidgetDecorator type="GenericDecorator" mode="visibility" property="CameraModel" value="2" />
+                <PropertyWidgetDecorator type="GenericDecorator" mode="visibility" property="CameraModel" value="3" />
+              </Expression>
+            </Expression>
+          </PropertyWidgetDecorator>
+        </Hints>
+      </IntVectorProperty>
+      <Hints>
+        <FormatOptions extensions="cdb"
+          file_description="Cinema Image Exports" />
+      </Hints>
+    </Proxy>
+  </ProxyGroup>
+
+  <ProxyGroup name="insitu2_writer_parameters">
+    <SaveScreenshotProxy
+        base_proxygroup="misc"
+        base_proxyname="SaveScreenshotBase"
+        name="SaveScreenshot"
+        processes="client">
+      <Documentation>
+        Variation with catalyst specific extensions.
+      </Documentation>
+
+      <ProxyProperty name="Format">
+        <ProxyListDomain name="proxy_list">
+          <Group name="screenshot_writers" />
+          <Group name="insitu2_misc" />
+        </ProxyListDomain>
+        <Hints>
+          <ProxySelectionWidget enabled="0" />
+        </Hints>
+      </ProxyProperty>
+
+      <PropertyGroup label="Size and Scaling">
+        <Property name="SaveAllViews" />
+        <Property name="ImageResolution" />
+        <Property name="FontScaling" />
+      </PropertyGroup>
+
+      <PropertyGroup label="Separator Options" >
+        <Property name="SeparatorWidth" />
+        <Property name="SeparatorColor" />
+      </PropertyGroup>
+
+      <PropertyGroup label="Coloring">
+        <Property name="OverrideColorPalette" />
+        <Property name="StereoMode" />
+        <Property name="TransparentBackground" />
+      </PropertyGroup>
+
+      <PropertyGroup label="Image Options">
+        <Property name="Format" />
+      </PropertyGroup>
+
+      <SubProxy>
+        <Proxy name="CatalystOptions"
+               proxygroup="misc"
+               proxyname="CatalystOptions"></Proxy>
+        <ExposedProperties>
+           <PropertyGroup label="Catalyst Options">
+             <Property name="WriteFrequency" />
+             <Property name="CatalystFilePattern" />
+             <Property name="CatalystFitToScreen" />
+           </PropertyGroup>
+        </ExposedProperties>
+      </SubProxy>
+    </SaveScreenshotProxy>
+  </ProxyGroup>
+
 </ServerManagerConfiguration>

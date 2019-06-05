@@ -69,7 +69,15 @@ pqPythonSyntaxHighlighter::pqPythonSyntaxHighlighter(QTextEdit* textEdit, QObjec
 
   {
     vtkPythonScopeGilEnsurer gilEnsurer;
+
+    // PyErr_Fetch() -- PyErr_Restore() helps us catch import related exceptions
+    // thus avoiding printing any messages to the terminal if the `pygments`
+    // import fails. `pygments` is totally optional for ParaView.
+    PyObject *type, *value, *traceback;
+    PyErr_Fetch(&type, &value, &traceback);
     this->Internals->PygmentsModule.TakeReference(PyImport_ImportModule("pygments"));
+    PyErr_Restore(type, value, traceback);
+
     if (this->Internals->PygmentsModule && this->Internals->TextEdit != NULL)
     {
       this->Internals->HighlightFunction.TakeReference(
@@ -194,8 +202,10 @@ void pqPythonSyntaxHighlighter::rehighlightSyntax()
 #if PY_MAJOR_VERSION == 2
     vtkSmartPyObject resultingTextBytes(PyUnicode_AsUTF8String(resultingText));
     char* resultingTextAsCString = PyString_AsString(resultingTextBytes);
+#elif PY_VERSION_HEX >= 0x03070000
+    char* resultingTextAsCString = const_cast<char*>(PyUnicode_AsUTF8(resultingText));
 #else
-    char* resultingTextAsCString = PyUnicode_AsUTF8(resultingText);
+    const char* resultingTextAsCString = PyUnicode_AsUTF8(resultingText);
 #endif
 
     QString pygmentsOutput = QString::fromUtf8(resultingTextAsCString);

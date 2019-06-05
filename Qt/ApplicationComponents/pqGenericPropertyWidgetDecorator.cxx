@@ -33,23 +33,32 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "pqCoreUtilities.h"
 #include "vtkCommand.h"
+#include "vtkDataObject.h"
+#include "vtkDataSetAttributes.h"
+#include "vtkPVArrayInformation.h"
+#include "vtkPVDataInformation.h"
 #include "vtkPVXMLElement.h"
+#include "vtkSMArrayListDomain.h"
 #include "vtkSMProxyListDomain.h"
 #include "vtkSMProxyProperty.h"
 #include "vtkSMUncheckedPropertyHelper.h"
 #include "vtkWeakPointer.h"
 
 #include <QtDebug>
+
+#include <cassert>
 #include <sstream>
 
 class pqGenericPropertyWidgetDecorator::pqInternals
 {
 public:
   vtkWeakPointer<vtkSMProperty> Property;
+  int Index;
   std::vector<std::string> Values;
   bool Inverse;
   bool Enabled;
   bool Visible;
+  int NumberOfComponents;
 
   enum
   {
@@ -58,9 +67,11 @@ public:
   } Mode;
 
   pqInternals()
-    : Inverse(false)
+    : Index(0)
+    , Inverse(false)
     , Enabled(true)
     , Visible(true)
+    , NumberOfComponents(-1)
     , Mode(ENABLED_STATE)
   {
   }
@@ -74,16 +85,10 @@ public:
       bool status = false;
       return this->Inverse ? !status : status;
     }
-    if (helper.GetNumberOfElements() != 1)
-    {
-      qCritical() << "pqGenericPropertyWidgetDecorator may not work as expected.";
-      // currently, we only support 1 element properties.
-      return false;
-    }
 
     if (vtkSMProxyProperty::SafeDownCast(this->Property))
     {
-      if (vtkSMProxyListDomain::SafeDownCast(this->Property->FindDomain("vtkSMProxyListDomain")))
+      if (this->Property->FindDomain<vtkSMProxyListDomain>())
       {
         bool status = false;
         for (auto it = this->Values.begin(); helper.GetAsProxy(0) && it != this->Values.end(); ++it)
@@ -108,7 +113,53 @@ public:
       return false;
     }
 
-    vtkVariant val = helper.GetAsVariant(0);
+    // The "number_of_components" attribute is used to enable/disable a widget based on
+    // whether the referenced property value refers to an array in the input that has
+    // the specified number of components.
+    if (this->NumberOfComponents > -1)
+    {
+      if (!this->Property->IsA("vtkSMStringVectorProperty") || helper.GetNumberOfElements() != 5)
+      {
+        qCritical()
+          << "The NumberOfComponents attribute is applicable only to a vtkSMStringVectorProperty "
+          << "with 5 elements. This property is a " << this->Property->GetClassName() << " with "
+          << helper.GetNumberOfElements() << " elements.";
+        return false;
+      }
+
+      // Look for array list domain
+      auto ald = this->Property->FindDomain<vtkSMArrayListDomain>();
+      if (!ald)
+      {
+        qCritical() << "The NumberOfComponents attribute requires an ArrayListDomain in the "
+                    << "StringVectorProperty '" << this->Property->GetXMLName()
+                    << "', but none was found.";
+        return false;
+      }
+
+      // Field association is always one element before the array name element.
+      int arrayAssociation = helper.GetAsInt(this->Index - 1);
+      const char* arrayName = helper.GetAsString(this->Index);
+      vtkPVDataInformation* dataInfo = ald->GetInputDataInformation("Input");
+      if (!dataInfo)
+      {
+        qCritical() << "Could not get data information for Input property";
+        return false;
+      }
+
+      // Array components could be 0 if arrayName is the NoneString
+      int arrayComponents = 0;
+      vtkPVArrayInformation* arrayInfo = dataInfo->GetArrayInformation(arrayName, arrayAssociation);
+      if (arrayInfo)
+      {
+        arrayComponents = arrayInfo->GetNumberOfComponents();
+      }
+
+      bool status = arrayComponents == this->NumberOfComponents;
+      return this->Inverse ? !status : status;
+    }
+
+    vtkVariant val = helper.GetAsVariant(this->Index);
     bool status = false;
     for (auto it = this->Values.begin(); it != this->Values.end(); ++it)
     {
@@ -126,7 +177,7 @@ pqGenericPropertyWidgetDecorator::pqGenericPropertyWidgetDecorator(
   , Internals(new pqGenericPropertyWidgetDecorator::pqInternals())
 {
   vtkSMProxy* proxy = this->parentWidget()->proxy();
-  Q_ASSERT(proxy != nullptr);
+  assert(proxy != nullptr);
 
   const char* propertyName = config->GetAttribute("property");
   if (propertyName == nullptr || proxy->GetProperty(propertyName) == nullptr)
@@ -138,11 +189,10 @@ pqGenericPropertyWidgetDecorator::pqGenericPropertyWidgetDecorator(
   }
 
   this->Internals->Property = proxy->GetProperty(propertyName);
-  if (vtkSMUncheckedPropertyHelper(this->Internals->Property).GetNumberOfElements() > 1)
+
+  if (config->GetAttribute("index") != nullptr)
   {
-    qCritical() << "pqGenericPropertyWidgetDecorator currently only supports "
-                   "single valued properties";
-    return;
+    config->GetScalarAttribute("index", &this->Internals->Index);
   }
 
   const char* value = config->GetAttribute("value");
@@ -150,18 +200,16 @@ pqGenericPropertyWidgetDecorator::pqGenericPropertyWidgetDecorator(
   {
     // see if there are multiple values instead.
     value = config->GetAttribute("values");
-    if (value == nullptr)
+    if (value != nullptr)
     {
-      qCritical() << "Missing 'value' in the specified configuration.";
-      return;
-    }
-    std::stringstream ss;
-    ss.str(value);
-    std::string item;
-    auto vec_inserter = std::back_inserter(this->Internals->Values);
-    while (std::getline(ss, item, ' '))
-    {
-      *(vec_inserter++) = item;
+      std::stringstream ss;
+      ss.str(value);
+      std::string item;
+      auto vec_inserter = std::back_inserter(this->Internals->Values);
+      while (std::getline(ss, item, ' '))
+      {
+        *(vec_inserter++) = item;
+      }
     }
   }
   else
@@ -187,6 +235,11 @@ pqGenericPropertyWidgetDecorator::pqGenericPropertyWidgetDecorator(
   if (config->GetAttribute("inverse") && strcmp(config->GetAttribute("inverse"), "1") == 0)
   {
     this->Internals->Inverse = true;
+  }
+
+  if (config->GetAttribute("number_of_components"))
+  {
+    this->Internals->NumberOfComponents = atoi(config->GetAttribute("number_of_components"));
   }
 
   pqCoreUtilities::connect(this->Internals->Property, vtkCommand::UncheckedPropertyModifiedEvent,

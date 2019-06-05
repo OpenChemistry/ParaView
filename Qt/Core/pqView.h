@@ -33,8 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define pqView_h
 
 #include "pqProxy.h"
-#include "vtkSetGet.h" // needed for VTK_LEGACY.
-#include <QSize>       // needed for QSize.
+#include <QSize> // needed for QSize.
 
 class pqOutputPort;
 class pqPipelineSource;
@@ -100,6 +99,13 @@ public:
   virtual bool supportsUndo() const { return false; }
 
   /**
+  * Returns if this view module can support
+  * image capture. Returns false by default. Subclassess must override
+  * if that's not the case.
+  */
+  virtual bool supportsCapture() const { return false; }
+
+  /**
   * Returns the type of this view module.
   */
   QString getViewType() const { return this->ViewType; }
@@ -152,7 +158,7 @@ public:
 
   /**
   * Returns the current size of the rendering context.
-  * Default implementation returns the client size ofthe widget. Subclasses
+  * Default implementation returns the client size of the widget. Subclasses
   * may override to change this behavior.
   */
   virtual QSize getSize();
@@ -183,7 +189,7 @@ public:
   QList<pqRepresentation*> getRepresentations() const;
 
   /**
-  * This method returns is any pqPipelineSource can be dislayed in this
+  * This method returns is any pqPipelineSource can be displayed in this
   * view. NOTE: This is no longer virtual. Simply forwards to
   * vtkSMViewProxy::CanDisplayData().
   */

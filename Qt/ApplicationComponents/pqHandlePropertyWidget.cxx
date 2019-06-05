@@ -37,8 +37,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMPropertyGroup.h"
 #include "vtkSMPropertyHelper.h"
 
-#include <QDoubleValidator>
-
 //-----------------------------------------------------------------------------
 pqHandlePropertyWidget::pqHandlePropertyWidget(
   vtkSMProxy* smproxy, vtkSMPropertyGroup* smgroup, QWidget* parentObject)
@@ -46,10 +44,6 @@ pqHandlePropertyWidget::pqHandlePropertyWidget(
 {
   Ui::HandlePropertyWidget ui;
   ui.setupUi(this);
-
-  new QDoubleValidator(ui.worldPositionX);
-  new QDoubleValidator(ui.worldPositionY);
-  new QDoubleValidator(ui.worldPositionZ);
 
   if (vtkSMProperty* worldPosition = smgroup->GetProperty("WorldPosition"))
   {

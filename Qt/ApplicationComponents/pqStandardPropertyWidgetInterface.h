@@ -75,8 +75,10 @@ public:
    * \li \c transfer_function_editor : pqTransferFunctionWidgetPropertyWidget
    * \li \c viewtype_selector: pqViewTypePropertyWidget
    * \li \c view_resolution: pqViewResolutionPropertyWidget
+   * \li \c pause_livesource: pqPauseLiveSourcePropertyWidget
    */
-  pqPropertyWidget* createWidgetForProperty(vtkSMProxy* proxy, vtkSMProperty* property) override;
+  pqPropertyWidget* createWidgetForProperty(
+    vtkSMProxy* proxy, vtkSMProperty* property, QWidget* parentWidget) override;
 
   /**
    * Given a proxy and its property group, create a widget for the same, of possible.
@@ -102,7 +104,7 @@ public:
    * \li \c cinema_export_selector : pqCinemaConfiguration
    */
   pqPropertyWidget* createWidgetForPropertyGroup(
-    vtkSMProxy* proxy, vtkSMPropertyGroup* group) override;
+    vtkSMProxy* proxy, vtkSMPropertyGroup* group, QWidget* parentWidget) override;
 
   /**
    * Given the type of the decorator and the pqPropertyWidget that needs to be

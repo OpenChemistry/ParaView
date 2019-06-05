@@ -478,7 +478,7 @@ void pqRenderViewSelectionReaction::preSelection()
   }
 
   vtkSMRenderViewProxy* rmp = this->View->getRenderViewProxy();
-  Q_ASSERT(rmp != NULL);
+  assert(rmp != NULL);
 
   int x = rmp->GetInteractor()->GetEventPosition()[0];
   int y = rmp->GetInteractor()->GetEventPosition()[1];
@@ -588,9 +588,14 @@ void pqRenderViewSelectionReaction::UpdateTooltip()
       pipeline->GetTooltipInfo(association, tooltipPos, tooltipText))
     {
       QWidget* widget = this->View->widget();
+
+      // Take DPI scaling into account for the transformation
+      qreal dpr = widget->devicePixelRatioF();
+
       // Convert renderer based position to a global position
-      QPoint pos =
-        widget->mapToGlobal(QPoint(tooltipPos[0], widget->size().height() - tooltipPos[1]));
+      QPoint pos = widget->mapToGlobal(
+        QPoint(tooltipPos[0] / dpr, widget->size().height() - (tooltipPos[1] / dpr)));
+
       QToolTip::showText(pos, tooltipText.c_str());
     }
     else
@@ -610,7 +615,7 @@ void pqRenderViewSelectionReaction::onLeftButtonRelease()
   }
 
   vtkSMRenderViewProxy* viewProxy = this->View->getRenderViewProxy();
-  Q_ASSERT(viewProxy != NULL);
+  assert(viewProxy != NULL);
 
   int x = viewProxy->GetInteractor()->GetEventPosition()[0];
   int y = viewProxy->GetInteractor()->GetEventPosition()[1];
@@ -651,7 +656,7 @@ int pqRenderViewSelectionReaction::getSelectionModifier()
   int selectionModifier = this->Superclass::getSelectionModifier();
 
   vtkSMRenderViewProxy* rmp = this->View->getRenderViewProxy();
-  Q_ASSERT(rmp != NULL);
+  assert(rmp != NULL);
 
   bool ctrl = rmp->GetInteractor()->GetControlKey() == 1;
   bool shift = rmp->GetInteractor()->GetShiftKey() == 1;

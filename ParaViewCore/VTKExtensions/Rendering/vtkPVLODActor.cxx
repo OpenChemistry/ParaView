@@ -30,7 +30,7 @@
 
 #include <math.h>
 
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
 #include "vtkOSPRayActorNode.h"
 #endif
 
@@ -123,6 +123,7 @@ void vtkPVLODActor::Render(vtkRenderer* ren, vtkMapper* vtkNotUsed(m))
     this->Texture->Render(ren);
   }
   this->Device->SetTexture(this->Texture);
+  this->Device->SetShaderProperty(this->ShaderProperty);
 
   // make sure the device has the same matrix
   matrix = this->Device->GetUserMatrix();
@@ -133,6 +134,10 @@ void vtkPVLODActor::Render(vtkRenderer* ren, vtkMapper* vtkNotUsed(m))
   vtkInformation* info = this->GetPropertyKeys();
   this->Device->SetPropertyKeys(info);
   this->Device->Render(ren, mapper);
+  if (this->Texture)
+  {
+    this->Texture->PostRender(ren);
+  }
   this->Property->PostRender(this, ren);
   this->EstimatedRenderTime = mapper->GetTimeToDraw();
 }
@@ -158,27 +163,7 @@ int vtkPVLODActor::RenderOpaqueGeometry(vtkViewport* vp)
   // Do this check only when not in selection mode
   if (this->GetIsOpaque() || (ren->GetSelector() && this->Property->GetOpacity() > 0.0))
   {
-    this->Property->Render(this, ren);
-
-    // render the backface property
-    if (this->BackfaceProperty)
-    {
-      this->BackfaceProperty->BackfaceRender(this, ren);
-    }
-
-    // render the texture
-    if (this->Texture)
-    {
-      this->Texture->Render(ren);
-    }
     this->Render(ren, this->Mapper);
-    this->Property->PostRender(this, ren);
-
-    if (this->Texture)
-    {
-      this->Texture->PostRender(ren);
-    }
-
     renderedSomething = 1;
   }
 
@@ -336,7 +321,7 @@ void vtkPVLODActor::PrintSelf(ostream& os, vtkIndent indent)
 //----------------------------------------------------------------------------
 void vtkPVLODActor::SetEnableScaling(int val)
 {
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
   if (this->Mapper)
   {
     vtkInformation* info = this->Mapper->GetInformation();
@@ -355,7 +340,7 @@ void vtkPVLODActor::SetEnableScaling(int val)
 //----------------------------------------------------------------------------
 void vtkPVLODActor::SetScalingArrayName(const char* val)
 {
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
   if (this->Mapper)
   {
     vtkInformation* mapperInfo = this->Mapper->GetInformation();
@@ -374,7 +359,7 @@ void vtkPVLODActor::SetScalingArrayName(const char* val)
 //----------------------------------------------------------------------------
 void vtkPVLODActor::SetScalingFunction(vtkPiecewiseFunction* pwf)
 {
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
   if (this->Mapper)
   {
     vtkInformation* mapperInfo = this->Mapper->GetInformation();

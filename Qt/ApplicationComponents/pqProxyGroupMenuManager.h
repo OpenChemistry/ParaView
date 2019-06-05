@@ -137,6 +137,15 @@ public:
    */
   bool supportsQuickLaunch() const { return this->SupportsQuickLaunch; }
 
+  void setEnableFavorites(bool enable) { this->EnableFavorites = enable; }
+
+  QMenu* getFavoritesMenu();
+
+  /**
+   * Given a category name, return the category label.
+   */
+  QString categoryLabel(const QString& category);
+
 public slots:
   /**
   * Load a configuration XML. It will find the elements with resourceTagName
@@ -193,19 +202,33 @@ protected slots:
    */
   void populateRecentlyUsedMenu();
 
+  /**
+   * called when "favorites" menu is being shown.
+   * create the menu (and submenu) with actions for the filters in the favorites list.
+   */
+  void populateFavoritesMenu();
+
 protected:
   QString ResourceTagName;
   vtkPVXMLElement* MenuRoot;
   int RecentlyUsedMenuSize;
   bool Enabled;
+  bool EnableFavorites;
 
   void loadRecentlyUsedItems();
   void saveRecentlyUsedItems();
 
   /**
+   * Load the favorites from settings.
+   */
+  void loadFavoritesItems();
+
+  /**
   * Returns the action for a given proxy.
   */
   QAction* getAction(const QString& pgroup, const QString& proxyname);
+
+  QAction* getAddToCategoryAction(const QString& path);
 
 private:
   Q_DISABLE_COPY(pqProxyGroupMenuManager)

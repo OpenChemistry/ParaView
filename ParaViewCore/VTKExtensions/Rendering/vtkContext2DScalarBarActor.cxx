@@ -76,7 +76,7 @@ public:
   static vtkScalarBarItem* New() { VTK_OBJECT_FACTORY_NEW_BODY(vtkScalarBarItem); }
 
   // Forward calls to vtkContextItem::Paint to vtkContext2DScalarBarActor
-  bool Paint(vtkContext2D* painter) VTK_OVERRIDE
+  bool Paint(vtkContext2D* painter) override
   {
     bool somethingRendered = false;
     if (this->Actor)
@@ -134,6 +134,8 @@ vtkContext2DScalarBarActor::vtkContext2DScalarBarActor()
 
   this->UseCustomLabels = false;
   this->CustomLabels = vtkSmartPointer<vtkDoubleArray>::New();
+
+  this->ReverseLegend = false;
 
   this->ScalarBarItem = vtkScalarBarItem::New();
   this->ScalarBarItem->Actor = this;
@@ -286,7 +288,14 @@ void vtkContext2DScalarBarActor::UpdateScalarBarTexture(vtkImageData* image)
     color[1] = colorTmp[1];
     color[2] = colorTmp[2];
     color[3] = static_cast<unsigned char>(255.0 * ctf->GetOpacity(originalValue) + 0.5);
-    colors->SetTypedTuple(i, color);
+    if (this->ReverseLegend)
+    {
+      colors->SetTypedTuple(numColors - i - 1, color);
+    }
+    else
+    {
+      colors->SetTypedTuple(i, color);
+    }
   }
 }
 
@@ -422,26 +431,8 @@ vtkRectf vtkContext2DScalarBarActor::GetAboveRangeColorRect(double size[2])
 
   if (ctf->GetUseAboveRangeColor())
   {
-    if (this->Orientation == VTK_ORIENT_VERTICAL)
-    {
-      double width = size[0];
-      rect = vtkRectf(0, size[1] - width, width, width);
-    }
-    else
-    {
-      // Horizontal
-      double nanSpace = this->GetNaNColorRect(size).GetWidth();
-      if (nanSpace > 0)
-      {
-        nanSpace += this->Spacer;
-      }
-      double height = size[1];
-
-      // Move it all the way to the right, minus the NaN swatch
-      rect = vtkRectf(size[0] - nanSpace - height, 0, height, height);
-    }
+    rect = this->GetOutOfRangeColorRectInternal(vtkContext2DScalarBarActor::ABOVE_RANGE, size);
   }
-
   return rect;
 }
 
@@ -468,6 +459,40 @@ vtkRectf vtkContext2DScalarBarActor::GetBelowRangeColorRect(double size[2])
 
   if (ctf->GetUseBelowRangeColor())
   {
+    rect = this->GetOutOfRangeColorRectInternal(vtkContext2DScalarBarActor::BELOW_RANGE, size);
+  }
+  return rect;
+}
+
+//----------------------------------------------------------------------------
+vtkRectf vtkContext2DScalarBarActor::GetOutOfRangeColorRectInternal(
+  vtkContext2DScalarBarActor::OutOfRangeType type, double size[2])
+{
+  vtkRectf rect(0, 0, 0, 0);
+  bool graphicallyAbove = type == vtkContext2DScalarBarActor::ABOVE_RANGE && !this->ReverseLegend;
+  if (graphicallyAbove)
+  {
+    if (this->Orientation == VTK_ORIENT_VERTICAL)
+    {
+      double width = size[0];
+      rect = vtkRectf(0, size[1] - width, width, width);
+    }
+    else
+    {
+      // Horizontal
+      double nanSpace = this->GetNaNColorRect(size).GetWidth();
+      if (nanSpace > 0)
+      {
+        nanSpace += this->Spacer;
+      }
+      double height = size[1];
+
+      // Move it all the way to the right, minus the NaN swatch
+      rect = vtkRectf(size[0] - nanSpace - height, 0, height, height);
+    }
+  }
+  else
+  {
     if (this->Orientation == VTK_ORIENT_VERTICAL)
     {
       double nanSpace = this->GetNaNColorRect(size).GetHeight();
@@ -485,7 +510,6 @@ vtkRectf vtkContext2DScalarBarActor::GetBelowRangeColorRect(double size[2])
       rect = vtkRectf(0, 0, width, width);
     }
   }
-
   return rect;
 }
 
@@ -587,6 +611,7 @@ void vtkContext2DScalarBarActor::PaintColorBar(vtkContext2D* painter, double siz
     }
 
     // Now loop over indexed colors and draw swatches
+    double x, y;
     for (int i = 0; i < numIndexedColors; ++i)
     {
       double shift = i * (indexedColorSwatchLength + this->Spacer);
@@ -597,16 +622,30 @@ void vtkContext2DScalarBarActor::PaintColorBar(vtkContext2D* painter, double siz
       brush->SetColorF(indexedColor);
       if (this->Orientation == VTK_ORIENT_VERTICAL)
       {
-        double x = barRect.GetX();
-        double y = barRect.GetY() + barRect.GetHeight() - shift - indexedColorSwatchLength;
+        x = barRect.GetX();
+        if (this->ReverseLegend)
+        {
+          y = barRect.GetY() + shift;
+        }
+        else
+        {
+          y = barRect.GetY() + barRect.GetHeight() - shift - indexedColorSwatchLength;
+        }
         painter->DrawRect(x, y, barRect.GetWidth(), indexedColorSwatchLength);
         annotationAnchors[y + 0.5 * indexedColorSwatchLength] = annotation;
       }
       else
       {
         // Horizontal
-        double x = barRect.GetX() + shift;
-        double y = barRect.GetY();
+        if (this->ReverseLegend)
+        {
+          x = barRect.GetX() + barRect.GetWidth() - shift - indexedColorSwatchLength;
+        }
+        else
+        {
+          x = barRect.GetX() + shift;
+        }
+        y = barRect.GetY();
         painter->DrawRect(x, y, indexedColorSwatchLength, barRect.GetHeight());
         annotationAnchors[x + 0.5 * indexedColorSwatchLength] = annotation;
       }
@@ -667,6 +706,10 @@ void vtkContext2DScalarBarActor::PaintColorBar(vtkContext2D* painter, double siz
     {
       low = barRect.GetY();
       high = low + barRect.GetHeight();
+    }
+    if (this->ReverseLegend)
+    {
+      std::swap(high, low);
     }
 
     if (this->GetAutomaticAnnotations())
@@ -848,6 +891,11 @@ void vtkContext2DScalarBarActor::PaintAxis(vtkContext2D* painter, double size[2]
   range[0] = lutRange[0];
   range[1] = lutRange[1];
 
+  if (this->ReverseLegend)
+  {
+    std::swap(range[0], range[1]);
+  }
+
   vtkPen* axisPen = this->Axis->GetPen();
   axisPen->SetColorF(this->LabelTextProperty->GetColor());
 
@@ -856,6 +904,8 @@ void vtkContext2DScalarBarActor::PaintAxis(vtkContext2D* painter, double size[2]
   // NOTE: the order of calls to this->Axis is important and should be
   // changed only with extreme care.
   this->Axis->SetTickLabelAlgorithm(vtkAxis::TICK_SIMPLE);
+  this->Axis->SetUnscaledMinimumLimit(std::numeric_limits<double>::max() * -1.0);
+  this->Axis->SetUnscaledMaximumLimit(std::numeric_limits<double>::max());
   this->Axis->SetUnscaledRange(range);
   this->Axis->SetAxisVisible(false);
   this->Axis->SetLabelsVisible(!indexedMode && this->DrawTickLabels == 1);
@@ -982,7 +1032,7 @@ void vtkContext2DScalarBarActor::PaintTitle(vtkContext2D* painter, double size[2
     // Move title to the top if the title is forced horizontal
     if (this->ForceHorizontalTitle && this->GetOrientation() != VTK_ORIENT_HORIZONTAL)
     {
-      titleY = axisRect.GetY() + axisRect.GetHeight() + 0.25 * titleHeight;
+      titleY = barAndAxisRect.GetY() + barAndAxisRect.GetHeight() + 0.25 * titleHeight;
     }
   }
   else // Vertical orientation

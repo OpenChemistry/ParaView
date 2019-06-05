@@ -40,7 +40,7 @@ class VTKPVVTKEXTENSIONSDEFAULT_EXPORT vtkFileSequenceParser : public vtkObject
 public:
   static vtkFileSequenceParser* New();
   vtkTypeMacro(vtkFileSequenceParser, vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Extract base file name sequence from the file.
@@ -63,7 +63,7 @@ protected:
   vtksys::RegularExpression* reg_ex5;
   vtksys::RegularExpression* reg_ex_last;
 
-  // Used internall so char * allocations are done automatically.
+  // Used internal so char * allocations are done automatically.
   vtkSetStringMacro(SequenceName);
 
   int SequenceIndex;

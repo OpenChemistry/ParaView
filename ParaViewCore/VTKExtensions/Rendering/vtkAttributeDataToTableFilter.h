@@ -29,14 +29,16 @@
 #include "vtkPVVTKExtensionsRenderingModule.h" // needed for export macro
 #include "vtkTableAlgorithm.h"
 
+class vtkDataSet;
 class vtkFieldData;
+class vtkIdTypeArray;
 
 class VTKPVVTKEXTENSIONSRENDERING_EXPORT vtkAttributeDataToTableFilter : public vtkTableAlgorithm
 {
 public:
   static vtkAttributeDataToTableFilter* New();
   vtkTypeMacro(vtkAttributeDataToTableFilter, vtkTableAlgorithm);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   //@{
   /**
@@ -92,24 +94,17 @@ protected:
   // Overridden to indicate to the executive that we accept non-composite
   // datasets. We let the executive manage the looping over the composite
   // dataset leaves.
-  int FillInputPortInformation(int port, vtkInformation* info) VTK_OVERRIDE;
+  int FillInputPortInformation(int port, vtkInformation* info) override;
 
   /**
    * Perform the data processing
    */
-  int RequestData(vtkInformation*, vtkInformationVector**, vtkInformationVector*) VTK_OVERRIDE;
+  int RequestData(vtkInformation*, vtkInformationVector**, vtkInformationVector*) override;
 
   /**
    * Create a default executive.
    */
-  vtkExecutive* CreateDefaultExecutive() VTK_OVERRIDE;
-
-  /**
-   * Internal method to return the chosen field from the input. May return 0 is
-   * the chosen field is not applicable for the current data object or not
-   * present.
-   */
-  vtkFieldData* GetSelectedField(vtkDataObject* input);
+  vtkExecutive* CreateDefaultExecutive() override;
 
   /**
    * Called when AddMetaData is true. Adds meta-data to the output.
@@ -117,6 +112,7 @@ protected:
   void Decorate(vtkTable* output, vtkDataObject* input);
 
   void PassFieldData(vtkFieldData* output, vtkFieldData* input);
+  void AddCellTypeAndConnectivity(vtkTable* output, vtkDataSet* ds);
 
   int FieldAssociation;
   bool AddMetaData;
@@ -126,6 +122,12 @@ protected:
 private:
   vtkAttributeDataToTableFilter(const vtkAttributeDataToTableFilter&) = delete;
   void operator=(const vtkAttributeDataToTableFilter&) = delete;
+
+  /**
+   * If original Ids for points are available (due to selection filtering),
+   * re-map the indices to original Ids.
+   */
+  void ConvertToOriginalIds(vtkDataSet* inputDS, vtkIdTypeArray* indices);
 };
 
 #endif

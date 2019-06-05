@@ -35,7 +35,7 @@ class VTKPVSERVERMANAGERDEFAULT_EXPORT vtkPVGeneralSettings : public vtkObject
 public:
   static vtkPVGeneralSettings* New();
   vtkTypeMacro(vtkPVGeneralSettings, vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Access the singleton.
@@ -156,8 +156,24 @@ public:
   /**
    * Set the precision of the animation time toolbar.
    */
-  vtkSetMacro(AnimationTimePrecision, int);
+  vtkSetClampMacro(AnimationTimePrecision, int, 1, 17);
   vtkGetMacro(AnimationTimePrecision, int);
+  //@}
+
+  enum
+  {
+    MIXED = 0,
+    SCIENTIFIC,
+    FIXED
+  };
+
+  //@{
+  /**
+   * Set the notation for the animation time toolbar.
+   */
+  void SetAnimationTimeNotation(int notation);
+  vtkSetMacro(AnimationTimeNotation, char);
+  vtkGetMacro(AnimationTimeNotation, char);
   //@}
 
   //@{
@@ -169,10 +185,50 @@ public:
   vtkBooleanMacro(ShowAnimationShortcuts, bool);
   //@}
 
+  //@{
+  /**
+   * Set whether to reset display when showing
+   * a representation in an empty view.
+   */
+  vtkSetMacro(ResetDisplayEmptyViews, bool);
+  vtkGetMacro(ResetDisplayEmptyViews, bool);
+  vtkBooleanMacro(ResetDisplayEmptyViews, bool);
+  //@}
+
+  //@{
+  /**
+   * This enum specifies which notations to use for displaying real number values.
+   */
+  enum
+  {
+    DISPLAY_REALNUMBERS_USING_SCIENTIFIC_NOTATION = 1,
+    DISPLAY_REALNUMBERS_USING_FIXED_NOTATION,
+  };
+  /**
+   * Get/Set the notation of real number displayed in widgets or views.
+   */
+  vtkSetMacro(RealNumberDisplayedNotation, int);
+  vtkGetMacro(RealNumberDisplayedNotation, int);
+  //@}
+
+  //@{
+  /**
+   * Get/Set the precision of real number displayed in widgets or views.
+   */
+  vtkSetMacro(RealNumberDisplayedPrecision, int);
+  vtkGetMacro(RealNumberDisplayedPrecision, int);
+  //@}
+
   /**
    * Forwarded for vtkSMParaViewPipelineControllerWithRendering.
    */
   void SetInheritRepresentationProperties(bool val);
+
+  // Description:
+  // When plotting data with nonpositive values, ignore the standard warning
+  // and draw only the data with positive values.
+  void SetIgnoreNegativeLogAxisWarning(bool val);
+  bool GetIgnoreNegativeLogAxisWarning();
 
   enum
   {
@@ -231,6 +287,14 @@ public:
 
   //@{
   /**
+   * Console font size.
+   */
+  vtkSetClampMacro(ConsoleFontSize, int, 8, VTK_INT_MAX);
+  vtkGetMacro(ConsoleFontSize, int);
+  //@}
+
+  //@{
+  /**
    *  Automatically color by **vtkBlockColors** if array is present on `Apply`.
    */
   vtkSetMacro(ColorByBlockColorsOnApply, bool);
@@ -251,11 +315,16 @@ protected:
   unsigned long AnimationGeometryCacheLimit;
   int AnimationTimePrecision;
   bool ShowAnimationShortcuts;
+  int RealNumberDisplayedNotation;
+  int RealNumberDisplayedPrecision;
+  bool ResetDisplayEmptyViews;
   int PropertiesPanelMode;
   bool LockPanels;
   int GUIFontSize;
   bool GUIOverrideFont;
+  int ConsoleFontSize;
   bool ColorByBlockColorsOnApply;
+  char AnimationTimeNotation;
 
 private:
   vtkPVGeneralSettings(const vtkPVGeneralSettings&) = delete;

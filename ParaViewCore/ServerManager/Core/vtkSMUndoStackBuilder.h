@@ -45,7 +45,7 @@ class VTKPVSERVERMANAGERCORE_EXPORT vtkSMUndoStackBuilder : public vtkSMObject
 public:
   static vtkSMUndoStackBuilder* New();
   vtkTypeMacro(vtkSMUndoStackBuilder, vtkSMObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Begins monitoring of the vtkSMProxyManager for undoable operations.
@@ -95,9 +95,9 @@ public:
   virtual void Clear();
 
   /**
-   * One can add arbritary elements to the active undo set.
+   * One can add arbitrary elements to the active undo set.
    * It is essential that the StateLoader on the UndoStack can handle the
-   * arbritary undo elements.
+   * arbitrary undo elements.
    * If that element has been escaped for any reason, the method will return false;
    */
   virtual bool Add(vtkUndoElement* element);

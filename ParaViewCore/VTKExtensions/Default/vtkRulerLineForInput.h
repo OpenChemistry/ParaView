@@ -16,8 +16,9 @@
  * @class   vtkRulerLineForInput
  *
  *
- * This filter produces a line along a side of the bounding box of its input.
- * Which coordinate axis this line is parallel to is configurable via SetAxis.
+ * This filter produces a line along a side of the bounding box of its input
+ * for either an axis-aligned bounding box or an object-oriented bounding box.
+ * Use SetAxis to choose to which coordinate axis this line is parallel.
  * This class is designed to work with the vtkRulerLineRepresentation to show
  * a ruler along the input data.
  *
@@ -36,24 +37,34 @@ class VTKPVVTKEXTENSIONSDEFAULT_EXPORT vtkRulerLineForInput : public vtkPolyData
 {
 public:
   vtkTypeMacro(vtkRulerLineForInput, vtkPolyDataAlgorithm);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
   static vtkRulerLineForInput* New();
+
+  enum class AxisType
+  {
+    X = 0,
+    Y,
+    Z,
+    OrientedBoundingBoxMajorAxis,
+    OrientedBoundingBoxMediumAxis,
+    OrientedBoundingBoxMinorAxis
+  };
 
   virtual void SetController(vtkMultiProcessController*);
   vtkGetObjectMacro(Controller, vtkMultiProcessController);
 
-  vtkSetClampMacro(Axis, int, 0, 2);
+  vtkSetClampMacro(Axis, int, 0, 5);
   vtkGetMacro(Axis, int);
 
 protected:
   vtkRulerLineForInput();
   ~vtkRulerLineForInput() override;
 
-  int FillInputPortInformation(int port, vtkInformation* info) VTK_OVERRIDE;
+  int FillInputPortInformation(int port, vtkInformation* info) override;
   int RequestInformation(vtkInformation* request, vtkInformationVector** inVectors,
-    vtkInformationVector* outVector) VTK_OVERRIDE;
+    vtkInformationVector* outVector) override;
   int RequestData(vtkInformation* request, vtkInformationVector** inVectors,
-    vtkInformationVector* outVector) VTK_OVERRIDE;
+    vtkInformationVector* outVector) override;
 
 private:
   vtkMultiProcessController* Controller;

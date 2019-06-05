@@ -30,19 +30,16 @@ class VTKPVCATALYST_EXPORT vtkCPInputDataDescription : public vtkObject
 public:
   static vtkCPInputDataDescription* New();
   vtkTypeMacro(vtkCPInputDataDescription, vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   // Description:
   // Reset the names of the fields that are needed.
   void Reset();
 
   // Description:
-  // Add in a name of a point field .
-  void AddPointField(const char* FieldName);
-
-  // Description:
-  // Add in a name of a cell field.
-  void AddCellField(const char* FieldName);
+  // Add in a name of an array with name *fieldName* of type *type*
+  // where the values comes from vtkDataObject::AttributeTypes.
+  void AddField(const char* fieldName, int type);
 
   // Description:
   // Get the number of fields currently specified in this object.
@@ -50,16 +47,17 @@ public:
 
   // Description:
   // Get the name of the field given its current index.
-  const char* GetFieldName(unsigned int FieldIndex);
+  const char* GetFieldName(unsigned int fieldIndex);
 
   // Description:
-  // Return true if a field with FieldName is needed.
-  bool IsFieldNeeded(const char* FieldName);
+  // Get the type of field given its current index. The types are defined
+  // in vtkDataObject::AttributeTypes. A return value of -1 indicates an invalid
+  // fieldIndex.
+  int GetFieldType(unsigned int fieldIndex);
 
   // Description:
-  // Return true if the field associated with FieldName is point data
-  // and false if it is cell data.
-  bool IsFieldPointData(const char* FieldName);
+  // Return true if a field with fieldName is needed.
+  bool IsFieldNeeded(const char* fieldName, int type);
 
   // Description:
   // When set to true, all fields are requested. Off by default.
@@ -95,19 +93,13 @@ public:
   vtkSetVector6Macro(WholeExtent, int);
   vtkGetVector6Macro(WholeExtent, int);
 
+  // Description:
+  // Shallow copy.
+  void ShallowCopy(vtkCPInputDataDescription*);
+
 protected:
   vtkCPInputDataDescription();
-  ~vtkCPInputDataDescription();
-
-  // Description:
-  // Verify that the input grid has the required information.
-  // Returns true if it does and false otherwise.
-  bool IsInputSufficient();
-
-  // Description:
-  // Check each grid for the required fields needed by the coprocessor.
-  // Returns true if it does and false otherwise.
-  bool DoesGridContainNeededFields(vtkDataSet* DataSet);
+  ~vtkCPInputDataDescription() override;
 
   // Description:
   // On when all fields must be requested for the coprocessing pipeline.

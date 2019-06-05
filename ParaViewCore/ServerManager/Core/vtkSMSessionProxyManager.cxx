@@ -30,6 +30,7 @@
 #include "vtkSMCoreUtilities.h"
 #include "vtkSMDeserializerProtobuf.h"
 #include "vtkSMDocumentation.h"
+#include "vtkSMExportProxyDepot.h"
 #include "vtkSMGlobalPropertiesLinkUndoElement.h"
 #include "vtkSMPipelineState.h"
 #include "vtkSMPropertyIterator.h"
@@ -46,7 +47,6 @@
 #include "vtkSMUndoStack.h"
 #include "vtkSMUndoStackBuilder.h"
 #include "vtkSmartPointer.h"
-#include "vtkStdString.h"
 #include "vtkStringList.h"
 #include "vtkVersion.h"
 
@@ -158,6 +158,9 @@ vtkSMSessionProxyManager::vtkSMSessionProxyManager(vtkSMSession* session)
   this->PipelineState = vtkSMPipelineState::New();
   this->PipelineState->SetSession(this->Session);
 
+  this->ExportDepot = vtkSMExportProxyDepot::New();
+  this->ExportDepot->Session = this;
+
   // setup event forwarder so that it forwards all events fired by this class via
   // the global proxy manager.
   vtkNew<vtkSMProxyManagerForwarder> forwarder;
@@ -181,6 +184,9 @@ vtkSMSessionProxyManager::~vtkSMSessionProxyManager()
 
   this->PipelineState->Delete();
   this->PipelineState = NULL;
+
+  this->ExportDepot->Delete();
+  this->ExportDepot = nullptr;
 }
 
 //----------------------------------------------------------------------------
@@ -561,22 +567,22 @@ void vtkSMSessionProxyManager::GetProxyNames(
 }
 
 //---------------------------------------------------------------------------
-vtkStdString vtkSMSessionProxyManager::RegisterProxy(const char* groupname, vtkSMProxy* proxy)
+std::string vtkSMSessionProxyManager::RegisterProxy(const char* groupname, vtkSMProxy* proxy)
 {
   assert(proxy != NULL);
 
-  vtkStdString label = vtkSMCoreUtilities::SanitizeName(proxy->GetXMLLabel());
-  vtkStdString name = this->GetUniqueProxyName(groupname, label.c_str());
+  std::string label = vtkSMCoreUtilities::SanitizeName(proxy->GetXMLLabel());
+  std::string name = this->GetUniqueProxyName(groupname, label.c_str());
   this->RegisterProxy(groupname, name.c_str(), proxy);
   return name;
 }
 
 //---------------------------------------------------------------------------
-vtkStdString vtkSMSessionProxyManager::GetUniqueProxyName(const char* groupname, const char* prefix)
+std::string vtkSMSessionProxyManager::GetUniqueProxyName(const char* groupname, const char* prefix)
 {
   if (!groupname || !prefix)
   {
-    return vtkStdString();
+    return std::string();
   }
 
   vtkSMSessionProxyManagerInternals::ProxyGroupType::iterator it =
@@ -1383,12 +1389,17 @@ vtkPVXMLElement* vtkSMSessionProxyManager::AddInternalState(vtkPVXMLElement* par
         vtkSMProxyManagerProxyListType::iterator it3 = it2->second.begin();
         for (; it3 != it2->second.end(); ++it3)
         {
-          if (visited_proxies.find(it3->GetPointer()->Proxy.GetPointer()) != visited_proxies.end())
+          auto curproxy = it3->GetPointer()->Proxy.GetPointer();
+          if (visited_proxies.find(curproxy) != visited_proxies.end())
           {
             vtkPVXMLElement* itemElement = vtkPVXMLElement::New();
             itemElement->SetName("Item");
-            itemElement->AddAttribute("id", it3->GetPointer()->Proxy->GetGlobalID());
+            itemElement->AddAttribute("id", curproxy->GetGlobalID());
             itemElement->AddAttribute("name", it2->first.c_str());
+            if (curproxy->GetLogName() != nullptr)
+            {
+              itemElement->AddAttribute("logname", curproxy->GetLogName());
+            }
             collectionElement->AddNestedElement(itemElement);
             itemElement->Delete();
             some_proxy_added = true;

@@ -57,6 +57,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMSessionProxyManager.h"
 #include "vtkSMSourceProxy.h"
 
+#include <cassert>
+
 //#define pqLiveInsituManagerDebugMacro(x) std::cerr << x << endl;
 #define pqLiveInsituManagerDebugMacro(x)
 
@@ -213,7 +215,7 @@ vtkSMLiveInsituLinkProxy* pqLiveInsituManager::linkProxy(pqServer* insituSession
 }
 
 //-----------------------------------------------------------------------------
-pqLiveInsituVisualizationManager* pqLiveInsituManager::connect(pqServer* server)
+pqLiveInsituVisualizationManager* pqLiveInsituManager::connect(pqServer* server, int portNumber)
 {
   if (!server)
   {
@@ -226,23 +228,29 @@ pqLiveInsituVisualizationManager* pqLiveInsituManager::connect(pqServer* server)
     vtkProcessModule::GetProcessModule()->MultipleSessionsSupportOn();
 
     bool user_ok = false;
-    int portNumber = QInputDialog::getInt(pqCoreUtilities::mainWidget(), "Catalyst Server Port",
-      "Enter the port number to accept connections \nfrom Catalyst on:", 22222, 1024, 0x0fffffff, 1,
-      &user_ok);
-    if (!user_ok)
+    if (portNumber == -1)
     {
-      // user cancelled.
-      return NULL;
+      portNumber = QInputDialog::getInt(pqCoreUtilities::mainWidget(), "Catalyst Server Port",
+        "Enter the port number to accept connections \nfrom Catalyst on:", 22222, 1024, 0x0fffffff,
+        1, &user_ok);
+      if (!user_ok)
+      {
+        // user cancelled.
+        return NULL;
+      }
     }
 
     pqLiveInsituVisualizationManager* mgr =
       new pqLiveInsituVisualizationManager(portNumber, server);
     QObject::connect(mgr, SIGNAL(insituDisconnected()), this, SLOT(onCatalystDisconnected()));
     this->Managers[server] = mgr;
-    QMessageBox::information(pqCoreUtilities::mainWidget(), "Ready for Catalyst connections",
+    QMessageBox* mBox = new QMessageBox(QMessageBox::Information, "Ready for Catalyst connections",
       QString("Accepting connections from Catalyst Co-Processor \n"
               "for live-coprocessing on port %1")
-        .arg(portNumber));
+        .arg(portNumber),
+      QMessageBox::Ok, pqCoreUtilities::mainWidget());
+    mBox->open();
+    QObject::connect(mgr, SIGNAL(insituConnected()), mBox, SLOT(close()));
     emit connectionInitiated(server);
     return mgr;
   }
@@ -326,7 +334,7 @@ void pqLiveInsituManager::time(pqPipelineSource* pipelineSource, double* time, v
       vtkSMSession* session = pipelineSource->getSourceProxy()->GetSession();
       pqServer* insituSession = model->findServer(session);
       vtkSMLiveInsituLinkProxy* linkProxy = pqLiveInsituManager::linkProxy(insituSession);
-      Q_ASSERT(linkProxy);
+      assert(linkProxy);
       *timeStep = linkProxy->GetTimeStep();
     }
   }

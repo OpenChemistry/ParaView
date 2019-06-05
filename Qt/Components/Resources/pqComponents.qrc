@@ -6,12 +6,13 @@
         <file>Icons/PVSplashScreen.png</file>
         <file>Icons/pq3DView16.png</file>
         <file>Icons/pqAdvanced26.png</file>
+        <file>Icons/pqAdvancedRed26.png</file>
         <file>Icons/pqAddFavorites16.png</file>
         <file>Icons/pqArrowDown16.png</file>
         <file>Icons/pqArrowUp16.png</file>
         <file>Icons/pqAutoApply32.png</file>
+        <file>Icons/pqAxes.png</file>
         <file>Icons/pqBack16.png</file>
-        <file>Icons/pqBagChart16.png</file>
         <file>Icons/pqBottomCenter32.png</file>
         <file>Icons/pqBottomLeftCorner32.png</file>
         <file>Icons/pqBottomRightCorner32.png</file>
@@ -35,6 +36,7 @@
         <file>Icons/pqConnect16.png</file>
         <file>Icons/pqConnect24.png</file>
         <file>Icons/pqConnect32.png</file>
+        <file>Icons/pqConfig16.png</file>
         <file>Icons/pqCopy22.png</file>
         <file>Icons/pqCut22.png</file>
         <file>Icons/pqDataServer32.png</file>
@@ -82,7 +84,6 @@
         <file>Icons/pqFolderUp16.png</file>
         <file>Icons/pqFrustumSelectionCell24.png</file>
         <file>Icons/pqFrustumSelectionPoint24.png</file>
-        <file>Icons/pqFunctionalBagChart16.png</file>
         <file>Icons/pqGlobalData16.png</file>
         <file>Icons/pqGlyph24.png</file>
         <file>Icons/pqGroup24.png</file>
@@ -148,6 +149,7 @@
         <file>Icons/pqPrint22.png</file>
         <file>Icons/pqProbeLocation24.png</file>
         <file>Icons/pqProgrammableFilter24.png</file>
+        <file>Icons/pqQuit22.png</file>
         <file>Icons/pqRamp16.png</file>
         <file>Icons/pqRamp24.png</file>
         <file>Icons/pqRectilinearGrid16.png</file>
@@ -178,7 +180,9 @@
         <file>Icons/pqRotateCameraCW24.png</file>
         <file>Icons/pqRotateCameraCW.png</file>
         <file>Icons/pqRotateCameraCW@2x.png</file>
-        <file>Icons/pqRuler16.png</file>
+        <file>Icons/pqRuler.png</file>
+        <file>Icons/pqRuler@2x.png</file>
+        <file>Icons/pqRulerScale16.png</file>
         <file>Icons/pqSave16.png</file>
         <file>Icons/pqSave24.png</file>
         <file>Icons/pqSave32.png</file>
@@ -187,6 +191,7 @@
         <file>Icons/pqScalarBar16.png</file>
         <file>Icons/pqScalarBar24.png</file>
         <file>Icons/pqScalarBar32.png</file>
+        <file>Icons/pqSecureServer16.png</file>
         <file>Icons/pqSelect16.png</file>
         <file>Icons/pqSelect24.png</file>
         <file>Icons/pqSelect32.png</file>
@@ -354,5 +359,6 @@
         <file>Icons/inherited_opacity.png</file>
         <file>Icons/no_color.png</file>
         <file>Icons/no_opacity.png</file>
+        <file>pqPresetGroups.json</file>
     </qresource>
 </RCC>

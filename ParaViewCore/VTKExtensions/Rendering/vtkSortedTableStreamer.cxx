@@ -105,6 +105,10 @@ public:
         dstArray->SetNumberOfComponents(otherArray->GetNumberOfComponents());
         dstArray->SetName(otherArray->GetName());
         dstArray->Allocate(minSize * otherArray->GetNumberOfComponents());
+        if (auto oinfo = otherArray->GetInformation())
+        {
+          dstArray->CopyInformation(oinfo);
+        }
       }
 
       for (vtkIdType idx = 0; idx < otherArray->GetNumberOfTuples(); ++idx)
@@ -727,9 +731,9 @@ public:
     bool revertOrder) override
   {
     // ------------------------------------------------------------------------
-    // Make sure that the Cache is builded
+    // Make sure that the Cache is built
     //    This will sort the local array, that's why we don't want to do it
-    //    at each execution. Specialy when we only change the requested block.
+    //    at each execution. Specially when we only change the requested block.
     // ------------------------------------------------------------------------
     if (this->NeedToBuildCache)
     {
@@ -860,9 +864,9 @@ public:
     bool revertOrder) override
   {
     // ------------------------------------------------------------------------
-    // Make sure that the Cache is builded
+    // Make sure that the Cache is built
     //    This will sort the local array, that's why we don't want to do it
-    //    at each execution. Specialy when we only change the requested block.
+    //    at each execution. Specially when we only change the requested block.
     // ------------------------------------------------------------------------
     if (this->NeedToBuildCache)
     {
@@ -1067,6 +1071,11 @@ public:
       subArray->SetNumberOfComponents(srcArray->GetNumberOfComponents());
       subArray->SetName(srcArray->GetName());
       subArray->Allocate(size * srcArray->GetNumberOfComponents());
+      if (auto sinfo = srcArray->GetInformation())
+      {
+        subArray->CopyInformation(sinfo);
+      }
+
       vtkIdType max = size + offset;
       if (sorter != NULL && sorter->Array != NULL)
       {

@@ -33,8 +33,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define _pqPropertyWidget_h
 
 #include "pqComponentsModule.h"
+#include "vtkSetGet.h" // for VTK_LEGACY_REMOVE.
 
-#include "pqDebug.h"
 #include "pqPropertyLinks.h"
 #include <QPointer>
 #include <QScopedPointer>
@@ -43,10 +43,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 class pqPropertyWidgetDecorator;
 class pqTimer;
 class pqView;
+class vtkPVXMLElement;
 class vtkSMDomain;
 class vtkSMProperty;
 class vtkSMProxy;
-
 /**
 * pqPropertyWidget represents a widget created for each property of a proxy on
 * the pqPropertiesPanel (for the proxy's properties or display properties).
@@ -132,6 +132,12 @@ public:
   * Returns the tooltip to use for the property. May return an empty string.
   */
   static QString getTooltip(vtkSMProperty* property);
+
+  /**
+   * Helper method to return value from WidgetHeight XML hint, if any.
+   * `<WidgetHeight number_of_rows="val">`,
+   */
+  static int hintsWidgetHeightNumberOfRows(vtkPVXMLElement* hints, int defaultValue = 10);
 
 signals:
   /**
@@ -239,6 +245,9 @@ private:
   void editingFinished();
 };
 
+#if !defined(VTK_LEGACY_REMOVE)
+#include "pqDebug.h"
 #define PV_DEBUG_PANELS() pqDebug("PV_DEBUG_PANELS")
+#endif
 
 #endif // _pqPropertyWidget_h

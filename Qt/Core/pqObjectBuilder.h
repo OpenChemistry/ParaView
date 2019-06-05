@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define pqObjectBuilder_h
 
 #include "pqCoreModule.h"
+#include "vtkSetGet.h" // for VTK_LEGACY
 #include <QMap>
 #include <QObject>
 #include <QVariant>
@@ -82,11 +83,12 @@ public:
   * MultipleConnectionsSupport to true. In that case
   * this will always try to connect the server using the details specified in
   * the resource irrespective if the server is already connected or any other
-  * server connections exists.
+  * server connections exists and will wait for timeout seconds for direct connection.
+  * 0 means no retry, -1 means infinite retries.
   * Calling this method while waiting for a previous server connection to be
   * established raises errors.
   */
-  pqServer* createServer(const pqServerResource& resource);
+  pqServer* createServer(const pqServerResource& resource, int connectionTimeout = 60);
 
   /**
   * Destroy a server connection
@@ -133,14 +135,26 @@ public:
   /**
   * Creates a new view module of the given type on the given server.
   */
-  virtual pqView* createView(
-    const QString& type, pqServer* server, bool detachedFromLayout = false);
+  virtual pqView* createView(const QString& type, pqServer* server);
+
+  /**
+   * Deprecated in ParaView 5.7. `detachedFromLayout` argument is not longer
+   * applicable. All views are now created *detached* by default.
+   */
+  VTK_LEGACY(pqView* createView(const QString& type, pqServer* server, bool detachedFromLayout));
 
   /**
   * Destroys the view module. This destroys the view module
   * as well as all the displays in the view module.
   */
   virtual void destroy(pqView* view);
+
+  /**
+   * Assigns the view to the layout. If layout is nullptr, this method will
+   * use an arbitrary layout on the same server as the view, if any, or create a
+   * new layout and assign the view to it.
+   */
+  virtual void addToLayout(pqView* view, pqProxy* layout = nullptr);
 
   /**
   * Creates a representation to show the data from the given output port of a
@@ -211,7 +225,7 @@ public:
   /**
   * This is a convenience method to return the name of the
   * property on the proxy, if any, which can be used to set the filename.
-  * If no such property exists, this retruns a null string.
+  * If no such property exists, this returns a null string.
   * If there are more than 1 properties with FileListDomain, then it looks at
   * the Hints for the proxy for the XML of the form
   * `<DefaultFileNameProperty name="<propertyname>" />` and uses that property

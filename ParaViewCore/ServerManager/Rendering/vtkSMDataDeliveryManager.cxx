@@ -19,18 +19,19 @@
 #include "vtkNew.h"
 #include "vtkObjectFactory.h"
 #include "vtkPVDataDeliveryManager.h"
+#include "vtkPVLogger.h"
 #include "vtkPVRenderView.h"
 #include "vtkPVStreamingPiecesInformation.h"
 #include "vtkRenderer.h"
 #include "vtkSMSession.h"
 #include "vtkSMViewProxy.h"
-#include "vtkTimerLog.h"
 
-#include <assert.h>
+#include <cassert>
 
 vtkStandardNewMacro(vtkSMDataDeliveryManager);
 //----------------------------------------------------------------------------
 vtkSMDataDeliveryManager::vtkSMDataDeliveryManager()
+
 {
 }
 
@@ -55,42 +56,32 @@ void vtkSMDataDeliveryManager::Deliver(bool interactive)
   assert(this->ViewProxy != NULL);
 
   vtkPVRenderView* view = vtkPVRenderView::SafeDownCast(this->ViewProxy->GetClientSideObject());
-  bool use_lod = interactive && view->GetUseLODForInteractiveRender();
-  bool use_distributed_rendering = interactive
-    ? view->GetUseDistributedRenderingForInteractiveRender()
-    : view->GetUseDistributedRenderingForStillRender();
+  const bool use_lod = interactive && view->GetUseLODForInteractiveRender();
+  const bool use_distributed_rendering = use_lod ? view->GetUseDistributedRenderingForLODRender()
+                                                 : view->GetUseDistributedRenderingForRender();
 
+  const int data_distribution_mode = view->GetDataDistributionMode(use_distributed_rendering);
   vtkMTimeType update_ts = view->GetUpdateTimeStamp();
-  int delivery_type = LOCAL_RENDERING_AND_FULL_RES;
-  if (!use_lod && use_distributed_rendering)
-  {
-    delivery_type = REMOTE_RENDERING_AND_FULL_RES;
-  }
-  else if (use_lod && !use_distributed_rendering)
-  {
-    delivery_type = LOCAL_RENDERING_AND_LOW_RES;
-  }
-  else if (use_lod && use_distributed_rendering)
-  {
-    delivery_type = REMOTE_RENDERING_AND_LOW_RES;
-  }
 
-  vtkTimeStamp& timeStamp = this->DeliveryTimestamps[delivery_type];
+  // note: this will create new vtkTimeStamp, if needed.
+  vtkTimeStamp& timeStamp = use_lod ? this->DeliveryTimestampsLOD[data_distribution_mode]
+                                    : this->DeliveryTimestamps[data_distribution_mode];
+
   if (timeStamp > update_ts)
   {
-    // we delivered the data since the update. Nothing delivery to be done.
+    // we have delivered the data since the last update on this view for the
+    // chosen data delivery mode. No delivery needs to be done at this time.
     return;
   }
 
+  // Get a list of representations for which we need to delivery data.
   std::vector<unsigned int> keys_to_deliver;
-  if (!view->GetDeliveryManager()->NeedsDelivery(timeStamp, keys_to_deliver, use_lod))
+  if (!view->GetDeliveryManager()->NeedsDelivery(timeStamp, keys_to_deliver, interactive))
   {
     timeStamp.Modified();
     return;
   }
 
-  // cout << "Request Delivery: " <<  keys_to_deliver.size() << endl;
-  vtkTimerLog::MarkStartEvent("vtkSMDataDeliveryManager: Deliver Geometry");
   vtkClientServerStream stream;
   stream << vtkClientServerStream::Invoke << VTKOBJECT(this->ViewProxy) << "Deliver"
          << static_cast<int>(use_lod) << static_cast<unsigned int>(keys_to_deliver.size())
@@ -99,7 +90,6 @@ void vtkSMDataDeliveryManager::Deliver(bool interactive)
          << vtkClientServerStream::End;
   this->ViewProxy->GetSession()->ExecuteStream(this->ViewProxy->GetLocation(), stream, false);
   timeStamp.Modified();
-  vtkTimerLog::MarkEndEvent("vtkSMDataDeliveryManager: Deliver Geometry");
 }
 
 //----------------------------------------------------------------------------
@@ -118,7 +108,7 @@ bool vtkSMDataDeliveryManager::DeliverStreamedPieces()
   //    reader.
   // 2. Request streamed pieces for those representations.
 
-  vtkTimerLog::MarkStartEvent("vtkSMDataDeliveryManager: Deliver Geometry (streaming)");
+  vtkVLogScopeF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(), "deliver geometry (for streaming)");
 
   vtkNew<vtkPVStreamingPiecesInformation> info;
   this->ViewProxy->GatherInformation(info.GetPointer(), vtkPVSession::DATA_SERVER);
@@ -137,7 +127,6 @@ bool vtkSMDataDeliveryManager::DeliverStreamedPieces()
     session->ExecuteStream(this->ViewProxy->GetLocation(), stream, false);
   }
 
-  vtkTimerLog::MarkEndEvent("vtkSMDataDeliveryManager: Deliver Geometry (streaming)");
   return keys_to_deliver.size() > 0;
 }
 

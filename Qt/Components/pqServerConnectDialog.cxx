@@ -39,6 +39,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqServerConfigurationImporter.h"
 #include "pqServerResource.h"
 #include "pqSettings.h"
+#include "vtkSetGet.h"
 
 #include <QAuthenticator>
 #include <QFormLayout>
@@ -48,6 +49,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QSyntaxHighlighter>
 #include <QTextStream>
 #include <QUrl>
+
+#include <cassert>
 
 namespace
 {
@@ -157,7 +160,7 @@ pqServerConnectDialog::pqServerConnectDialog(
     SLOT(updateConfigurations()));
 
   QObject::connect(this->Internals->servers, SIGNAL(currentCellChanged(int, int, int, int)), this,
-    SLOT(onServerSelected(int)));
+    SLOT(onServerSelected()));
 
   QObject::connect(
     this->Internals->servers, SIGNAL(itemDoubleClicked(QTableWidgetItem*)), this, SLOT(connect()));
@@ -184,6 +187,9 @@ pqServerConnectDialog::pqServerConnectDialog(
     SLOT(acceptConfigurationPage2()));
 
   QObject::connect(this->Internals->deleteServer, SIGNAL(clicked()), this, SLOT(deleteServer()));
+
+  QObject::connect(this, SIGNAL(serverAdded()), this, SLOT(updateButtons()));
+  QObject::connect(this, SIGNAL(serverDeleted()), this, SLOT(updateButtons()));
 
   QObject::connect(this->Internals->connect, SIGNAL(clicked()), this, SLOT(connect()));
 
@@ -302,39 +308,64 @@ void pqServerConnectDialog::updateConfigurations()
 }
 
 //-----------------------------------------------------------------------------
-void pqServerConnectDialog::onServerSelected(int row)
+void pqServerConnectDialog::onServerSelected()
 {
-  Q_ASSERT(this->Internals->servers->rowCount() == this->Internals->Configurations.size());
-
-  // covert the row number to original index (since servers can be sorted).
-  int original_index = this->Internals->servers->item(row, 0)->data(Qt::UserRole).toInt();
-
-  bool is_mutable = false;
-  if (original_index >= 0 && original_index < this->Internals->servers->rowCount())
-  {
-    is_mutable = this->Internals->Configurations[original_index].isMutable();
-  }
-  this->Internals->editServer->setEnabled(is_mutable);
-  this->Internals->deleteServer->setEnabled(is_mutable);
-  this->Internals->connect->setEnabled(true);
+  assert(this->Internals->servers->rowCount() == this->Internals->Configurations.size());
+  this->updateButtons();
 }
 
 //-----------------------------------------------------------------------------
 void pqServerConnectDialog::addServer()
 {
   this->editConfiguration(pqServerConfiguration());
+  emit serverAdded();
+}
+
+//-----------------------------------------------------------------------------
+void pqServerConnectDialog::updateButtons()
+{
+  // Handle the case where there are no servers.
+  if (this->Internals->servers->rowCount() == 0)
+  {
+    this->Internals->editServer->setEnabled(false);
+    this->Internals->deleteServer->setEnabled(false);
+    this->Internals->connect->setEnabled(false);
+    this->Internals->timeoutLabel->setVisible(false);
+    this->Internals->timeoutSpinBox->setVisible(false);
+    return;
+  }
+
+  int row = this->Internals->servers->currentRow();
+  if (row >= 0)
+  {
+    // Convert the row number to original index (since servers can be sorted).
+    int original_index = this->Internals->servers->item(row, 0)->data(Qt::UserRole).toInt();
+
+    bool is_mutable = false;
+    bool isReverse = false;
+    if (original_index >= 0 && original_index < this->Internals->servers->rowCount())
+    {
+      is_mutable = this->Internals->Configurations[original_index].isMutable();
+      isReverse = this->Internals->Configurations[original_index].resource().isReverse();
+    }
+    this->Internals->editServer->setEnabled(is_mutable);
+    this->Internals->deleteServer->setEnabled(is_mutable);
+    this->Internals->connect->setEnabled(true);
+    this->Internals->timeoutLabel->setVisible(!isReverse);
+    this->Internals->timeoutSpinBox->setVisible(!isReverse);
+  }
 }
 
 //-----------------------------------------------------------------------------
 void pqServerConnectDialog::editServer()
 {
   int row = this->Internals->servers->currentRow();
-  Q_ASSERT(row >= 0 && row < this->Internals->servers->rowCount());
+  assert(row >= 0 && row < this->Internals->servers->rowCount());
 
   // covert the row number to original index (since servers can be sorted).
   int original_index = this->Internals->servers->item(row, 0)->data(Qt::UserRole).toInt();
 
-  Q_ASSERT(original_index >= 0 && original_index < this->Internals->Configurations.size());
+  assert(original_index >= 0 && original_index < this->Internals->Configurations.size());
 
   this->editConfiguration(this->Internals->Configurations[original_index]);
 }
@@ -343,7 +374,7 @@ void pqServerConnectDialog::editServer()
 void pqServerConnectDialog::editConfiguration(const pqServerConfiguration& configuration)
 {
   // ensure that we are not editing non-mutable configurations by mistake.
-  Q_ASSERT(configuration.isMutable());
+  assert(configuration.isMutable());
 
   this->Internals->ActiveConfiguration = configuration.clone();
   this->Internals->OriginalName = configuration.name();
@@ -373,6 +404,9 @@ void pqServerConnectDialog::editConfiguration(const pqServerConfiguration& confi
   {
     type = CLIENT_SERVER_REVERSE_CONNECT;
     this->Internals->port->setValue(configuration.resource().port(11111));
+
+    // set the host the the remote server name is correct, even if it not used for connecting.
+    this->Internals->host->setText(configuration.resource().host());
   }
   else if (scheme == "cdsrs")
   {
@@ -387,6 +421,10 @@ void pqServerConnectDialog::editConfiguration(const pqServerConfiguration& confi
     type = CLIENT_DATA_SERVER_RENDER_SERVER_REVERSE_CONNECT;
     this->Internals->dataServerPort->setValue(configuration.resource().dataServerPort(11111));
     this->Internals->renderServerPort->setValue(configuration.resource().renderServerPort(22222));
+
+    // set the host the the remote server name is correct, even if it not used for connecting.
+    this->Internals->dataServerHost->setText(configuration.resource().dataServerHost());
+    this->Internals->renderServerHost->setText(configuration.resource().renderServerHost());
   }
   this->Internals->type->setCurrentIndex(type);
   this->updateServerType();
@@ -483,7 +521,7 @@ void pqServerConnectDialog::acceptConfigurationPage1()
 
     case CLIENT_SERVER_REVERSE_CONNECT:
       resource.setScheme("csrc");
-      resource.setHost("localhost");
+      resource.setHost(this->Internals->host->text());
       resource.setPort(this->Internals->port->value());
       break;
 
@@ -497,9 +535,9 @@ void pqServerConnectDialog::acceptConfigurationPage1()
 
     case CLIENT_DATA_SERVER_RENDER_SERVER_REVERSE_CONNECT:
       resource.setScheme("cdsrsrc");
-      resource.setDataServerHost("localhost");
+      resource.setDataServerHost(this->Internals->dataServerHost->text());
       resource.setDataServerPort(this->Internals->dataServerPort->value());
-      resource.setRenderServerHost("localhost");
+      resource.setRenderServerHost(this->Internals->renderServerHost->text());
       resource.setRenderServerPort(this->Internals->renderServerPort->value());
       break;
 
@@ -528,7 +566,7 @@ void pqServerConnectDialog::editServerStartup()
     {
       double delay, timeout;
       this->Internals->startup_type->setCurrentIndex(1);
-      this->Internals->commandLine->setText(config.command(timeout, delay));
+      this->Internals->commandLine->setText(config.execCommand(timeout, delay));
       this->Internals->delay->setValue(delay);
     }
     break;
@@ -587,12 +625,12 @@ void pqServerConnectDialog::goToFirstPage()
 void pqServerConnectDialog::deleteServer()
 {
   int row = this->Internals->servers->currentRow();
-  Q_ASSERT(row >= 0 && row < this->Internals->servers->rowCount());
+  assert(row >= 0 && row < this->Internals->servers->rowCount());
 
   // covert the row number to original index (since servers can be sorted).
   int original_index = this->Internals->servers->item(row, 0)->data(Qt::UserRole).toInt();
 
-  Q_ASSERT(original_index >= 0 && original_index < this->Internals->Configurations.size());
+  assert(original_index >= 0 && original_index < this->Internals->Configurations.size());
 
   const pqServerConfiguration& config = this->Internals->Configurations[original_index];
   if (QMessageBox::question(this, "Delete Server Configuration",
@@ -602,6 +640,8 @@ void pqServerConnectDialog::deleteServer()
     pqApplicationCore::instance()->serverConfigurations().removeConfiguration(config.name());
     pqApplicationCore::instance()->serverConfigurations().saveNow();
   }
+
+  emit serverDeleted();
 }
 
 //-----------------------------------------------------------------------------
@@ -642,14 +682,15 @@ void pqServerConnectDialog::loadServers()
 void pqServerConnectDialog::connect()
 {
   int row = this->Internals->servers->currentRow();
-  Q_ASSERT(row >= 0 && row < this->Internals->servers->rowCount());
+  assert(row >= 0 && row < this->Internals->servers->rowCount());
 
   // covert the row number to original index (since servers can be sorted).
   int original_index = this->Internals->servers->item(row, 0)->data(Qt::UserRole).toInt();
 
-  Q_ASSERT(original_index >= 0 && original_index < this->Internals->Configurations.size());
+  assert(original_index >= 0 && original_index < this->Internals->Configurations.size());
 
   this->Internals->ToConnect = this->Internals->Configurations[original_index];
+  this->Internals->ToConnect.setConnectionTimeout(this->Internals->timeoutSpinBox->value());
   this->accept();
 }
 
@@ -830,8 +871,6 @@ void pqServerConnectDialog::importServersSelectionChanged()
 //-----------------------------------------------------------------------------
 void pqServerConnectDialog::importServers()
 {
-  // Make sure servers importer and server table widget are synchronized
-  this->updateImportableConfigurations();
   QList<QTableWidgetItem*> items = this->Internals->importServersTable->selectedItems();
   QSet<int> indexes;
   foreach (QTableWidgetItem* item, items)

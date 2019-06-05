@@ -46,7 +46,7 @@ class VTKPVCLIENTSERVERCORERENDERING_EXPORT vtkPVDataDeliveryManager : public vt
 public:
   static vtkPVDataDeliveryManager* New();
   vtkTypeMacro(vtkPVDataDeliveryManager, vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Returned a hash number that can be used to verify that both client and
@@ -185,7 +185,7 @@ public:
    * server-sides using Deliver().
    */
   bool NeedsDelivery(
-    vtkMTimeType timestamp, std::vector<unsigned int>& keys_to_deliver, bool use_low_res);
+    vtkMTimeType timestamp, std::vector<unsigned int>& keys_to_deliver, bool interactive);
 
   /**
    * Triggers delivery for the geometries of indicated representations.
@@ -232,10 +232,17 @@ protected:
   vtkPVDataDeliveryManager();
   ~vtkPVDataDeliveryManager() override;
 
+  /**
+   * Helper method to return the current data distribution mode by querying the
+   * vtkPVRenderView.
+   */
+  int GetViewDataDistributionMode(bool use_lod);
+
   vtkWeakPointer<vtkPVRenderView> RenderView;
   vtkSmartPointer<vtkPKdTree> KdTree;
 
   vtkTimeStamp RedistributionTimeStamp;
+  std::string LastCutsGeneratorToken;
 
 private:
   vtkPVDataDeliveryManager(const vtkPVDataDeliveryManager&) = delete;

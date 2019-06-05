@@ -17,12 +17,17 @@
  * @brief   Used to load ParaView plugins.
  *
  * vtkPVPluginLoader can be used to load plugins for ParaView. vtkPVPluginLoader
- * loads the plugin on the local process. For verbose details during the process
- * of loading the plugin, try setting the environment variable PV_PLUGIN_DEBUG.
+ * loads the plugin on the local process.
+ *
+ * vtkPVPluginLoader logs plugin related messages using at
+ * `PARAVIEW_LOG_PLUGIN_VERBOSITY` level. See `vtkPVLogger::SetPluginVerbosity`
+ * for information on using environment variables to override or elevate the
+ * verbosity level.
+ *
  * This class only needed when loading plugins from shared libraries
  * dynamically. For statically importing plugins, one directly uses
  * PV_PLUGIN_IMPORT() macro defined in vtkPVPlugin.h.
-*/
+ */
 
 #ifndef vtkPVPluginLoader_h
 #define vtkPVPluginLoader_h
@@ -30,19 +35,16 @@
 #include "vtkObject.h"
 #include "vtkPVClientServerCoreCoreModule.h" //needed for exports
 
-class vtkIntArray;
-class vtkPVPlugin;
-class vtkStringArray;
-class vtkPVPlugin;
+#include <functional> // for std::function
 
-typedef bool (*vtkPluginLoadFunction)(const char*);
+class vtkPVPlugin;
 
 class VTKPVCLIENTSERVERCORECORE_EXPORT vtkPVPluginLoader : public vtkObject
 {
 public:
   static vtkPVPluginLoader* New();
   vtkTypeMacro(vtkPVPluginLoader, vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Tries to the load the plugin given the path to the plugin file.
@@ -132,10 +134,13 @@ public:
   vtkGetMacro(Loaded, bool);
   //@}
 
+  //@{
   /**
-   * Sets the function used to load static plugins.
    */
-  static void SetStaticPluginLoadFunction(vtkPluginLoadFunction function);
+  using PluginLoaderCallback = std::function<bool(const char*)>;
+  static int RegisterLoadPluginCallback(PluginLoaderCallback callback);
+  static void UnregisterLoadPluginCallback(int id);
+  //@}
 
   /**
    * Internal method used in pqParaViewPlugin.cxx.in to tell the
@@ -154,7 +159,7 @@ protected:
    * Called by LoadPluginInternal() to do the final steps in loading of a
    * plugin.
    */
-  bool LoadPlugin(const char* file, vtkPVPlugin* plugin);
+  bool LoadPluginInternal(vtkPVPlugin* plugin);
 
   vtkSetStringMacro(ErrorString);
   vtkSetStringMacro(PluginName);
@@ -167,14 +172,12 @@ protected:
   char* PluginVersion;
   char* FileName;
   char* SearchPaths;
-  bool DebugPlugin;
   bool Loaded;
 
 private:
   vtkPVPluginLoader(const vtkPVPluginLoader&) = delete;
   void operator=(const vtkPVPluginLoader&) = delete;
-
-  static vtkPluginLoadFunction StaticPluginLoadFunction;
+  static bool CallPluginLoaderCallbacks(const char* nameOrFile);
 };
 
 // Implementation of Schwartz counter idiom to ensure that the plugin library

@@ -21,10 +21,12 @@
  * The header file also defines few import macros that are required for
  * exporting/importing plugins.
  *
- * When debugging issues with plugins try setting the PV_PLUGIN_DEBUG
- * environment variable on all the processes where you are trying to load the
- * plugin. That will print extra information as the plugin is being loaded.
-*/
+ * When debugging issues with plugins try setting the
+ * `PARAVIEW_LOG_PLUGIN_VERBOSITY=<level>`  environment variable on all the processes
+ * where you are trying to load the plugin. That will print extra information as
+ * the plugin is being loaded. See `vtkPVLogger::SetPluginVerbosity` for
+ * details.
+ */
 
 #ifndef vtkPVPlugin_h
 #define vtkPVPlugin_h
@@ -81,6 +83,11 @@ public:
   virtual const char* GetRequiredPlugins() = 0;
 
   /**
+   * Returns a description of this plugin.
+   */
+  virtual const char* GetDescription() = 0;
+
+  /**
    * Returns EULA for the plugin, if any. If none, this will return nullptr.
    */
   virtual const char* GetEULA() = 0;
@@ -121,6 +128,14 @@ public:
   static EULAConfirmationCallback GetEULAConfirmationCallback();
   //@}
 
+protected:
+  /**
+   * Set the filename the plugin is loaded from, if any. If it's nullptr, then
+   * its assumed that the plugin is "linked-in" i.e. not loaded from an external
+   * file.
+   */
+  void SetFileName(const char* filename);
+
 private:
   /**
    * Called to confirm EULA in `ImportPlugin` if the plugin has a non-empty EULA.
@@ -131,7 +146,6 @@ private:
   static bool ConfirmEULA(vtkPVPlugin* plugin);
 
   char* FileName;
-  void SetFileName(const char* filename);
 
   static EULAConfirmationCallback EULAConfirmationCallbackPtr;
   friend class vtkPVPluginLoader;

@@ -28,6 +28,8 @@
 class vtkCallbackCommand;
 class vtkDataSet;
 class vtkDataSetSurfaceFilter;
+class vtkExplicitStructuredGrid;
+class vtkFeatureEdges;
 class vtkGenericDataSet;
 class vtkGenericGeometryFilter;
 class vtkHyperTreeGrid;
@@ -51,7 +53,7 @@ class VTKPVVTKEXTENSIONSRENDERING_EXPORT vtkPVGeometryFilter : public vtkDataObj
 public:
   static vtkPVGeometryFilter* New();
   vtkTypeMacro(vtkPVGeometryFilter, vtkDataObjectAlgorithm);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   //@{
   /**
@@ -67,6 +69,15 @@ public:
    */
   vtkSetMacro(UseOutline, int);
   vtkGetMacro(UseOutline, int);
+  //@}
+
+  //@{
+  /**
+   * Set/get whether to produce feature edges (vs. surface).
+   * If both this and UseOutline are true, then an outline will be produced.
+   */
+  vtkSetMacro(GenerateFeatureEdges, bool);
+  vtkGetMacro(GenerateFeatureEdges, bool);
   //@}
 
   //@{
@@ -213,18 +224,17 @@ protected:
    * Overridden to create vtkMultiBlockDataSet when input is a
    * composite-dataset and vtkPolyData when input is a vtkDataSet.
    */
-  int RequestDataObject(
-    vtkInformation*, vtkInformationVector**, vtkInformationVector*) VTK_OVERRIDE;
+  int RequestDataObject(vtkInformation*, vtkInformationVector**, vtkInformationVector*) override;
   virtual int RequestAMRData(vtkInformation* request, vtkInformationVector** inputVector,
     vtkInformationVector* outputVector);
   virtual int RequestCompositeData(vtkInformation* request, vtkInformationVector** inputVector,
     vtkInformationVector* outputVector);
   int RequestData(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
   //@}
 
   // Create a default executive.
-  vtkExecutive* CreateDefaultExecutive() VTK_OVERRIDE;
+  vtkExecutive* CreateDefaultExecutive() override;
 
   /**
    * Produce geometry for a block in the dataset.
@@ -261,6 +271,9 @@ protected:
 
   void HyperTreeGridExecute(vtkHyperTreeGrid* input, vtkPolyData* output, int doCommunicate);
 
+  void ExplicitStructuredGridExecute(
+    vtkExplicitStructuredGrid* input, vtkPolyData* out, int doCommunicate, const int* wholeExtent);
+
   /**
    * Cleans up the output polydata. If doCommunicate is true the method is free
    * to communicate with other processes as needed.
@@ -285,6 +298,7 @@ protected:
   vtkGenericGeometryFilter* GenericGeometryFilter;
   vtkUnstructuredGridGeometryFilter* UnstructuredGridGeometryFilter;
   vtkPVRecoverGeometryWireframe* RecoverWireframeFilter;
+  vtkFeatureEdges* FeatureEdgesFilter;
 
   /**
    * Call CheckAttributes on the \c input which ensures that all attribute
@@ -295,16 +309,15 @@ protected:
   // Callback for recording progress of internal filters.
   void HandleGeometryFilterProgress(vtkObject* caller, unsigned long, void*);
 
-  int FillInputPortInformation(int, vtkInformation*) VTK_OVERRIDE;
+  int FillInputPortInformation(int, vtkInformation*) override;
 
-  void ReportReferences(vtkGarbageCollector*) VTK_OVERRIDE;
+  void ReportReferences(vtkGarbageCollector*) override;
 
   /**
    * Overridden to request ghost-cells for vtkUnstructuredGrid inputs so that we
    * don't generate internal surfaces.
    */
-  int RequestUpdateExtent(
-    vtkInformation*, vtkInformationVector**, vtkInformationVector*) VTK_OVERRIDE;
+  int RequestUpdateExtent(vtkInformation*, vtkInformationVector**, vtkInformationVector*) override;
 
   // Convenience method to purge ghost cells.
   void RemoveGhostCells(vtkPolyData*);
@@ -317,6 +330,7 @@ protected:
   int StripModFirstPass;
   bool HideInternalAMRFaces;
   bool UseNonOverlappingAMRMetaDataForOutlines;
+  bool GenerateFeatureEdges;
 
 private:
   vtkPVGeometryFilter(const vtkPVGeometryFilter&) = delete;

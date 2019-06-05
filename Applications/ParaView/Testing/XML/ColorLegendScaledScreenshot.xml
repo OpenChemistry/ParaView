@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <pqevents>
-  <pqevent object="pqClientMainWindow/menubar/menuSources" command="activate" arguments="SphereSource" />
+  <pqevent object="pqClientMainWindow/menubar/menuSources/Alphabetical" command="activate" arguments="SphereSource" />
   <pqevent object="pqClientMainWindow/propertiesDock/propertiesPanel/Accept" command="activate" arguments="" />
   <pqevent object="pqClientMainWindow/variableToolbar/displayColor/Variables" command="activated" arguments="Normals" />
   <pqevent object="pqClientMainWindow/variableToolbar/displayColor/Components" command="activated" arguments="X" />
@@ -15,5 +15,5 @@
   <pqevent object="pqClientMainWindow/SaveScreenshotDialog/widget/OKButton" command="activate" arguments="" />
 
   <!-- compare the saved screenshot -->
-  <pqcompareimage image="$PARAVIEW_TEST_ROOT/colorlegendscaledscreenshot.png" baseline="$PARAVIEW_DATA_ROOT/Baseline/ColorLegendScaledScreenshot.png" />
+  <pqcompareimage image="$PARAVIEW_TEST_ROOT/colorlegendscaledscreenshot.png" baseline="$PARAVIEW_DATA_ROOT/Applications/ParaView/Testing/Data/Baseline/ColorLegendScaledScreenshot.png" />
 </pqevents>

@@ -28,7 +28,8 @@
 #include "vtkSMTrace.h"
 #include "vtkTimerLog.h"
 
-#include <assert.h>
+#include <cassert>
+#include <sstream>
 
 #define MAX_NUMBER_OF_INTERNAL_REPRESENTATIONS 10
 
@@ -56,6 +57,26 @@ vtkSMRepresentationProxy::~vtkSMRepresentationProxy()
 }
 
 //----------------------------------------------------------------------------
+#if !defined(VTK_LEGACY_REMOVE)
+void vtkSMRepresentationProxy::SetDebugName(const char* name)
+{
+  VTK_LEGACY_REPLACED_BODY(
+    vtkSMRepresentationProxy::SetDebugName, "ParaView 5.7", vtkSMProxy::SetLogName);
+  this->SetLogName(name);
+}
+#endif
+
+//----------------------------------------------------------------------------
+#if !defined(VTK_LEGACY_REMOVE)
+const char* vtkSMRepresentationProxy::GetDebugName()
+{
+  VTK_LEGACY_REPLACED_BODY(
+    vtkSMRepresentationProxy::GetDebugName, "ParaView 5.7", vtkSMProxy::GetLogName);
+  return this->GetLogName();
+}
+#endif
+
+//----------------------------------------------------------------------------
 void vtkSMRepresentationProxy::CreateVTKObjects()
 {
   if (this->ObjectsCreated)
@@ -79,9 +100,11 @@ void vtkSMRepresentationProxy::CreateVTKObjects()
          << vtkClientServerStream::End;
   this->ExecuteStream(stream);
 
-  vtkObject::SafeDownCast(this->GetClientSideObject())
-    ->AddObserver(
+  if (auto obj = vtkObject::SafeDownCast(this->GetClientSideObject()))
+  {
+    obj->AddObserver(
       vtkCommand::UpdateDataEvent, this, &vtkSMRepresentationProxy::OnVTKRepresentationUpdated);
+  }
 }
 
 //---------------------------------------------------------------------------
@@ -177,18 +200,27 @@ void vtkSMRepresentationProxy::UpdatePipelineInternal(double time, bool doTime)
 }
 
 //----------------------------------------------------------------------------
-void vtkSMRepresentationProxy::MarkDirty(vtkSMProxy* modifiedProxy)
+void vtkSMRepresentationProxy::MarkDirtyFromProducer(
+  vtkSMProxy* modifiedProxy, vtkSMProxy* producer, vtkSMProperty* property)
 {
-  if ((modifiedProxy != this) && this->ObjectsCreated &&
-    // this check ensures that for composite representations, we don't end up
-    // marking all representations dirty when a sub-representation is modified.
-    (this->GetSubProxyName(modifiedProxy) == NULL))
+  assert(producer != this);
+  if (this->ObjectsCreated && !this->MarkedModified)
   {
-    // We need to check that modified proxy is a type of proxy that affects data
-    // rendered/processed by the representation. This is basically a HACK to
-    // avoid invalidating geometry when lookuptable and piecewise-function is
-    // modified.
-    if (!this->MarkedModified && !this->SkipDependency(modifiedProxy))
+    // `producer` has been "modified". Now the question to answer is if that
+    // modification of the `producer` is enough for this representation to re-execute
+    // i.e. generate new geometry (or any other appropriate artifact) for rendering
+    // and re-deliver to the rendering nodes, clear caches etc. Alternatively, it
+    // could merely be a "rendering" change, e.g. change in LUT, that doesn't
+    // require us to re-execute the representation.
+    //
+    // To answer that question, we rely on following observation:
+    // Typically a producer is marked as such because of a ProxyProperty or
+    // InputProperty. If it's a ProxyProperty, it's not a pipeline connection
+    // and hence changing it should not affect representation's data processing
+    // pipeline (only rendering pipeline).
+    //
+    // Of course, there may be exceptions....TODO:
+    if (vtkSMInputProperty::SafeDownCast(property) != nullptr || property == nullptr)
     {
       this->MarkedModified = true;
       this->VTKRepresentationUpdated = false;
@@ -199,25 +231,12 @@ void vtkSMRepresentationProxy::MarkDirty(vtkSMProxy* modifiedProxy)
     }
   }
 
-  if (modifiedProxy == this)
-  {
-    // propagate the modification to all sub-representations. If modifiedProxy
-    // != this, then the sub-representations are marked modified by input proxy
-    // dependencies properly.
-    // This ensures that when "Representation" property on
-    // composite-representations is changed, for example, the
-    // sub-representations that actually re-execute are noticed and
-    // data-information, among other things, gets updated.
-    for (unsigned int cc = 0, max = this->GetNumberOfSubProxies(); cc < max; ++cc)
-    {
-      vtkSMProxy* subRepr = this->GetSubProxy(cc);
-      if (subRepr)
-      {
-        subRepr->MarkDirty(modifiedProxy);
-      }
-    }
-  }
+  this->Superclass::MarkDirtyFromProducer(modifiedProxy, producer, property);
+}
 
+//----------------------------------------------------------------------------
+void vtkSMRepresentationProxy::MarkDirty(vtkSMProxy* modifiedProxy)
+{
   // vtkSMProxy::MarkDirty does not call MarkConsumersAsDirty unless
   // this->NeedsUpdate is false. Generally, that's indeed correct since we
   // have marked the consumer dirty previously, we don't need to do it again.
@@ -226,28 +245,7 @@ void vtkSMRepresentationProxy::MarkDirty(vtkSMProxy* modifiedProxy)
   // result in the view realizing that data may have changed). Hence we force
   // NeedsUpdate to false.
   this->NeedsUpdate = false;
-
   this->Superclass::MarkDirty(modifiedProxy);
-}
-
-//----------------------------------------------------------------------------
-bool vtkSMRepresentationProxy::SkipDependency(vtkSMProxy* producer)
-{
-  if (producer && producer->GetXMLName() &&
-    (strcmp(producer->GetXMLName(), "PVLookupTable") == 0 ||
-        strcmp(producer->GetXMLName(), "PiecewiseFunction") == 0))
-  {
-    return true;
-  }
-
-  if (producer && producer->GetXMLGroup() &&
-    (strcmp(producer->GetXMLGroup(), "lookup_tables") == 0 ||
-        strcmp(producer->GetXMLGroup(), "piecewise_functions") == 0))
-  {
-    return true;
-  }
-
-  return false;
 }
 
 //----------------------------------------------------------------------------
@@ -331,7 +329,7 @@ vtkPVProminentValuesInformation* vtkSMRepresentationProxy::GetProminentValuesInf
   {
     vtkTimerLog::MarkStartEvent("vtkSMRepresentationProxy::GetProminentValues");
     this->CreateVTKObjects();
-    this->UpdatePipeline();
+
     // Initialize parameters with specified values:
     this->ProminentValuesInformation->Initialize();
     this->ProminentValuesInformation->SetFieldAssociation(
@@ -343,7 +341,23 @@ vtkPVProminentValuesInformation* vtkSMRepresentationProxy::GetProminentValuesInf
     this->ProminentValuesInformation->SetForce(force);
 
     // Ask the server to fill out the rest of the information:
-    this->GatherInformation(this->ProminentValuesInformation);
+
+    // Now, we need to check if the array of interest is on the input or
+    // produced as an artifact by the representation.
+    vtkSMPropertyHelper inputHelper(this, "Input");
+    vtkSMSourceProxy* input = vtkSMSourceProxy::SafeDownCast(inputHelper.GetAsProxy());
+    const unsigned int port = inputHelper.GetOutputPort();
+    if (input &&
+      input->GetDataInformation(port)->GetArrayInformation(name.c_str(), fieldAssoc) != nullptr)
+    {
+      this->ProminentValuesInformation->SetPortNumber(port);
+      input->GatherInformation(this->ProminentValuesInformation);
+    }
+    else
+    {
+      this->GatherInformation(this->ProminentValuesInformation);
+    }
+
     vtkTimerLog::MarkEndEvent("vtkSMRepresentationProxy::GetProminentValues");
     this->ProminentValuesFraction = fraction;
     this->ProminentValuesUncertainty = uncertaintyAllowed;
@@ -396,9 +410,7 @@ bool vtkSMRepresentationProxy::SetRepresentationType(const char* type)
 {
   if (vtkSMProperty* property = this->GetProperty("Representation"))
   {
-    vtkSMStringListDomain* sld =
-      vtkSMStringListDomain::SafeDownCast(property->FindDomain("vtkSMStringListDomain"));
-
+    auto sld = property->FindDomain<vtkSMStringListDomain>();
     unsigned int tmp;
     if (sld != NULL && sld->IsInDomain(type, tmp) == 0)
     {

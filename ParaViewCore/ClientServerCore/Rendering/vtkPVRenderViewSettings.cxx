@@ -44,7 +44,8 @@ vtkPVRenderViewSettings* vtkPVRenderViewSettings::GetInstance()
 
 //----------------------------------------------------------------------------
 vtkPVRenderViewSettings::vtkPVRenderViewSettings()
-  : OutlineThreshold(250)
+  : DefaultInteractionMode(0)
+  , OutlineThreshold(250)
   , PointPickingRadius(0)
   , DisableIceT(false)
 {
@@ -86,6 +87,20 @@ void vtkPVRenderViewSettings::SetResolveCoincidentTopology(int mode)
 void vtkPVRenderViewSettings::SetPolygonOffsetParameters(double factor, double units)
 {
   vtkMapper::SetResolveCoincidentTopologyPolygonOffsetParameters(factor, units);
+  this->Modified();
+}
+
+//----------------------------------------------------------------------------
+void vtkPVRenderViewSettings::SetLineOffsetParameters(double factor, double units)
+{
+  vtkMapper::SetResolveCoincidentTopologyLineOffsetParameters(factor, units);
+  this->Modified();
+}
+
+//----------------------------------------------------------------------------
+void vtkPVRenderViewSettings::SetPointOffsetParameter(double units)
+{
+  vtkMapper::SetResolveCoincidentTopologyPointOffsetParameter(units);
   this->Modified();
 }
 

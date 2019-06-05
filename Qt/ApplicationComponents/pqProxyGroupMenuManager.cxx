@@ -32,7 +32,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqProxyGroupMenuManager.h"
 
 #include "pqActiveObjects.h"
+#include "pqAddToFavoritesReaction.h"
 #include "pqCoreUtilities.h"
+#include "pqManageFavoritesReaction.h"
 #include "pqPVApplicationCore.h"
 #include "pqServerManagerModel.h"
 #include "pqSetData.h"
@@ -48,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkNew.h"
 #include "vtkSmartPointer.h"
 
+#include <QApplication>
 #include <QMap>
 #include <QMenu>
 #include <QPair>
@@ -118,6 +121,9 @@ public:
   ProxyInfoMap Proxies;
   CategoryInfoMap Categories;
   QList<QPair<QString, QString> > RecentlyUsed;
+  // list of favorites. Each pair is {filterGroup, filterPath} where filterPath
+  // is the category path to access the favorite: category1;category2;...;filterName
+  QList<QPair<QString, QString> > Favorites;
   QSet<QString> ProxyDefinitionGroupToListen;
   QSet<unsigned long> CallBackIDs;
   QWidget Widget;
@@ -126,6 +132,7 @@ public:
   void* LocalActiveSession;
 
   QPointer<QMenu> RecentMenu;
+  QPointer<QMenu> FavoritesMenu;
 };
 
 //-----------------------------------------------------------------------------
@@ -138,6 +145,7 @@ pqProxyGroupMenuManager::pqProxyGroupMenuManager(
   this->Internal = new pqInternal();
   this->RecentlyUsedMenuSize = 0;
   this->Enabled = true;
+  this->EnableFavorites = false;
 
   QObject::connect(pqApplicationCore::instance(), SIGNAL(loadXML(vtkPVXMLElement*)), this,
     SLOT(loadConfiguration(vtkPVXMLElement*)));
@@ -381,6 +389,140 @@ void pqProxyGroupMenuManager::saveRecentlyUsedItems()
 }
 
 //-----------------------------------------------------------------------------
+void pqProxyGroupMenuManager::populateFavoritesMenu()
+{
+  this->loadFavoritesItems();
+  if (this->Internal->FavoritesMenu)
+  {
+    this->Internal->FavoritesMenu->clear();
+
+    QAction* manageFavoritesAction =
+      this->Internal->FavoritesMenu->addAction("&Manage Favorites...")
+      << pqSetName("actionManage_Favorites");
+    new pqManageFavoritesReaction(manageFavoritesAction, this);
+
+    this->Internal->FavoritesMenu->addAction(this->getAddToCategoryAction(QString()));
+    this->Internal->FavoritesMenu->addSeparator();
+
+    for (const QPair<QString, QString>& key : this->Internal->Favorites)
+    {
+      QStringList categories = key.second.split(";", QString::SkipEmptyParts);
+      bool isCategory = key.first.compare("categories") == 0;
+      QString filter = isCategory ? QString("") : categories.takeLast();
+      if (!isCategory)
+      {
+        categories.removeLast();
+      }
+
+      QMenu* submenu = this->Internal->FavoritesMenu;
+      for (const QString& category : categories)
+      {
+        bool submenuExists = false;
+        for (QAction* submenuAction : submenu->actions())
+        {
+          if (submenuAction->menu() && submenuAction->menu()->objectName() == category)
+          {
+            // if category menu already exists, use it
+            submenu = submenuAction->menu();
+            submenuExists = true;
+            break;
+          }
+        }
+        if (!submenuExists)
+        {
+          submenu = submenu->addMenu(category) << pqSetName(category);
+          QString path = categories.join(";");
+          submenu->addAction(this->getAddToCategoryAction(path));
+          submenu->addSeparator();
+        }
+      }
+
+      // if favorite does not exist (e.g. filter from an unloaded plugin)
+      // no action will be created. (but favorite stays in memory)
+      auto action = isCategory ? nullptr : this->getAction(key.first, filter);
+      if (action)
+      {
+        action->setObjectName(filter);
+        submenu->addAction(action);
+      }
+    }
+  }
+}
+
+//-----------------------------------------------------------------------------
+QAction* pqProxyGroupMenuManager::getAddToCategoryAction(const QString& path)
+{
+  QAction* actionAddToFavorites = new QAction(this);
+  actionAddToFavorites->setObjectName(QString("actionAddTo:%1").arg(path));
+  actionAddToFavorites->setText(
+    QApplication::translate("pqPipelineBrowserContextMenu", "&Add current filter", Q_NULLPTR));
+  actionAddToFavorites->setData(path);
+
+  // get filters list for current category
+  QVector<QString> filters;
+  for (const QPair<QString, QString>& key : this->Internal->Favorites)
+  {
+    if (key.first == "filters")
+    {
+      QStringList categories = key.second.split(";", QString::SkipEmptyParts);
+      QString filter = categories.takeLast();
+      categories.removeLast();
+      if (path == categories.join(";"))
+      {
+        filters << filter;
+      }
+    }
+  }
+
+  new pqAddToFavoritesReaction(actionAddToFavorites, filters);
+
+  return actionAddToFavorites;
+}
+
+//-----------------------------------------------------------------------------
+void pqProxyGroupMenuManager::loadFavoritesItems()
+{
+  this->Internal->Favorites.clear();
+  pqSettings* settings = pqApplicationCore::instance()->settings();
+  QString key = QString("favorites.%1/").arg(this->ResourceTagName);
+  if (settings->contains(key))
+  {
+    QString list = settings->value(key).toString();
+    QStringList parts = list.split("|", QString::SkipEmptyParts);
+    for (const QString& part : parts)
+    {
+      QStringList pieces = part.split(";", QString::SkipEmptyParts);
+      if (pieces.size() >= 2)
+      {
+        QString group = pieces.takeFirst();
+        QString path = pieces.join(";");
+        QPair<QString, QString> aKey(group, path);
+        this->Internal->Favorites.push_back(aKey);
+      }
+    }
+  }
+
+  this->updateMenuStyle();
+}
+
+//-----------------------------------------------------------------------------
+QMenu* pqProxyGroupMenuManager::getFavoritesMenu()
+{
+  return this->Internal->FavoritesMenu;
+}
+
+//-----------------------------------------------------------------------------
+QString pqProxyGroupMenuManager::categoryLabel(const QString& category)
+{
+  if (this->Internal->Categories.contains(category))
+  {
+    return this->Internal->Categories[category].Label;
+  }
+
+  return QString();
+}
+
+//-----------------------------------------------------------------------------
 void pqProxyGroupMenuManager::populateMenu()
 {
   // We reuse QAction instances, yet we don't want to have callbacks set up for
@@ -399,7 +541,7 @@ void pqProxyGroupMenuManager::populateMenu()
     this->Internal->SearchAction->deleteLater();
   }
 
-  QList<QMenu*> submenus = _menu->findChildren<QMenu*>();
+  QList<QMenu*> submenus = _menu->findChildren<QMenu*>(QString(), Qt::FindDirectChildrenOnly);
   foreach (QMenu* submenu, submenus)
   {
     delete submenu;
@@ -424,21 +566,14 @@ void pqProxyGroupMenuManager::populateMenu()
     this->connect(rmenu, SIGNAL(aboutToShow()), SLOT(populateRecentlyUsedMenu()));
   }
 
-  // Add categories.
-  pqInternal::CategoryInfoMap::iterator categoryIter = this->Internal->Categories.begin();
-  for (; categoryIter != this->Internal->Categories.end(); ++categoryIter)
+  if (this->EnableFavorites)
   {
-    QList<QAction*> action_list = this->actions(categoryIter.key());
-    if (action_list.size() > 0)
-    {
-      QMenu* categoryMenu = _menu->addMenu(categoryIter.value().Label)
-        << pqSetName(categoryIter.key());
-      foreach (QAction* action, action_list)
-      {
-        categoryMenu->addAction(action);
-      }
-    }
+    auto* bmenu = _menu->addMenu("&Favorites") << pqSetName("Favorites");
+    this->Internal->FavoritesMenu = bmenu;
+    this->connect(_menu, SIGNAL(aboutToShow()), SLOT(populateFavoritesMenu()));
   }
+
+  _menu->addSeparator();
 
   // Add alphabetical list.
   QMenu* alphabeticalMenu = _menu;
@@ -466,6 +601,22 @@ void pqProxyGroupMenuManager::populateMenu()
     alphabeticalMenu->addAction(action);
   }
 
+  // Add categories.
+  pqInternal::CategoryInfoMap::iterator categoryIter = this->Internal->Categories.begin();
+  for (; categoryIter != this->Internal->Categories.end(); ++categoryIter)
+  {
+    QList<QAction*> action_list = this->actions(categoryIter.key());
+    if (action_list.size() > 0)
+    {
+      QMenu* categoryMenu = _menu->addMenu(categoryIter.value().Label)
+        << pqSetName(categoryIter.key());
+      foreach (QAction* action, action_list)
+      {
+        categoryMenu->addAction(action);
+      }
+    }
+  }
+
   emit this->menuPopulated();
 }
 
@@ -475,6 +626,25 @@ void pqProxyGroupMenuManager::updateMenuStyle()
   pqSettings* settings = pqApplicationCore::instance()->settings();
   bool sc = settings->value("GeneralSettings.ForceSingleColumnMenus", false).toBool();
   this->menu()->setStyleSheet(QString("QMenu { menu-scrollable: %1; }").arg(sc ? 1 : 0));
+
+  for (QAction* action : this->actions())
+  {
+    QFont f = action->font();
+    f.setBold(false);
+    action->setFont(f);
+  }
+
+  for (auto bm : this->Internal->Favorites)
+  {
+    QStringList path = bm.second.split(";", QString::SkipEmptyParts);
+    QString filter = path.takeLast();
+    if (QAction* action = this->getAction(bm.first, filter))
+    {
+      QFont f = action->font();
+      f.setBold(true);
+      action->setFont(f);
+    }
+  }
 }
 
 //-----------------------------------------------------------------------------
@@ -513,6 +683,17 @@ QAction* pqProxyGroupMenuManager::getAction(const QString& pgroup, const QString
       QStringList data_list;
       data_list << pgroup << pname;
       action << pqSetName(name) << pqSetData(data_list);
+      pqSettings settings;
+      if (pgroup == "filters" || pgroup == "sources")
+      {
+        QString menuName = pgroup == "filters" ? "Filters" : "Sources";
+        auto variant = settings.value(
+          QString("pqCustomShortcuts/%1/Alphabetical/%2").arg(menuName, label), QVariant());
+        if (variant.canConvert<QKeySequence>())
+        {
+          action->setShortcut(variant.value<QKeySequence>());
+        }
+      }
       if (iter.value().OmitFromToolbar.size() > 0)
       {
         action->setProperty("OmitFromToolbar", iter.value().OmitFromToolbar);

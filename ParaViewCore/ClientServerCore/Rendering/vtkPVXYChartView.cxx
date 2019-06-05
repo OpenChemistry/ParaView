@@ -35,8 +35,7 @@
 #include "vtkTextProperty.h"
 #include "vtkXYChartRepresentation.h"
 
-#include <sstream>
-#include <string>
+bool vtkPVXYChartView::IgnoreNegativeLogAxisWarning = false;
 
 class vtkPVXYChartView::vtkInternals
 {
@@ -65,15 +64,14 @@ vtkPVXYChartView::vtkPVXYChartView()
 {
   this->Internals = new vtkInternals();
 
-  this->Chart = NULL;
-  this->InternalTitle = NULL;
+  this->Chart = nullptr;
   this->PlotTime = vtkPVPlotTime::New();
   this->HideTimeMarker = false;
   this->SortByXAxis = false;
 
   // Use the buffer id - performance issues are fixed.
   this->ContextView->GetScene()->SetUseBufferId(true);
-  this->LogScaleWarningLabel = NULL;
+  this->LogScaleWarningLabel = nullptr;
 }
 
 //----------------------------------------------------------------------------
@@ -82,18 +80,15 @@ vtkPVXYChartView::~vtkPVXYChartView()
   if (this->Chart)
   {
     this->Chart->Delete();
-    this->Chart = NULL;
+    this->Chart = nullptr;
   }
   if (LogScaleWarningLabel)
   {
     this->LogScaleWarningLabel->Delete();
-    this->LogScaleWarningLabel = NULL;
+    this->LogScaleWarningLabel = nullptr;
   }
   this->PlotTime->Delete();
-  this->PlotTime = NULL;
-
-  this->SetInternalTitle(NULL);
-
+  this->PlotTime = nullptr;
   delete this->Internals;
 }
 
@@ -121,12 +116,12 @@ void vtkPVXYChartView::SetChartType(const char* type)
   if (this->Chart)
   {
     this->Chart->Delete();
-    this->Chart = NULL;
+    this->Chart = nullptr;
   }
   if (LogScaleWarningLabel)
   {
     this->LogScaleWarningLabel->Delete();
-    this->LogScaleWarningLabel = NULL;
+    this->LogScaleWarningLabel = nullptr;
   }
 
   // Construct the correct type of chart
@@ -164,17 +159,31 @@ void vtkPVXYChartView::SetChartType(const char* type)
       this->Chart->SetAnnotationLink(annLink.GetPointer());
     }
 
-    // Set up a warning for when log-scaling is requested on negative values
-    this->LogScaleWarningLabel = vtkChartWarning::New();
-    this->LogScaleWarningLabel->SetLabel("WARNING!\n"
-                                         "One or more plot series crosses or contains\n"
-                                         "an axis origin. Use the View Options menu to\n"
-                                         "turn off log-scaling or specify a valid axis\n"
-                                         "range; or scroll the view; or remove the line\n"
-                                         "series from the chart in the Properties Tab.");
-    this->LogScaleWarningLabel->SetVisible(1);
-    this->LogScaleWarningLabel->SetDimensions(150, 150, 150, 150);
-    this->Chart->AddItem(this->LogScaleWarningLabel);
+    bool warning = true;
+    if (vtkPVXYChartView::IgnoreNegativeLogAxisWarning == true)
+    {
+      vtkChartXY* chartXY = vtkChartXY::SafeDownCast(this->Chart);
+      if (chartXY)
+      {
+        warning = false;
+        chartXY->AdjustLowerBoundForLogPlotOn();
+      }
+    }
+
+    if (warning)
+    {
+      // Set up a warning for when log-scaling is requested on negative values
+      this->LogScaleWarningLabel = vtkChartWarning::New();
+      this->LogScaleWarningLabel->SetLabel("WARNING!\n"
+                                           "One or more plot series crosses or contains\n"
+                                           "an axis origin. Use the View Options menu to\n"
+                                           "turn off log-scaling or specify a valid axis\n"
+                                           "range; or scroll the view; or remove the line\n"
+                                           "series from the chart in the Properties Tab.");
+      this->LogScaleWarningLabel->SetVisible(1);
+      this->LogScaleWarningLabel->SetDimensions(150, 150, 150, 150);
+      this->Chart->AddItem(this->LogScaleWarningLabel);
+    }
 
     // setup default mouse actions
     this->Chart->SetActionToButton(vtkChart::PAN, vtkContextMouseEvent::LEFT_BUTTON);
@@ -182,24 +191,6 @@ void vtkPVXYChartView::SetChartType(const char* type)
 
     // set default selection mode
     this->Chart->SetSelectionMode(vtkContextScene::SELECTION_DEFAULT);
-  }
-}
-
-//----------------------------------------------------------------------------
-void vtkPVXYChartView::SetTitle(const char* title)
-{
-  if (this->Chart)
-  {
-    std::string tmp(title);
-    if (tmp.find("${TIME}") != std::string::npos)
-    {
-      this->SetInternalTitle(title);
-    }
-    else
-    {
-      this->Chart->SetTitle(title);
-      this->SetInternalTitle(NULL);
-    }
   }
 }
 
@@ -276,6 +267,42 @@ void vtkPVXYChartView::SetTitleAlignment(int alignment)
   {
     this->Chart->GetTitleProperties()->SetJustification(alignment);
   }
+}
+
+//----------------------------------------------------------------------------
+const char* vtkPVXYChartView::GetTitleFontFamily()
+{
+  return this->Chart ? this->Chart->GetTitleProperties()->GetFontFamilyAsString() : nullptr;
+}
+
+//----------------------------------------------------------------------------
+int vtkPVXYChartView::GetTitleFontSize()
+{
+  return this->Chart ? this->Chart->GetTitleProperties()->GetFontSize() : -1;
+}
+
+//----------------------------------------------------------------------------
+int vtkPVXYChartView::GetTitleFontBold()
+{
+  return this->Chart ? this->Chart->GetTitleProperties()->GetBold() : 0;
+}
+
+//----------------------------------------------------------------------------
+int vtkPVXYChartView::GetTitleFontItalic()
+{
+  return this->Chart ? this->Chart->GetTitleProperties()->GetItalic() : 0;
+}
+
+//----------------------------------------------------------------------------
+double* vtkPVXYChartView::GetTitleColor()
+{
+  return this->Chart ? this->Chart->GetTitleProperties()->GetColor() : nullptr;
+}
+
+//----------------------------------------------------------------------------
+int vtkPVXYChartView::GetTitleAlignment()
+{
+  return this->Chart ? this->Chart->GetTitleProperties()->GetJustification() : 0;
 }
 
 //----------------------------------------------------------------------------
@@ -738,19 +765,7 @@ void vtkPVXYChartView::Render(bool interactive)
   {
     return;
   }
-  if (this->InternalTitle)
-  {
-    std::ostringstream new_title;
-    std::string title(this->InternalTitle);
-    size_t pos = title.find("${TIME}");
-    if (pos != std::string::npos)
-    {
-      // The string was found - replace it and set the chart title.
-      new_title << title.substr(0, pos) << this->GetViewTime()
-                << title.substr(pos + strlen("${TIME}"));
-      this->Chart->SetTitle(new_title.str().c_str());
-    }
-  }
+  this->Chart->SetTitle(this->GetFormattedTitle());
 
   this->PlotTime->SetTime(this->GetViewTime());
   this->PlotTime->SetTimeAxisMode(vtkPVPlotTime::NONE);
@@ -791,7 +806,7 @@ void vtkPVXYChartView::Update()
   // At this point, all representations must have updated which series are
   // visible, etc. So we can now recalculate the axes bounds to pick a good
   // value.
-  if (this->Chart == NULL)
+  if (this->Chart == nullptr)
   {
     return;
   }
@@ -825,7 +840,7 @@ void vtkPVXYChartView::Update()
     }
     else
     {
-      chartAxis->SetCustomTickPositions(NULL);
+      chartAxis->SetCustomTickPositions(nullptr);
     }
     chartAxis->Update();
   }

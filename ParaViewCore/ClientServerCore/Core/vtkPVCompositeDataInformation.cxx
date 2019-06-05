@@ -21,6 +21,7 @@
 #include "vtkNew.h"
 #include "vtkObjectFactory.h"
 #include "vtkPVDataInformation.h"
+#include "vtkPartitionedDataSet.h"
 #include "vtkSmartPointer.h"
 #include "vtkTimerLog.h"
 #include "vtkUniformGrid.h"
@@ -50,6 +51,7 @@ vtkPVCompositeDataInformation::vtkPVCompositeDataInformation()
   this->DataIsComposite = 0;
   this->DataIsMultiPiece = 0;
   this->NumberOfPieces = 0;
+  this->NumberOfAMRLevels = 0;
   // DON'T FORGET TO UPDATE Initialize().
 }
 
@@ -65,6 +67,7 @@ void vtkPVCompositeDataInformation::PrintSelf(ostream& os, vtkIndent indent)
   this->Superclass::PrintSelf(os, indent);
   os << indent << "DataIsMultiPiece: " << this->DataIsMultiPiece << endl;
   os << indent << "DataIsComposite: " << this->DataIsComposite << endl;
+  os << indent << "NumberOfAMRLevels: " << this->NumberOfAMRLevels << endl;
 }
 
 //----------------------------------------------------------------------------
@@ -116,6 +119,7 @@ void vtkPVCompositeDataInformation::Initialize()
   this->DataIsMultiPiece = 0;
   this->NumberOfPieces = 0;
   this->DataIsComposite = 0;
+  this->NumberOfAMRLevels = 0;
   this->Internal->ChildrenInformation.clear();
 }
 
@@ -179,6 +183,15 @@ void vtkPVCompositeDataInformation::CopyFromObject(vtkObject* object)
     return;
   }
 
+  // partitioned datasets are treated like multi-piece here:
+  vtkPartitionedDataSet* partDS = vtkPartitionedDataSet::SafeDownCast(cds);
+  if (partDS)
+  {
+    this->DataIsMultiPiece = 1;
+    this->SetNumberOfPieces(partDS->GetNumberOfPartitions());
+    return;
+  }
+
   vtkUniformGridAMR* amr = vtkUniformGridAMR::SafeDownCast(cds);
   if (amr)
   {
@@ -230,21 +243,21 @@ void vtkPVCompositeDataInformation::CopyFromObject(vtkObject* object)
 //----------------------------------------------------------------------------
 void vtkPVCompositeDataInformation::CopyFromAMR(vtkUniformGridAMR* amr)
 {
-  unsigned int num_levels = amr->GetNumberOfLevels();
-  if (num_levels == 0)
+  this->NumberOfAMRLevels = amr->GetNumberOfLevels();
+  if (this->NumberOfAMRLevels == 0)
   {
     this->Internal->ChildrenInformation.clear();
   }
   else
   {
-    this->Internal->ChildrenInformation.resize(num_levels);
+    this->Internal->ChildrenInformation.resize(this->NumberOfAMRLevels);
   }
 
   // we use this to "simulate" a composite tree from AMR
   vtkNew<vtkMultiPieceDataSet> tempMultiPiece;
   vtkNew<vtkPVDataInformation> tempDSInfo;
 
-  for (unsigned int level = 0; level < num_levels; level++)
+  for (unsigned int level = 0; level < this->NumberOfAMRLevels; level++)
   {
     unsigned int num_datasets = amr->GetNumberOfDataSets(level);
     tempMultiPiece->SetNumberOfPieces(num_datasets);
@@ -282,6 +295,9 @@ void vtkPVCompositeDataInformation::AddInformation(vtkPVInformation* pvi)
 
   this->DataIsComposite = info->GetDataIsComposite();
   this->DataIsMultiPiece = info->GetDataIsMultiPiece();
+  // should be same across all the nodes
+  this->NumberOfAMRLevels = info->GetNumberOfAMRLevels();
+
   if (this->DataIsMultiPiece)
   {
     if (this->NumberOfPieces != info->NumberOfPieces)
@@ -342,7 +358,7 @@ void vtkPVCompositeDataInformation::CopyToStream(vtkClientServerStream* css)
   //  vtkTimerLog::MarkStartEvent("Copying composite information to stream");
   css->Reset();
   *css << vtkClientServerStream::Reply << this->DataIsComposite << this->DataIsMultiPiece
-       << this->NumberOfPieces;
+       << this->NumberOfPieces << this->NumberOfAMRLevels;
 
   unsigned int numChildren = static_cast<unsigned int>(this->Internal->ChildrenInformation.size());
   *css << numChildren;
@@ -390,13 +406,19 @@ void vtkPVCompositeDataInformation::CopyFromStream(const vtkClientServerStream* 
     return;
   }
 
+  if (!css->GetArgument(0, 3, &this->NumberOfAMRLevels))
+  {
+    vtkErrorMacro("Error parsing number of levels.");
+    return;
+  }
+
   unsigned int numChildren;
-  if (!css->GetArgument(0, 3, &numChildren))
+  if (!css->GetArgument(0, 4, &numChildren))
   {
     vtkErrorMacro("Error parsing number of children.");
     return;
   }
-  int msgIdx = 3;
+  int msgIdx = 4;
   this->Internal->ChildrenInformation.resize(numChildren);
 
   while (1)

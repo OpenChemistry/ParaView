@@ -36,7 +36,7 @@ class VTKPVSERVERIMPLEMENTATIONCORE_EXPORT vtkSIProxy : public vtkSIObject
 public:
   static vtkSIProxy* New();
   vtkTypeMacro(vtkSIProxy, vtkSIObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * This method is called before the deletion of the SIObject.
@@ -44,17 +44,17 @@ public:
    * a first pass on all SIObject with a AboutToDelete() we can simply delete the
    * remaining SIObjects.
    */
-  void AboutToDelete() VTK_OVERRIDE;
+  void AboutToDelete() override;
 
   /**
    * Push a new state to the underneath implementation
    */
-  void Push(vtkSMMessage* msg) VTK_OVERRIDE;
+  void Push(vtkSMMessage* msg) override;
 
   /**
    * Pull the current state of the underneath implementation
    */
-  void Pull(vtkSMMessage* msg) VTK_OVERRIDE;
+  void Pull(vtkSMMessage* msg) override;
 
   //@{
   /**
@@ -130,9 +130,20 @@ public:
    */
   virtual bool ExtendDefinition(const char* xml);
 
+  /**
+   * A helper that makes up an default name if none is provided.
+   */
+  const char* GetLogNameOrDefault();
+
 protected:
   vtkSIProxy();
   ~vtkSIProxy() override;
+
+  /**
+   * Create an instance of the class specified. Default implementation uses
+   * `this->Interpreter->NewInstance()`.
+   */
+  virtual vtkObjectBase* NewVTKObject(const char* className);
 
   /**
    * Returns the subproxy helper for the subproxy with the given name, if any.
@@ -164,7 +175,7 @@ protected:
   /**
    * Called to delete VTK objects.
    */
-  void DeleteVTKObjects();
+  virtual void DeleteVTKObjects();
 
   /**
    * Called after CreateVTKObjects(). The main difference for subclasses when
@@ -200,6 +211,9 @@ protected:
   vtkSetStringMacro(XMLSubProxyName);
   vtkSetStringMacro(PostPush);
   vtkSetStringMacro(PostCreation);
+  vtkGetStringMacro(LogName);
+
+  void SetLogName(const char* name);
 
   char* VTKClassName;
   char* XMLGroup;
@@ -218,6 +232,9 @@ private:
 
   class vtkInternals;
   vtkInternals* Internals;
+
+  char* LogName;
+  std::string DefaultLogName;
 };
 
 #endif

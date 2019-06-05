@@ -169,8 +169,7 @@
                      clean_command="RemoveAllViewProxies"
                      command="AddViewProxy"
                      name="ViewModules"
-                     repeat_command="1"
-                     state_ignored="1">
+                     repeat_command="1">
         <ProxyGroupDomain name="groups">
           <Group name="views" />
         </ProxyGroupDomain>
@@ -189,16 +188,14 @@
       <DoubleVectorProperty command="SetSceneTime"
                             default_values="none"
                             name="AnimationTime"
-                            number_of_elements="1"
-                            precision="17">
+                            number_of_elements="1" >
         <Documentation>Set the current animation time.</Documentation>
       </DoubleVectorProperty>
       <DoubleVectorProperty command="SetStartTime"
                             default_values="0.0"
                             label="Start Time"
                             name="StartTime"
-                            number_of_elements="1"
-                            precision="17">
+                            number_of_elements="1" >
         <Documentation>Set the start time for the animation
         scene.</Documentation>
       </DoubleVectorProperty>
@@ -206,8 +203,7 @@
                             default_values="1.0"
                             label="End Time"
                             name="EndTime"
-                            number_of_elements="1"
-                            precision="17">
+                            number_of_elements="1" >
         <Documentation>Set the end time for the animation
         scene.</Documentation>
       </DoubleVectorProperty>
@@ -522,6 +518,30 @@
     <Proxy name="PNG" class="vtkPNGWriter" process="client"
       base_proxygroup="screenshot_writers"
       base_proxyname="PNG">
+      <StringVectorProperty name="SuffixFormat"
+        number_of_elements="1"
+        default_values=".%04d">
+        <Documentation>
+          Specify the suffix format string to use to add a suffix to the output
+          filenames based on the current timestep number.
+        </Documentation>
+      </StringVectorProperty>
+    </Proxy>
+    <Proxy name="TIFF" class="vtkTIFFWriter" process="client"
+      base_proxygroup="screenshot_writers"
+      base_proxyname="TIFF">
+      <StringVectorProperty name="SuffixFormat"
+        number_of_elements="1"
+        default_values=".%04d">
+        <Documentation>
+          Specify the suffix format string to use to add a suffix to the output
+          filenames based on the current timestep number.
+        </Documentation>
+      </StringVectorProperty>
+    </Proxy>
+    <Proxy name="BMP" class="vtkBMPWriter" process="client"
+      base_proxygroup="screenshot_writers"
+      base_proxyname="BMP">
       <StringVectorProperty name="SuffixFormat"
         number_of_elements="1"
         default_values=".%04d">

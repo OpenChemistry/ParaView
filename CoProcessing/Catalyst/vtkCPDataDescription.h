@@ -29,7 +29,7 @@ class VTKPVCATALYST_EXPORT vtkCPDataDescription : public vtkObject
 public:
   static vtkCPDataDescription* New();
   vtkTypeMacro(vtkCPDataDescription, vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /// Set the time step and current simulation time.
   void SetTimeData(double time, vtkIdType timeStep);
@@ -95,6 +95,10 @@ public:
   /// Set user defined information that can be passed from the
   /// adaptor to the coprocessing pipelines.
   vtkGetObjectMacro(UserData, vtkFieldData);
+
+  /// Copy of dataDescription. Does a deep copy of the data members
+  /// but a shallow copy of the vtkDataObjects.
+  void Copy(vtkCPDataDescription*);
 
 protected:
   vtkCPDataDescription();

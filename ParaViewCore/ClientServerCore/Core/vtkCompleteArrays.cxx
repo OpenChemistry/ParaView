@@ -17,6 +17,7 @@
 #include "vtkAbstractArray.h"
 #include "vtkCellData.h"
 #include "vtkClientServerStream.h"
+#include "vtkHyperTreeGrid.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkMultiProcessController.h"
@@ -150,6 +151,7 @@ int vtkCompleteArrays::FillInputPortInformation(int port, vtkInformation* info)
   if (port == 0)
   {
     info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkTable");
+    info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkHyperTreeGrid");
   }
   return 1;
 }
@@ -214,11 +216,21 @@ int vtkCompleteArrays::RequestData(
     return 1;
   }
 
+  vtkHyperTreeGrid* inputHTG = vtkHyperTreeGrid::SafeDownCast(input);
+  // let vtkHyperTreeGrid pass-through this filter
+  if (inputHTG)
+  {
+    vtkHyperTreeGrid* outputHTG = vtkHyperTreeGrid::SafeDownCast(output);
+    outputHTG->ShallowCopy(inputHTG);
+    return 1;
+  }
+
   // Initialize
   //
   vtkDebugMacro(<< "Completing array");
 
   outputDS->CopyStructure(inputDS);
+  outputDS->GetFieldData()->PassData(inputDS->GetFieldData());
   outputDS->GetPointData()->PassData(inputDS->GetPointData());
   outputDS->GetCellData()->PassData(inputDS->GetCellData());
 

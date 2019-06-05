@@ -44,7 +44,7 @@ class VTKPVSERVERMANAGERRENDERING_EXPORT vtkSMPVRepresentationProxy
 public:
   static vtkSMPVRepresentationProxy* New();
   vtkTypeMacro(vtkSMPVRepresentationProxy, vtkSMRepresentationProxy);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Returns true if scalar coloring is enabled. This checks whether a property
@@ -243,11 +243,11 @@ public:
    * Set the scalar bar visibility. This will create a new scalar bar as needed.
    * Scalar bar is only shown if scalar coloring is indeed being used.
    */
-  virtual bool SetScalarBarVisibility(vtkSMProxy* view, bool visibile);
-  static bool SetScalarBarVisibility(vtkSMProxy* proxy, vtkSMProxy* view, bool visibile)
+  virtual bool SetScalarBarVisibility(vtkSMProxy* view, bool visible);
+  static bool SetScalarBarVisibility(vtkSMProxy* proxy, vtkSMProxy* view, bool visible)
   {
     vtkSMPVRepresentationProxy* self = vtkSMPVRepresentationProxy::SafeDownCast(proxy);
-    return self ? self->SetScalarBarVisibility(view, visibile) : false;
+    return self ? self->SetScalarBarVisibility(view, visible) : false;
   }
   //@}
 
@@ -325,7 +325,7 @@ public:
    * colors, scalar coloring it setup properly. Currently this is hard-coded for
    * Volume and Slice representation types.
    */
-  bool SetRepresentationType(const char* type) VTK_OVERRIDE;
+  bool SetRepresentationType(const char* type) override;
 
   /**
    * True if ranges have to be computed independently on component 0 for the color
@@ -347,7 +347,7 @@ protected:
    * Overridden to ensure that the RepresentationTypesInfo and
    * Representations's domain are up-to-date.
    */
-  void CreateVTKObjects() VTK_OVERRIDE;
+  void CreateVTKObjects() override;
 
   // Whenever the "Representation" property is modified, we ensure that the
   // this->InvalidateDataInformation() is called.
@@ -358,12 +358,12 @@ protected:
    * "Input" properties for all internal representations (including setting up
    * of the link to the extract-selection representation).
    */
-  void SetPropertyModifiedFlag(const char* name, int flag) VTK_OVERRIDE;
+  void SetPropertyModifiedFlag(const char* name, int flag) override;
 
   /**
    * Overridden to process "RepresentationType" elements.
    */
-  int ReadXMLAttributes(vtkSMSessionProxyManager* pm, vtkPVXMLElement* element) VTK_OVERRIDE;
+  int ReadXMLAttributes(vtkSMSessionProxyManager* pm, vtkPVXMLElement* element) override;
 
   /**
    * In case of UseSeparateColorMap enabled, this function prefix the given

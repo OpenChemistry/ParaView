@@ -56,12 +56,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QKeyEvent>
 #include <QMenu>
 
-#include <assert.h>
+#include <cassert>
 
 //-----------------------------------------------------------------------------
 pqPipelineBrowserWidget::pqPipelineBrowserWidget(QWidget* parentObject)
   : Superclass(parentObject)
-  , PipelineModel(new pqPipelineModel(this))
+  , PipelineModel(
+      new pqPipelineModel(*pqApplicationCore::instance()->getServerManagerModel(), this))
   , FilteredPipelineModel(new pqPipelineAnnotationFilterModel(this))
   , ContextMenu(new QMenu(this))
 {
@@ -147,6 +148,20 @@ bool pqPipelineBrowserWidget::eventFilter(QObject* object, QEvent* eventArg)
   }
 
   return this->Superclass::eventFilter(object, eventArg);
+}
+
+//----------------------------------------------------------------------------
+bool pqPipelineBrowserWidget::viewportEvent(QEvent* evt)
+{
+  if (evt->type() == QEvent::FontChange)
+  {
+    // Pass the changed font to the model otherwise it doesn't use
+    // correct font for modified items.
+    QFont modifiedFont = this->font();
+    modifiedFont.setBold(true);
+    this->PipelineModel->setModifiedFont(modifiedFont);
+  }
+  return this->Superclass::viewportEvent(evt);
 }
 
 //----------------------------------------------------------------------------
@@ -259,7 +274,8 @@ void pqPipelineBrowserWidget::setVisibility(bool visible, const QModelIndexList&
   }
   if (pqView* view = pqActiveObjects::instance().activeView())
   {
-    if (view->getNumberOfVisibleDataRepresentations() == 1 && visible)
+    if (view->getNumberOfVisibleDataRepresentations() == 1 && visible &&
+      vtkPVGeneralSettings::GetInstance()->GetResetDisplayEmptyViews())
     {
       view->resetDisplay();
     }
@@ -280,8 +296,9 @@ void pqPipelineBrowserWidget::setVisibility(bool visible, pqOutputPort* port)
 {
   if (port)
   {
+    auto& activeObjects = pqActiveObjects::instance();
     vtkNew<vtkSMParaViewPipelineControllerWithRendering> controller;
-    pqView* activeView = pqActiveObjects::instance().activeView();
+    pqView* activeView = activeObjects.activeView();
     vtkSMViewProxy* viewProxy = activeView ? activeView->getViewProxy() : NULL;
     int scalarBarMode = vtkPVGeneralSettings::GetInstance()->GetScalarBarMode();
 
@@ -304,10 +321,24 @@ void pqPipelineBrowserWidget::setVisibility(bool visible, pqOutputPort* port)
       {
         // Make sure the given port is selected specially if we are in
         // multi-server / catalyst configuration type
-        pqActiveObjects::instance().setActivePort(port);
+        activeObjects.setActivePort(port);
       }
+
+      auto activeLayout = activeObjects.activeLayout();
+      const auto location = activeObjects.activeLayoutLocation();
+
       vtkSMProxy* repr = controller->SetVisibility(
         port->getSourceProxy(), port->getPortNumber(), viewProxy, visible);
+      if (visible && viewProxy == nullptr && repr)
+      {
+        // this implies that the controller would have created a new view.
+        // let's get that view so we toggle scalar bar visibility in that view
+        // and also add it to layout.
+        viewProxy = vtkSMViewProxy::FindView(repr);
+        controller->AssignViewToLayout(viewProxy, activeLayout, location);
+      }
+
+      // assign to layout, in case a new view is created.
       // update scalar bars: show new ones if needed. Hiding of scalar bars is
       // taken care of by vtkSMParaViewPipelineControllerWithRendering (I still
       // wonder if that's the best thing to do).

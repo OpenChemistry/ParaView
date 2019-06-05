@@ -49,6 +49,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <QPointer>
 
+#include <cassert>
+
 class pqFindDataCurrentSelectionFrame::pqInternals
 {
   vtkSmartPointer<vtkSMProxy> RepresentationProxy;
@@ -103,14 +105,14 @@ public:
       return;
     }
 
-    Q_ASSERT(server != NULL);
+    assert(server != NULL);
 
     if (this->ViewProxy && this->ViewProxy->GetSession() != server->session())
     {
       this->deleteSpreadSheet();
     }
 
-    Q_ASSERT(this->ViewProxy == NULL || (this->ViewProxy->GetSession() == server->session()));
+    assert(this->ViewProxy == NULL || (this->ViewProxy->GetSession() == server->session()));
     if (!this->ViewProxy)
     {
       vtkSMSessionProxyManager* pxm = server->proxyManager();
@@ -201,12 +203,12 @@ public:
   // combobox.
   void updateFieldType()
   {
-    if (this->RepresentationProxy)
+    if (this->ViewProxy)
     {
       int fieldType =
         this->Ui.showTypeComboBox->itemData(this->Ui.showTypeComboBox->currentIndex()).toInt();
-      vtkSMPropertyHelper(this->RepresentationProxy, "FieldAssociation").Set(fieldType);
-      this->RepresentationProxy->UpdateVTKObjects();
+      vtkSMPropertyHelper(this->ViewProxy, "FieldAssociation").Set(fieldType);
+      this->ViewProxy->UpdateVTKObjects();
       this->ViewProxy->StillRender();
     }
   }

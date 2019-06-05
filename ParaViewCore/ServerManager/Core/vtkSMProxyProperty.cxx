@@ -61,7 +61,6 @@ vtkStandardNewMacro(vtkSMProxyProperty);
 vtkSMProxyProperty::vtkSMProxyProperty()
 {
   this->PPInternals = new vtkSMProxyProperty::vtkPPInternals(this);
-  this->SkipDependency = false;
 }
 
 //---------------------------------------------------------------------------
@@ -305,11 +304,6 @@ void vtkSMProxyProperty::ReadFrom(
 //---------------------------------------------------------------------------
 int vtkSMProxyProperty::ReadXMLAttributes(vtkSMProxy* parent, vtkPVXMLElement* element)
 {
-  int skip_dependency;
-  if (element->GetScalarAttribute("skip_dependency", &skip_dependency))
-  {
-    this->SkipDependency = (skip_dependency == 1);
-  }
   return this->Superclass::ReadXMLAttributes(parent, element);
 }
 
@@ -323,10 +317,8 @@ void vtkSMProxyProperty::Copy(vtkSMProperty* src)
     return;
   }
 
-  vtkSMProxyListDomain* spld =
-    vtkSMProxyListDomain::SafeDownCast(src->FindDomain("vtkSMProxyListDomain"));
-  vtkSMProxyListDomain* tpld =
-    vtkSMProxyListDomain::SafeDownCast(this->FindDomain("vtkSMProxyListDomain"));
+  auto spld = src->FindDomain<vtkSMProxyListDomain>();
+  auto tpld = this->FindDomain<vtkSMProxyListDomain>();
 
   bool modified = false;
   bool unchecked_modified = false;
@@ -364,7 +356,6 @@ void vtkSMProxyProperty::Copy(vtkSMProperty* src)
 void vtkSMProxyProperty::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os, indent);
-  os << indent << "SkipDependency: " << this->SkipDependency << endl;
   // os << indent << "Values: ";
   // for (unsigned int i=0; i<this->GetNumberOfProxies(); i++)
   //  {

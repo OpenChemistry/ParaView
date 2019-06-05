@@ -65,7 +65,8 @@ void FEAdaptor::CoProcess(Grid& grid, Attributes& attributes, Particles& particl
     if (volumetricGridChannel->GetIfGridIsNecessary())
     { // only build the VTK volumetric grid if it's needed this time step
       vtkNew<vtkUnstructuredGrid> volumetricGrid;
-      this->BuildVTKVolumetricGridDataStructures(grid, attributes, volumetricGrid);
+      this->BuildVTKVolumetricGridDataStructures(
+        grid, attributes, volumetricGridChannel, volumetricGrid);
       volumetricGridChannel->SetGrid(volumetricGrid);
     }
     vtkCPInputDataDescription* particlesChannel =
@@ -73,6 +74,7 @@ void FEAdaptor::CoProcess(Grid& grid, Attributes& attributes, Particles& particl
     if (particlesChannel->GetIfGridIsNecessary())
     { // only build the VTK particles if it's needed this time step
       vtkNew<vtkPolyData> vtkparticles;
+      // the particles have no field data
       this->BuildVTKParticlesDataStructures(particles, vtkparticles);
       particlesChannel->SetGrid(vtkparticles);
     }
@@ -103,53 +105,58 @@ void FEAdaptor::BuildVTKVolumetricGrid(Grid& grid, vtkUnstructuredGrid* volumetr
   }
 }
 
-void FEAdaptor::UpdateVTKAttributes(
-  Grid& grid, Attributes& attributes, vtkUnstructuredGrid* volumetricGrid)
+void FEAdaptor::UpdateVTKAttributes(Grid& grid, Attributes& attributes,
+  vtkCPInputDataDescription* volumetricGridChannel, vtkUnstructuredGrid* volumetricGrid)
 {
-  if (volumetricGrid->GetPointData()->GetNumberOfArrays() == 0)
+  if (volumetricGridChannel->IsFieldNeeded("velocity", 0))
   {
-    // velocity array
-    vtkNew<vtkDoubleArray> velocity;
-    velocity->SetName("velocity");
-    velocity->SetNumberOfComponents(3);
-    velocity->SetNumberOfTuples(static_cast<vtkIdType>(grid.GetNumberOfPoints()));
-    volumetricGrid->GetPointData()->AddArray(velocity);
+    if (volumetricGrid->GetPointData()->GetNumberOfArrays() == 0)
+    {
+      // velocity array
+      vtkNew<vtkDoubleArray> velocity;
+      velocity->SetName("velocity");
+      velocity->SetNumberOfComponents(3);
+      velocity->SetNumberOfTuples(static_cast<vtkIdType>(grid.GetNumberOfPoints()));
+      volumetricGrid->GetPointData()->AddArray(velocity);
+    }
+    vtkDoubleArray* velocity =
+      vtkDoubleArray::SafeDownCast(volumetricGrid->GetPointData()->GetArray("velocity"));
+    // The velocity array is ordered as vx0,vx1,vx2,..,vy0,vy1,vy2,..,vz0,vz1,vz2,..
+    // so we need to create a full copy of it with VTK's ordering of
+    // vx0,vy0,vz0,vx1,vy1,vz1,..
+    double* velocityData = attributes.GetVelocityArray();
+    vtkIdType numTuples = velocity->GetNumberOfTuples();
+    for (vtkIdType i = 0; i < numTuples; i++)
+    {
+      double values[3] = { velocityData[i], velocityData[i + numTuples],
+        velocityData[i + 2 * numTuples] };
+      velocity->SetTypedTuple(i, values);
+    }
   }
-  if (volumetricGrid->GetCellData()->GetNumberOfArrays() == 0)
+  if (volumetricGridChannel->IsFieldNeeded("pressure", 1))
   {
-    // pressure array
-    vtkNew<vtkFloatArray> pressure;
-    pressure->SetName("pressure");
-    pressure->SetNumberOfComponents(1);
-    volumetricGrid->GetCellData()->AddArray(pressure);
+    if (volumetricGrid->GetCellData()->GetNumberOfArrays() == 0)
+    {
+      // pressure array
+      vtkNew<vtkFloatArray> pressure;
+      pressure->SetName("pressure");
+      pressure->SetNumberOfComponents(1);
+      volumetricGrid->GetCellData()->AddArray(pressure);
+    }
+    vtkFloatArray* pressure =
+      vtkFloatArray::SafeDownCast(volumetricGrid->GetCellData()->GetArray("pressure"));
+    // The pressure array is a scalar array so we can reuse
+    // memory as long as we ordered the points properly.
+    float* pressureData = attributes.GetPressureArray();
+    pressure->SetArray(pressureData, static_cast<vtkIdType>(grid.GetNumberOfCells()), 1);
   }
-  vtkDoubleArray* velocity =
-    vtkDoubleArray::SafeDownCast(volumetricGrid->GetPointData()->GetArray("velocity"));
-  // The velocity array is ordered as vx0,vx1,vx2,..,vy0,vy1,vy2,..,vz0,vz1,vz2,..
-  // so we need to create a full copy of it with VTK's ordering of
-  // vx0,vy0,vz0,vx1,vy1,vz1,..
-  double* velocityData = attributes.GetVelocityArray();
-  vtkIdType numTuples = velocity->GetNumberOfTuples();
-  for (vtkIdType i = 0; i < numTuples; i++)
-  {
-    double values[3] = { velocityData[i], velocityData[i + numTuples],
-      velocityData[i + 2 * numTuples] };
-    velocity->SetTypedTuple(i, values);
-  }
-
-  vtkFloatArray* pressure =
-    vtkFloatArray::SafeDownCast(volumetricGrid->GetCellData()->GetArray("pressure"));
-  // The pressure array is a scalar array so we can reuse
-  // memory as long as we ordered the points properly.
-  float* pressureData = attributes.GetPressureArray();
-  pressure->SetArray(pressureData, static_cast<vtkIdType>(grid.GetNumberOfCells()), 1);
 }
 
-void FEAdaptor::BuildVTKVolumetricGridDataStructures(
-  Grid& grid, Attributes& attributes, vtkUnstructuredGrid* volumetricGrid)
+void FEAdaptor::BuildVTKVolumetricGridDataStructures(Grid& grid, Attributes& attributes,
+  vtkCPInputDataDescription* volumetricGridChannel, vtkUnstructuredGrid* volumetricGrid)
 {
   this->BuildVTKVolumetricGrid(grid, volumetricGrid);
-  this->UpdateVTKAttributes(grid, attributes, volumetricGrid);
+  this->UpdateVTKAttributes(grid, attributes, volumetricGridChannel, volumetricGrid);
 }
 
 void FEAdaptor::BuildVTKParticlesDataStructures(Particles& particles, vtkPolyData* vtkparticles)

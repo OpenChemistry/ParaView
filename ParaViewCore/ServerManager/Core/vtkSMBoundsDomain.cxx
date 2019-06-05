@@ -22,8 +22,11 @@
 #include "vtkPVXMLElement.h"
 #include "vtkSMArrayRangeDomain.h"
 #include "vtkSMDoubleVectorProperty.h"
+#include "vtkSMIntVectorProperty.h"
 #include "vtkSMSourceProxy.h"
 #include "vtkSMUncheckedPropertyHelper.h"
+
+#include <cmath>
 
 vtkStandardNewMacro(vtkSMBoundsDomain);
 //---------------------------------------------------------------------------
@@ -31,6 +34,7 @@ vtkSMBoundsDomain::vtkSMBoundsDomain()
 {
   this->Mode = vtkSMBoundsDomain::NORMAL;
   this->ScaleFactor = 0.1;
+  this->AxisFlags = X_Y_AND_Z_AXES;
   this->ArrayRangeDomain = NULL;
 }
 
@@ -50,6 +54,16 @@ void vtkSMBoundsDomain::Update(vtkSMProperty*)
   {
     this->UpdateOriented();
     return;
+  }
+
+  auto* flagsInfo = this->GetAxisFlagsInformation();
+  if (flagsInfo)
+  {
+    this->AxisFlags = flagsInfo->GetUncheckedElement(0);
+  }
+  else
+  {
+    this->AxisFlags = X_Y_AND_Z_AXES;
   }
 
   vtkPVDataInformation* info = this->GetInputInformation();
@@ -81,6 +95,18 @@ vtkPVDataInformation* vtkSMBoundsDomain::GetInputInformation()
     }
   }
   return NULL;
+}
+
+//---------------------------------------------------------------------------
+vtkSMIntVectorProperty* vtkSMBoundsDomain::GetAxisFlagsInformation()
+{
+  return vtkSMIntVectorProperty::SafeDownCast(this->GetRequiredProperty("AxisFlags"));
+}
+
+//---------------------------------------------------------------------------
+bool vtkSMBoundsDomain::IsAxisEnabled(int axis)
+{
+  return (this->AxisFlags & (1 << axis)) != 0;
 }
 
 //---------------------------------------------------------------------------
@@ -190,7 +216,10 @@ void vtkSMBoundsDomain::SetDomainValues(double bounds[6])
     std::vector<vtkEntry> entries;
     for (int j = 0; j < 3; j++)
     {
-      entries.push_back(vtkEntry(bounds[2 * j], bounds[2 * j + 1]));
+      if (this->IsAxisEnabled(j))
+      {
+        entries.push_back(vtkEntry(bounds[2 * j], bounds[2 * j + 1]));
+      }
     }
     this->SetEntries(entries);
   }
@@ -199,8 +228,11 @@ void vtkSMBoundsDomain::SetDomainValues(double bounds[6])
     std::vector<vtkEntry> entries;
     for (int j = 0; j < 3; j++)
     {
-      entries.push_back(vtkEntry(bounds[2 * j], bounds[2 * j + 1]));
-      entries.push_back(vtkEntry(bounds[2 * j], bounds[2 * j + 1]));
+      if (this->IsAxisEnabled(j))
+      {
+        entries.push_back(vtkEntry(bounds[2 * j], bounds[2 * j + 1]));
+        entries.push_back(vtkEntry(bounds[2 * j], bounds[2 * j + 1]));
+      }
     }
     this->SetEntries(entries);
   }
@@ -209,7 +241,10 @@ void vtkSMBoundsDomain::SetDomainValues(double bounds[6])
     std::vector<vtkEntry> entries;
     for (int j = 0; j < 3; j++)
     {
-      entries.push_back(vtkEntry(0, bounds[2 * j + 1] - bounds[2 * j]));
+      if (this->IsAxisEnabled(j))
+      {
+        entries.push_back(vtkEntry(0, bounds[2 * j + 1] - bounds[2 * j]));
+      }
     }
     this->SetEntries(entries);
   }
@@ -276,7 +311,6 @@ void vtkSMBoundsDomain::SetDomainValues(double bounds[6])
     entries.push_back(vtkEntry(0, maxbounds));
     this->SetEntries(entries);
   }
-
   else if (this->Mode == vtkSMBoundsDomain::APPROXIMATE_CELL_LENGTH)
   {
     double diameter = sqrt((bounds[1] - bounds[0]) * (bounds[1] - bounds[0]) +
@@ -284,6 +318,19 @@ void vtkSMBoundsDomain::SetDomainValues(double bounds[6])
       (bounds[5] - bounds[4]) * (bounds[5] - bounds[4]));
     std::vector<vtkEntry> entries;
     entries.push_back(vtkEntry(0, diameter));
+    this->SetEntries(entries);
+  }
+  else if (this->Mode == vtkSMBoundsDomain::COMPONENT_MAGNITUDE)
+  {
+    if (vtkMath::AreBoundsInitialized(bounds) == 0)
+    {
+      return;
+    }
+
+    std::vector<vtkEntry> entries;
+    entries.emplace_back(vtkEntry(0, bounds[1] - bounds[0]));
+    entries.emplace_back(vtkEntry(0, bounds[3] - bounds[2]));
+    entries.emplace_back(vtkEntry(0, bounds[5] - bounds[4]));
     this->SetEntries(entries);
   }
 }
@@ -301,12 +348,12 @@ int vtkSMBoundsDomain::SetDefaultValues(vtkSMProperty* property, bool use_unchec
       double unitDistance = 1.0;
       if (vtkMath::AreBoundsInitialized(bounds))
       {
-        double diameter = sqrt((bounds[1] - bounds[0]) * (bounds[1] - bounds[0]) +
+        const double diameter = sqrt((bounds[1] - bounds[0]) * (bounds[1] - bounds[0]) +
           (bounds[3] - bounds[2]) * (bounds[3] - bounds[2]) +
           (bounds[5] - bounds[4]) * (bounds[5] - bounds[4]));
 
-        int numCells = dataInfo->GetNumberOfCells();
-        double linearNumCells = pow((double)numCells, (1.0 / 3.0));
+        const auto numCells = dataInfo->GetNumberOfCells();
+        const double linearNumCells = std::cbrt(numCells);
         unitDistance = diameter;
         if (linearNumCells != 0.0 && !vtkMath::IsNan(linearNumCells) &&
           !vtkMath::IsInf(linearNumCells))
@@ -346,6 +393,10 @@ int vtkSMBoundsDomain::ReadXMLAttributes(vtkSMProperty* prop, vtkPVXMLElement* e
     else if (strcmp(mode, "oriented_magnitude") == 0)
     {
       this->Mode = vtkSMBoundsDomain::ORIENTED_MAGNITUDE;
+    }
+    else if (strcmp(mode, "component_magnitude") == 0)
+    {
+      this->Mode = vtkSMBoundsDomain::COMPONENT_MAGNITUDE;
     }
     else if (strcmp(mode, "scaled_extent") == 0)
     {
@@ -413,6 +464,14 @@ void vtkSMBoundsDomain::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os, indent);
 
+  static const char xyz[] = "XYZ";
+
   os << indent << "Mode: " << this->Mode << endl;
   os << indent << "ScaleFactor: " << this->ScaleFactor << endl;
+  os << indent << "AxisFlags: ";
+  for (int i = 0; i < 3; ++i)
+  {
+    os << xyz[i] << ":" << ((this->AxisFlags & (1 << i)) ? "On" : "Off") << " ";
+  }
+  os << endl;
 }

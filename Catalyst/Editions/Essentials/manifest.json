@@ -25,8 +25,6 @@
         { "class":"vtkPVContourFilter" },
         { "class":"vtkPVCylinder" },
         { "class":"vtkPVDataSetAlgorithmSelectorFilter" },
-        { "class":"vtkPVGlyphFilter" },
-        { "class":"vtkPVLegacyGlyphFilter" },
         { "class":"vtkPVMetaClipDataSet" },
         { "class":"vtkPVMetaSliceDataSet" },
         { "class":"vtkPVPlane" }
@@ -80,7 +78,6 @@
         { "class":"vtkCellCenters" },
         { "class":"vtkClipDataSet" },
         { "class":"vtkClipVolume" },
-        { "class":"vtkPassArrays" },
         { "class":"vtkTableBasedClipDataSet" }
       ],
       "replace":[
@@ -101,7 +98,6 @@
         "Cut",
         "ExtractGeometry",
         "Glyph",
-        "LegacyGlyph",
         "PassArrays"
       ]
     },

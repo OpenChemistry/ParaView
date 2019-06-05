@@ -37,10 +37,14 @@ def CreateCoProcessor():
         elif  grid.IsA('vtkMultiBlockDataSet'):
           writer = servermanager.writers.XMLMultiBlockDataWriter(Input=adaptorinput)
           extension = '.vtm'
+        elif  grid.IsA('vtkHyperTreeGrid'):
+          writer = servermanager.writers.HyperTreeGridWriter(Input=adaptorinput)
+          extension = '.htg'
         else:
           print("Don't know how to create a writer for a ", grid.GetClassName())
 
         if extension:
+          name = name.translate(None, '/') # Get rid of any slashes in the channel name
           coprocessor.RegisterWriter(writer, filename=name+'_%t'+extension, freq=outputfrequency)
 
     return Pipeline()

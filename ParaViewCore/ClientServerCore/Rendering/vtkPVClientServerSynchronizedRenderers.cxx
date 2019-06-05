@@ -23,7 +23,7 @@
 #include "vtkSquirtCompressor.h"
 #include "vtkUnsignedCharArray.h"
 #include "vtkZlibImageCompressor.h"
-#ifdef PARAVIEW_ENABLE_NVPIPE
+#if VTK_MODULE_ENABLE_ParaView_nvpipe
 #include "vtkNvPipeCompressor.h"
 #endif
 
@@ -192,7 +192,7 @@ void vtkPVClientServerSynchronizedRenderers::ConfigureCompressor(const char* str
     }
     else if (className == "vtkNvPipeCompressor" && this->NVPipeSupport)
     {
-#ifdef PARAVIEW_ENABLE_NVPIPE
+#if VTK_MODULE_ENABLE_ParaView_nvpipe
       comp = vtkNvPipeCompressor::New();
 #else
       assert(false);
@@ -229,26 +229,6 @@ void vtkPVClientServerSynchronizedRenderers::ConfigureCompressor(const char* str
   {
     vtkWarningMacro("Could not configure the compressor, invalid stream. " << stream << ".");
   }
-}
-
-//----------------------------------------------------------------------------
-void vtkPVClientServerSynchronizedRenderers::PushImageToScreen()
-{
-  // This trick allows us to not clear the color buffer before pasting back
-  // the image from the server. This makes it possible to preserve any
-  // annotations rendered esp. vtkGridAxes3DActor which renders in multiple
-  // layers.
-  // This is not the most elegant solution. We should rethink if
-  // vtkSynchronizedRenderers::PushImageToScreen() should clear the screen by
-  // default -- I can argue not.
-  int layer = this->Renderer->GetLayer();
-  int prev = this->Renderer->GetPreserveColorBuffer();
-  if (layer == 0)
-  {
-    this->Renderer->SetPreserveColorBuffer(1);
-  }
-  this->Superclass::PushImageToScreen();
-  this->Renderer->SetPreserveColorBuffer(prev);
 }
 
 //----------------------------------------------------------------------------

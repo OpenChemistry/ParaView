@@ -16,7 +16,6 @@
 
 #include "vtkClientServerStream.h"
 #include "vtkObjectFactory.h"
-#include "vtkPVConfig.h" // needed for DEFAULT_DOUBLE_PRECISION_VALUE
 #include "vtkPVXMLElement.h"
 #include "vtkProcessModule.h"
 #include "vtkSMMessage.h"
@@ -39,7 +38,6 @@ vtkSMDoubleVectorProperty::vtkSMDoubleVectorProperty()
 {
   this->Internals = new vtkInternals(this);
   this->ArgumentIsArray = 0;
-  this->Precision = DEFAULT_DOUBLE_PRECISION_VALUE;
 }
 
 //---------------------------------------------------------------------------
@@ -211,12 +209,6 @@ int vtkSMDoubleVectorProperty::ReadXMLAttributes(vtkSMProxy* proxy, vtkPVXMLElem
     this->SetArgumentIsArray(arg_is_array);
   }
 
-  int precision = 0;
-  if (element->GetScalarAttribute("precision", &precision))
-  {
-    this->SetPrecision(precision);
-  }
-
   int numElems = this->GetNumberOfElements();
   if (numElems > 0)
   {
@@ -284,8 +276,6 @@ void vtkSMDoubleVectorProperty::PrintSelf(ostream& os, vtkIndent indent)
   this->Superclass::PrintSelf(os, indent);
 
   os << indent << "ArgumentIsArray: " << this->ArgumentIsArray << endl;
-  os << indent << "Precision: " << this->Precision << endl;
-
   os << indent << "Values: ";
   for (unsigned int i = 0; i < this->GetNumberOfElements(); i++)
   {

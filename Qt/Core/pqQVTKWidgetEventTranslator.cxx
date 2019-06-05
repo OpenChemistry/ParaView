@@ -43,7 +43,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QEvent>
 #include <QMouseEvent>
 
-#include "pqQVTKWidgetBase.h"
+#include "QVTKOpenGLNativeWidget.h"
+#include "QVTKOpenGLWidget.h"
+#include "QVTKOpenGLWindow.h"
+
 pqQVTKWidgetEventTranslator::pqQVTKWidgetEventTranslator(QObject* p)
   : pqWidgetEventTranslator(p)
 {
@@ -56,8 +59,30 @@ pqQVTKWidgetEventTranslator::~pqQVTKWidgetEventTranslator()
 bool pqQVTKWidgetEventTranslator::translateEvent(
   QObject* Object, QEvent* Event, int eventType, bool& error)
 {
-  pqQVTKWidgetBase* const widget = qobject_cast<pqQVTKWidgetBase*>(Object);
+  // Only translate events for QWidget subclasses that internally use a render
+  // window
+  QWidget* const widget = qobject_cast<QWidget*>(Object);
   if (!widget)
+  {
+    return false;
+  }
+
+  // Look for a render window in the possible widget types.
+  vtkRenderWindow* rw = nullptr;
+
+  if (QVTKOpenGLWidget* const qvtkWidget = qobject_cast<QVTKOpenGLWidget*>(Object))
+  {
+    rw = qvtkWidget->embeddedOpenGLWindow() ? qvtkWidget->renderWindow() : nullptr;
+  }
+
+  if (QVTKOpenGLNativeWidget* const qvtkNativeWidget =
+        qobject_cast<QVTKOpenGLNativeWidget*>(Object))
+  {
+    rw = qvtkNativeWidget->renderWindow();
+  }
+
+  // Could not find a render window, don't translate the event
+  if (rw == nullptr)
   {
     return false;
   }
@@ -100,7 +125,7 @@ bool pqQVTKWidgetEventTranslator::translateEvent(
           double normalized_x = mouseEvent->x() / static_cast<double>(size.width());
           double normalized_y = mouseEvent->y() / static_cast<double>(size.height());
           // Move to the place where the mouse was released and then release it.
-          // This mimicks drag without actually having to save all the intermediate
+          // This mimics drag without actually having to save all the intermediate
           // mouse move positions.
           emit recordEvent(widget, "mouseMove", QString("(%1,%2,%3,%4,%5)")
                                                   .arg(normalized_x)
@@ -150,7 +175,8 @@ bool pqQVTKWidgetEventTranslator::translateEvent(
 
       // Resize widget to 300x300
       int width = 300, height = 300;
-      QSize old_size = widget->maximumSize();
+      QSize oldSize = widget->size();
+      QSize oldMaxSize = widget->maximumSize();
       widget->setMaximumSize(width, height);
       widget->resize(width, height);
 
@@ -175,16 +201,17 @@ bool pqQVTKWidgetEventTranslator::translateEvent(
       {
         error = false;
         testUtil->pauseRecords(false);
-        widget->setMaximumSize(old_size);
+        widget->setMaximumSize(oldMaxSize);
+        widget->resize(oldSize);
         return true;
       }
       QString file = file_dialog.getSelectedFiles()[0];
 
       // Save screenshot
-      int offRen = widget->GetRenderWindow()->GetOffScreenRendering();
-      widget->GetRenderWindow()->SetOffScreenRendering(1);
-      pqCoreTestUtility::SaveScreenshot(widget->GetRenderWindow(), file);
-      widget->GetRenderWindow()->SetOffScreenRendering(offRen);
+      int offRen = rw->GetOffScreenRendering();
+      rw->SetOffScreenRendering(1);
+      pqCoreTestUtility::SaveScreenshot(rw, file);
+      rw->SetOffScreenRendering(offRen);
 
       // Get a relative to saved file
       QString relPathFile = baselineDir.relativeFilePath(file);
@@ -193,8 +220,8 @@ bool pqQVTKWidgetEventTranslator::translateEvent(
       testUtil->pauseRecords(false);
 
       // Restore widget size
-      widget->setMaximumSize(old_size);
-      widget->resize(old_size);
+      widget->setMaximumSize(oldMaxSize);
+      widget->resize(oldSize);
 
       // Emit record signal
       emit recordEvent(Object, pqCoreTestUtility::PQ_COMPAREVIEW_PROPERTY_NAME,

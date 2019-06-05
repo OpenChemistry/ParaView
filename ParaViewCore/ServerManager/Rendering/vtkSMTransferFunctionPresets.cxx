@@ -61,7 +61,7 @@ public:
           stream << iter->toStyledString().c_str();
         }
         stream << "]";
-        settings->SetSetting("TransferFuctionPresets.CustomPresets", stream.str());
+        settings->SetSetting("TransferFunctionPresets.CustomPresets", stream.str());
       }
     }
   }
@@ -202,7 +202,7 @@ private:
     }
     this->CustomPresetsLoaded = true;
 
-    const char* const settingsKey = "TransferFuctionPresets.CustomPresets";
+    const char* const settingsKey = "TransferFunctionPresets.CustomPresets";
     vtkSMSettings* settings = vtkSMSettings::GetInstance();
     if (settings == NULL || !settings->HasSetting(settingsKey))
     {
@@ -274,6 +274,12 @@ const Json::Value& vtkSMTransferFunctionPresets::GetFirstPresetWithName(const ch
     }
   }
   return nullValue;
+}
+
+//----------------------------------------------------------------------------
+bool vtkSMTransferFunctionPresets::HasPreset(const char* name)
+{
+  return !this->GetFirstPresetWithName(name).isNull();
 }
 
 //----------------------------------------------------------------------------
@@ -384,6 +390,16 @@ bool vtkSMTransferFunctionPresets::GetPresetHasIndexedColors(const Json::Value& 
 bool vtkSMTransferFunctionPresets::GetPresetHasAnnotations(const Json::Value& preset)
 {
   return (!preset.empty() && preset.isMember("Annotations"));
+}
+
+//----------------------------------------------------------------------------
+bool vtkSMTransferFunctionPresets::IsPresetDefault(const Json::Value& preset)
+{
+  if (preset.empty() || !preset.isMember("DefaultMap"))
+  {
+    return false;
+  }
+  return preset["DefaultMap"].asBool();
 }
 
 //----------------------------------------------------------------------------

@@ -36,6 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqActiveObjects.h"
 #include "pqChooseColorPresetReaction.h"
 #include "pqColorTableModel.h"
+#include "pqCoreUtilities.h"
 #include "pqDataRepresentation.h"
 #include "pqOpacityTableModel.h"
 #include "pqPipelineRepresentation.h"
@@ -64,13 +65,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkWeakPointer.h"
 #include "vtk_jsoncpp.h"
 
-#include <QDoubleValidator>
 #include <QMessageBox>
 #include <QPointer>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QtDebug>
 
+#include <cassert>
 #include <cmath>
 
 namespace
@@ -120,6 +121,8 @@ public:
   QPointer<pqColorOpacityEditorWidgetDecorator> Decorator;
   vtkWeakPointer<vtkSMPropertyGroup> PropertyGroup;
   vtkWeakPointer<vtkSMProxy> ScalarOpacityFunctionProxy;
+  QScopedPointer<QAction> TempAction;
+  QScopedPointer<pqChooseColorPresetReaction> ChoosePresetReaction;
 
   // We use this pqPropertyLinks instance to simply monitor smproperty changes.
   pqPropertyLinks LinksForMonitoringChanges;
@@ -130,9 +133,10 @@ public:
     : ColorTableModel(self)
     , OpacityTableModel(self)
     , PropertyGroup(group)
+    , TempAction(new QAction(self))
+    , ChoosePresetReaction(new pqChooseColorPresetReaction(this->TempAction.data(), false))
   {
     this->Ui.setupUi(self);
-    this->Ui.CurrentDataValue->setValidator(new QDoubleValidator(self));
     this->Ui.mainLayout->setMargin(pqPropertiesPanel::suggestedMargin());
     // this->Ui.mainLayout->setSpacing(
     //  pqPropertiesPanel::suggestedVerticalSpacing());
@@ -148,6 +152,9 @@ public:
     this->Ui.OpacityTable->horizontalHeader()->setHighlightSections(false);
     this->Ui.OpacityTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     this->Ui.OpacityTable->horizontalHeader()->setStretchLastSection(true);
+
+    QObject::connect(
+      this->ChoosePresetReaction.data(), SIGNAL(presetApplied()), self, SLOT(presetApplied()));
   }
 
   void render()
@@ -481,7 +488,7 @@ void pqColorOpacityEditorWidget::updateCurrentData()
   {
     double xrgbms[6];
     stc->GetNodeValue(ui.ColorEditor->currentPoint(), xrgbms);
-    ui.CurrentDataValue->setText(QString::number(xrgbms[0]));
+    ui.CurrentDataValue->setText(pqCoreUtilities::number(xrgbms[0]));
 
     // Don't enable widget for first/last control point. For those, users must
     // rescale the transfer function manually
@@ -492,7 +499,7 @@ void pqColorOpacityEditorWidget::updateCurrentData()
   {
     double xvms[4];
     pwf->GetNodeValue(ui.OpacityEditor->currentPoint(), xvms);
-    ui.CurrentDataValue->setText(QString::number(xvms[0]));
+    ui.CurrentDataValue->setText(pqCoreUtilities::number(xvms[0]));
 
     // Don't enable widget for first/last control point. For those, users must
     // rescale the transfer function manually
@@ -789,13 +796,8 @@ void pqColorOpacityEditorWidget::invertTransferFunctions()
 //-----------------------------------------------------------------------------
 void pqColorOpacityEditorWidget::choosePreset(const char* presetName)
 {
-  QAction* tmp = new QAction(NULL);
-  pqChooseColorPresetReaction* ccpr = new pqChooseColorPresetReaction(tmp, false);
-  ccpr->setTransferFunction(this->proxy());
-  this->connect(ccpr, SIGNAL(presetApplied()), SLOT(presetApplied()));
-  ccpr->choosePreset(presetName);
-  delete ccpr;
-  delete tmp;
+  this->Internals->ChoosePresetReaction->setTransferFunction(this->proxy());
+  this->Internals->ChoosePresetReaction->choosePreset(presetName);
 }
 
 //-----------------------------------------------------------------------------
@@ -829,7 +831,7 @@ void pqColorOpacityEditorWidget::saveAsPreset()
     return;
   }
 
-  Q_ASSERT(ui.saveColors->isChecked());
+  assert(ui.saveColors->isChecked());
   Json::Value preset = vtkSMTransferFunctionProxy::GetStateAsPreset(this->proxy());
 
   if (ui.saveOpacities->isChecked())

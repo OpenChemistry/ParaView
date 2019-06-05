@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Qt Includes.
 #include <QApplication>
+#include <QDebug>
 #include <QPainter>
 #include <QPixmap>
 #include <QStyle>
@@ -96,7 +97,11 @@ QModelIndex pqProxySILModel::mapToSource(const QModelIndex& proxyIndex) const
   }
   else if (proxyIndex.isValid())
   {
-    return silModel->makeIndex(static_cast<vtkIdType>(proxyIndex.internalId()));
+    if (proxyIndex.column() < silModel->columnCount())
+    {
+      return silModel->makeIndex(static_cast<vtkIdType>(proxyIndex.internalId()));
+    }
+    return QModelIndex();
   }
 
   return silModel->hierarchyIndex(this->HierarchyName);
@@ -148,86 +153,55 @@ void pqProxySILModel::onCheckStatusChanged()
 
 //-----------------------------------------------------------------------------
 QVariant pqProxySILModel::headerData(
-  int section, Qt::Orientation, int role /*= Qt::DisplayRole*/) const
+  int section, Qt::Orientation orientation, int role /*= Qt::DisplayRole*/) const
 {
-  if (section == (this->columnCount() - 1))
+  Q_UNUSED(section);
+
+  // we want align all text to the left-vcenter.
+  if (role == Qt::TextAlignmentRole && orientation == Qt::Horizontal)
   {
-    return QVariant();
+    return QVariant(Qt::AlignLeft | Qt::AlignVCenter);
   }
-  if (this->noCheckBoxes && (role == Qt::DecorationRole || role == Qt::CheckStateRole))
-  {
-    return QVariant();
-  }
-  else if (role == Qt::DisplayRole && this->HeaderTitle != "")
-  {
-    return this->HeaderTitle;
-  }
-  //
-  //
-  //
+
   if (role == Qt::DisplayRole)
   {
-    return this->HierarchyName;
+    return this->HeaderTitle.isEmpty() == false ? this->HeaderTitle : this->HierarchyName;
   }
-  else if (role == Qt::DecorationRole)
+  else if (this->noCheckBoxes == false && role == Qt::CheckStateRole)
   {
     QModelIndex srcIndex = this->mapToSource(QModelIndex());
     Qt::ItemFlags iflags = this->sourceModel()->flags(srcIndex);
     if ((iflags & Qt::ItemIsUserCheckable) || (iflags & Qt::ItemIsTristate))
     {
-      int checkState = this->sourceModel()->data(srcIndex, Qt::CheckStateRole).toInt();
-      switch (checkState)
-      {
-        case Qt::Checked:
-          return QVariant(this->CheckboxPixmaps[0]);
-
-        case Qt::PartiallyChecked:
-          return QVariant(this->CheckboxPixmaps[1]);
-
-        default:
-          return QVariant(this->CheckboxPixmaps[2]);
-      }
+      return this->sourceModel()->data(srcIndex, Qt::CheckStateRole);
     }
   }
 
   return QVariant();
 }
+
+//-----------------------------------------------------------------------------
+bool pqProxySILModel::setHeaderData(
+  int section, Qt::Orientation orientation, const QVariant& value, int role)
+{
+  if (role == Qt::CheckStateRole && orientation == Qt::Horizontal)
+  {
+    Q_UNUSED(section);
+    const QModelIndex srcIndex = this->mapToSource(QModelIndex());
+    auto srcModel = this->sourceModel();
+    return srcModel->setData(srcIndex, value, Qt::CheckStateRole);
+  }
+  return false;
+}
+
 //-----------------------------------------------------------------------------
 QVariant pqProxySILModel::data(const QModelIndex& proxyIndex, int role) const
 {
-  if (proxyIndex.column() == (this->columnCount() - 1))
-  {
-    if (role == Qt::DisplayRole)
-    {
-      // One based indexing works well with Exodus block ids
-      return QVariant(proxyIndex.row() + 1);
-    }
-    else
-    {
-      return QVariant();
-    }
-  }
   if (this->noCheckBoxes && (role == Qt::DecorationRole || role == Qt::CheckStateRole))
   {
     return QVariant();
   }
   return QAbstractProxyModel::data(proxyIndex, role);
-}
-
-//-----------------------------------------------------------------------------
-
-//-----------------------------------------------------------------------------
-void pqProxySILModel::toggleRootCheckState()
-{
-  int checkState = this->data(QModelIndex(), Qt::CheckStateRole).toInt();
-  if (checkState == Qt::PartiallyChecked || checkState == Qt::Unchecked)
-  {
-    this->setData(QModelIndex(), Qt::Checked, Qt::CheckStateRole);
-  }
-  else
-  {
-    this->setData(QModelIndex(), Qt::Unchecked, Qt::CheckStateRole);
-  }
 }
 
 //-----------------------------------------------------------------------------
@@ -243,14 +217,17 @@ void pqProxySILModel::setHeaderTitle(QString& title)
 //-----------------------------------------------------------------------------
 Qt::ItemFlags pqProxySILModel::flags(const QModelIndex& idx) const
 {
-  QModelIndex srcIndex = this->mapToSource(idx);
-  Qt::ItemFlags iflags = this->sourceModel()->flags(srcIndex);
-
-  if (this->noCheckBoxes)
+  Qt::ItemFlags iflags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+  if (idx.isValid() && (idx.column() < this->sourceModel()->columnCount()))
   {
-    Qt::ItemFlags mask = Qt::ItemIsUserCheckable | Qt::ItemIsTristate;
-    mask = ~mask;
-    iflags = iflags & mask;
+    QModelIndex srcIndex = this->mapToSource(idx);
+    iflags = this->sourceModel()->flags(srcIndex);
+    if (this->noCheckBoxes)
+    {
+      Qt::ItemFlags mask = Qt::ItemIsUserCheckable | Qt::ItemIsTristate;
+      mask = ~mask;
+      iflags = iflags & mask;
+    }
   }
   return iflags;
 }

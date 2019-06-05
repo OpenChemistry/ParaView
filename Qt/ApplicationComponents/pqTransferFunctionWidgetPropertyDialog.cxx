@@ -34,7 +34,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "pqTransferFunctionWidgetPropertyWidget.h"
 #include "vtkPiecewiseFunction.h"
+
+#include <QAction>
+#include <QDoubleValidator>
 #include <QString>
+#include <QStyle>
 
 class pqTransferFunctionWidgetPropertyDialog::pqInternals
 {
@@ -44,10 +48,11 @@ public:
   pqInternals(pqTransferFunctionWidgetPropertyDialog* self) { this->Ui.setupUi(self); }
 };
 
-pqTransferFunctionWidgetPropertyDialog::pqTransferFunctionWidgetPropertyDialog(
-  const QString& label, double* xrange, vtkPiecewiseFunction* transferFunction, QWidget* parentWdg)
+pqTransferFunctionWidgetPropertyDialog::pqTransferFunctionWidgetPropertyDialog(const QString& label,
+  vtkPiecewiseFunction* transferFunction, QWidget* propertyWdg, QWidget* parentWdg)
   : QDialog(parentWdg)
   , TransferFunction(transferFunction)
+  , PropertyWidget(propertyWdg)
   , Internals(new pqTransferFunctionWidgetPropertyDialog::pqInternals(this))
 {
   this->setWindowTitle(label);
@@ -59,35 +64,48 @@ pqTransferFunctionWidgetPropertyDialog::pqTransferFunctionWidgetPropertyDialog(
   QDoubleValidator* validator = new QDoubleValidator(this);
   this->Internals->Ui.minX->setValidator(validator);
   this->Internals->Ui.maxX->setValidator(validator);
-  this->Internals->Ui.minX->setText(QString::number(xrange[0]));
-  this->Internals->Ui.maxX->setText(QString::number(xrange[1]));
+  this->updateRange();
 
-  QObject::connect(this->Internals->Ui.minX, SIGNAL(textChangedAndEditingFinished()), this,
-    SLOT(onRangeChanged()));
-  QObject::connect(this->Internals->Ui.maxX, SIGNAL(textChangedAndEditingFinished()), this,
-    SLOT(onRangeChanged()));
+  QObject::connect(
+    this->Internals->Ui.minX, SIGNAL(textChangedAndEditingFinished()), this, SLOT(onRangeEdited()));
+  QObject::connect(
+    this->Internals->Ui.maxX, SIGNAL(textChangedAndEditingFinished()), this, SLOT(onRangeEdited()));
   QObject::connect(this->Internals->Ui.TransferFunctionEditor, SIGNAL(controlPointsModified()),
-    parentWdg, SLOT(propagateProxyPointsProperty()));
-  QObject::connect(parentWdg, SIGNAL(domainChanged()), this, SLOT(onDomainChanged()));
+    this->PropertyWidget, SLOT(propagateProxyPointsProperty()));
+
+  QAction* resetActn = new QAction(this->Internals->Ui.resetButton);
+  resetActn->setToolTip("Reset using current data values");
+  resetActn->setIcon(
+    this->Internals->Ui.resetButton->style()->standardIcon(QStyle::SP_BrowserReload));
+  this->Internals->Ui.resetButton->addAction(resetActn);
+  this->Internals->Ui.resetButton->setDefaultAction(resetActn);
+  QObject::connect(this->PropertyWidget, SIGNAL(domainChanged()), this->Internals->Ui.resetButton,
+    SLOT(highlight()));
+  QObject::connect(this->Internals->Ui.resetButton, SIGNAL(clicked()),
+    this->Internals->Ui.resetButton, SLOT(clear()));
+  QObject::connect(
+    resetActn, SIGNAL(triggered(bool)), this->PropertyWidget, SLOT(resetRangeToDomainDefault()));
+  QObject::connect(resetActn, SIGNAL(triggered(bool)), this, SLOT(updateRange()));
 }
 
 pqTransferFunctionWidgetPropertyDialog::~pqTransferFunctionWidgetPropertyDialog()
 {
 }
 
-void pqTransferFunctionWidgetPropertyDialog::onDomainChanged()
+void pqTransferFunctionWidgetPropertyDialog::updateRange()
 {
-  pqTransferFunctionWidgetPropertyWidget* parentWdg =
-    qobject_cast<pqTransferFunctionWidgetPropertyWidget*>(this->parent());
-  const double* range = parentWdg->getRange();
+  pqTransferFunctionWidgetPropertyWidget* propertyWdg =
+    qobject_cast<pqTransferFunctionWidgetPropertyWidget*>(this->PropertyWidget);
+  double range[2];
+  propertyWdg->getRange(range);
   this->Internals->Ui.minX->setText(QString::number(range[0]));
   this->Internals->Ui.maxX->setText(QString::number(range[1]));
 }
 
-void pqTransferFunctionWidgetPropertyDialog::onRangeChanged()
+void pqTransferFunctionWidgetPropertyDialog::onRangeEdited()
 {
-  pqTransferFunctionWidgetPropertyWidget* parentWdg =
-    qobject_cast<pqTransferFunctionWidgetPropertyWidget*>(this->parent());
-  parentWdg->setRange(
+  pqTransferFunctionWidgetPropertyWidget* propertyWdg =
+    qobject_cast<pqTransferFunctionWidgetPropertyWidget*>(this->PropertyWidget);
+  propertyWdg->setRange(
     this->Internals->Ui.minX->text().toDouble(), this->Internals->Ui.maxX->text().toDouble());
 }

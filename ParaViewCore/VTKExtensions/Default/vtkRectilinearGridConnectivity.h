@@ -96,7 +96,7 @@ class VTKPVVTKEXTENSIONSDEFAULT_EXPORT vtkRectilinearGridConnectivity
 public:
   vtkTypeMacro(vtkRectilinearGridConnectivity, vtkMultiBlockDataSetAlgorithm);
   static vtkRectilinearGridConnectivity* New();
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   //@{
   /**
@@ -162,10 +162,10 @@ protected:
   vtkRectilinearGridConnectivityFaceHash* FaceHash;
   vtkRectilinearGridConnectivityInternal* Internal;
 
-  vtkExecutive* CreateDefaultExecutive() VTK_OVERRIDE;
-  int FillInputPortInformation(int, vtkInformation*) VTK_OVERRIDE;
+  vtkExecutive* CreateDefaultExecutive() override;
+  int FillInputPortInformation(int, vtkInformation*) override;
   int RequestData(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
 
   // ---------------------------------------------------------------------- //
   // --------------------------- Volume  arrays --------------------------- //
@@ -292,7 +292,7 @@ protected:
   // fraction array and the iso-value to produce greater-than-isovalue sub-
   // volumes (or polyhedra) by employing an extended 256-entry lookup table.
   // These resulting polyhedra are stored in the output vtkPolyData (plyHedra).
-  // All point data attribues except for non-selected volume fraction arrays
+  // All point data attributes except for non-selected volume fraction arrays
   // are integrated when marching cubes. The integrated attribute arrays are
   // attached to the polyhedra's faces as the cell data.
   void ExtractFragmentPolyhedra(

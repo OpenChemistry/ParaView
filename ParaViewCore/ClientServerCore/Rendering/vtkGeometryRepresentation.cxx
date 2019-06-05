@@ -22,6 +22,7 @@
 #include "vtkCompositeDataDisplayAttributes.h"
 #include "vtkCompositeDataIterator.h"
 #include "vtkCompositePolyDataMapper2.h"
+#include "vtkHyperTreeGrid.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkMath.h"
@@ -45,15 +46,21 @@
 #include "vtkSelection.h"
 #include "vtkSelectionConverter.h"
 #include "vtkSelectionNode.h"
+#include "vtkShaderProperty.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
 #include "vtkTransform.h"
 #include "vtkUnstructuredGrid.h"
 
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
 #include "vtkOSPRayActorNode.h"
 #endif
 
+#include <vtk_jsoncpp.h>
 #include <vtksys/SystemTools.hxx>
+
+#include <memory>
+#include <tuple>
+#include <vector>
 
 //*****************************************************************************
 // This is used to convert a vtkPolyData to a vtkMultiBlockDataSet. If input is
@@ -68,7 +75,7 @@ public:
 
 protected:
   int RequestData(vtkInformation*, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE
+    vtkInformationVector* outputVector) override
   {
     vtkMultiBlockDataSet* inputMB = vtkMultiBlockDataSet::GetData(inputVector[0], 0);
     vtkMultiBlockDataSet* outputMB = vtkMultiBlockDataSet::GetData(outputVector, 0);
@@ -86,7 +93,7 @@ protected:
     return 1;
   }
 
-  int FillInputPortInformation(int, vtkInformation* info) VTK_OVERRIDE
+  int FillInputPortInformation(int, vtkInformation* info) override
   {
     info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkPolyData");
     info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkMultiBlockDataSet");
@@ -185,8 +192,6 @@ vtkGeometryRepresentation::vtkGeometryRepresentation()
   this->Representation = SURFACE;
 
   this->SuppressLOD = false;
-  this->DebugString = 0;
-  this->SetDebugString(this->GetClassName());
 
   vtkMath::UninitializeBounds(this->VisibleDataBounds);
 
@@ -195,12 +200,14 @@ vtkGeometryRepresentation::vtkGeometryRepresentation()
   this->PWF = NULL;
 
   this->UseDataPartitions = false;
+
+  this->UseShaderReplacements = false;
+  this->ShaderReplacementsString = "";
 }
 
 //----------------------------------------------------------------------------
 vtkGeometryRepresentation::~vtkGeometryRepresentation()
 {
-  this->SetDebugString(0);
   this->CacheKeeper->Delete();
   this->GeometryFilter->Delete();
   this->MultiBlockMaker->Delete();
@@ -272,6 +279,7 @@ int vtkGeometryRepresentation::FillInputPortInformation(int vtkNotUsed(port), vt
 {
   info->Set(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkDataSet");
   info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkCompositeDataSet");
+  info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkHyperTreeGrid");
 
   // Saying INPUT_IS_OPTIONAL() is essential, since representations don't have
   // any inputs on client-side (in client-server, client-render-server mode) and
@@ -408,14 +416,6 @@ int vtkGeometryRepresentation::ProcessViewRequest(
 }
 
 //----------------------------------------------------------------------------
-#if !defined(VTK_LEGACY_REMOVE)
-bool vtkGeometryRepresentation::DoRequestGhostCells(vtkInformation* info)
-{
-  return (vtkProcessModule::GetNumberOfGhostLevelsToRequest(info) > 0);
-}
-#endif
-
-//----------------------------------------------------------------------------
 int vtkGeometryRepresentation::RequestUpdateExtent(
   vtkInformation* request, vtkInformationVector** inputVector, vtkInformationVector* outputVector)
 {
@@ -500,6 +500,11 @@ bool vtkGeometryRepresentation::GetBounds(
     ds->GetBounds(bounds);
     return (vtkMath::AreBoundsInitialized(bounds) == 1);
   }
+  else if (vtkHyperTreeGrid* htg = vtkHyperTreeGrid::SafeDownCast(dataObject))
+  {
+    htg->GetBounds(bounds);
+    return (vtkMath::AreBoundsInitialized(bounds) == 1);
+  }
   return false;
 }
 
@@ -512,7 +517,6 @@ bool vtkGeometryRepresentation::IsCached(double cache_key)
 //----------------------------------------------------------------------------
 vtkDataObject* vtkGeometryRepresentation::GetRenderedDataObject(int port)
 {
-  // cout << this << ":" << this->DebugString << ":GetRenderedDataObject" << endl;
   (void)port;
   if (this->GeometryFilter->GetNumberOfInputConnections(0) > 0)
   {
@@ -524,7 +528,6 @@ vtkDataObject* vtkGeometryRepresentation::GetRenderedDataObject(int port)
 //----------------------------------------------------------------------------
 void vtkGeometryRepresentation::MarkModified()
 {
-  // cout << this << ":" << this->DebugString << ":MarkModified" << endl;
   if (!this->GetUseCache())
   {
     // Cleanup caches when not using cache.
@@ -760,7 +763,7 @@ void vtkGeometryRepresentation::SetOpacity(double val)
 //----------------------------------------------------------------------------
 void vtkGeometryRepresentation::SetLuminosity(double val)
 {
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
   vtkOSPRayActorNode::SetLuminosity(val, this->Property);
 #else
   (void)val;
@@ -897,6 +900,19 @@ void vtkGeometryRepresentation::SetNonlinearSubdivisionLevel(int val)
   if (vtkPVGeometryFilter::SafeDownCast(this->GeometryFilter))
   {
     vtkPVGeometryFilter::SafeDownCast(this->GeometryFilter)->SetNonlinearSubdivisionLevel(val);
+  }
+
+  // since geometry filter needs to execute, we need to mark the representation
+  // modified.
+  this->MarkModified();
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetGenerateFeatureEdges(bool val)
+{
+  if (vtkPVGeometryFilter::SafeDownCast(this->GeometryFilter))
+  {
+    vtkPVGeometryFilter::SafeDownCast(this->GeometryFilter)->SetGenerateFeatureEdges(val);
   }
 
   // since geometry filter needs to execute, we need to mark the representation
@@ -1068,7 +1084,7 @@ void vtkGeometryRepresentation::UpdateBlockAttributes(vtkMapper* mapper)
 //----------------------------------------------------------------------------
 void vtkGeometryRepresentation::SetEnableScaling(int val)
 {
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
   this->Actor->SetEnableScaling(val);
 #else
   (void)val;
@@ -1078,7 +1094,7 @@ void vtkGeometryRepresentation::SetEnableScaling(int val)
 //----------------------------------------------------------------------------
 void vtkGeometryRepresentation::SetScalingArrayName(const char* val)
 {
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
   this->Actor->SetScalingArrayName(val);
 #else
   (void)val;
@@ -1088,7 +1104,7 @@ void vtkGeometryRepresentation::SetScalingArrayName(const char* val)
 //----------------------------------------------------------------------------
 void vtkGeometryRepresentation::SetScalingFunction(vtkPiecewiseFunction* pwf)
 {
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
   this->Actor->SetScalingFunction(pwf);
 #else
   (void)pwf;
@@ -1098,7 +1114,7 @@ void vtkGeometryRepresentation::SetScalingFunction(vtkPiecewiseFunction* pwf)
 //----------------------------------------------------------------------------
 void vtkGeometryRepresentation::SetMaterial(const char* val)
 {
-#ifdef PARAVIEW_USE_OSPRAY
+#if VTK_MODULE_ENABLE_VTK_RenderingRayTracing
   if (!strcmp(val, "None"))
   {
     this->Property->SetMaterialName(nullptr);
@@ -1140,5 +1156,123 @@ void vtkGeometryRepresentation::ComputeVisibleDataBounds()
     }
     this->GetBounds(dataObject, this->VisibleDataBounds, cdAttributes);
     this->VisibleDataBoundsTime.Modified();
+  }
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetUseShaderReplacements(bool useShaderRepl)
+{
+  if (this->UseShaderReplacements != useShaderRepl)
+  {
+    this->UseShaderReplacements = useShaderRepl;
+    this->Modified();
+    this->UpdateShaderReplacements();
+  }
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetShaderReplacements(const char* replacementsString)
+{
+  if (strcmp(replacementsString, this->ShaderReplacementsString.c_str()))
+  {
+    this->ShaderReplacementsString = std::string(replacementsString);
+    this->Modified();
+    this->UpdateShaderReplacements();
+  }
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::UpdateShaderReplacements()
+{
+  vtkShaderProperty* props = this->Actor->GetShaderProperty();
+
+  if (!props)
+  {
+    return;
+  }
+
+  props->ClearAllShaderReplacements();
+
+  if (!this->UseShaderReplacements || this->ShaderReplacementsString == "")
+  {
+    return;
+  }
+
+  Json::CharReaderBuilder builder;
+  builder["collectComments"] = false;
+  Json::Value root;
+  std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
+  bool success = reader->parse(this->ShaderReplacementsString.c_str(),
+    this->ShaderReplacementsString.c_str() + this->ShaderReplacementsString.length(), &root,
+    nullptr);
+  if (!success)
+  {
+    vtkGenericWarningMacro("Unable to parse the replacement Json string!");
+    return;
+  }
+  bool isArray = root.isArray();
+  size_t nbReplacements = isArray ? root.size() : 1;
+
+  std::vector<std::tuple<vtkShader::Type, std::string, std::string> > replacements;
+  for (size_t index = 0; index < nbReplacements; ++index)
+  {
+    const Json::Value& repl = isArray ? root[(int)index] : root;
+    if (!repl.isMember("type"))
+    {
+      vtkErrorMacro("Syntax error in shader replacements: a type is required.");
+      return;
+    }
+    std::string type = repl["type"].asString();
+    vtkShader::Type shaderType = vtkShader::Unknown;
+    if (type == "fragment")
+    {
+      shaderType = vtkShader::Fragment;
+    }
+    else if (type == "vertex")
+    {
+      shaderType = vtkShader::Vertex;
+    }
+    else if (type == "geometry")
+    {
+      shaderType = vtkShader::Geometry;
+    }
+    if (shaderType == vtkShader::Unknown)
+    {
+      vtkErrorMacro("Unknown shader type for replacement:" << type);
+      return;
+    }
+
+    if (!repl.isMember("original"))
+    {
+      vtkErrorMacro("Syntax error in shader replacements: an original pattern is required.");
+      return;
+    }
+    std::string original = repl["original"].asString();
+    if (!repl.isMember("replacement"))
+    {
+      vtkErrorMacro("Syntax error in shader replacements: a replacement pattern is required.");
+      return;
+    }
+    std::string replacement = repl["replacement"].asString();
+    replacements.push_back(std::make_tuple(shaderType, original, replacement));
+  }
+
+  for (const auto& r : replacements)
+  {
+    switch (std::get<0>(r))
+    {
+      case vtkShader::Fragment:
+        props->AddFragmentShaderReplacement(std::get<1>(r), true, std::get<2>(r), true);
+        break;
+      case vtkShader::Vertex:
+        props->AddVertexShaderReplacement(std::get<1>(r), true, std::get<2>(r), true);
+        break;
+      case vtkShader::Geometry:
+        props->AddGeometryShaderReplacement(std::get<1>(r), true, std::get<2>(r), true);
+        break;
+      default:
+        assert(false && "unknown shader replacement type");
+        break;
+    }
   }
 }

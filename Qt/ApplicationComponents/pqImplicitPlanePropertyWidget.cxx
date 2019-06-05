@@ -40,8 +40,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMPropertyHelper.h"
 #include "vtkSMRenderViewProxy.h"
 
-#include <QDoubleValidator>
-
 namespace
 {
 // Implicit plane widget does not like it when any of the dimensions is 0. So
@@ -79,13 +77,6 @@ pqImplicitPlanePropertyWidget::pqImplicitPlanePropertyWidget(
 {
   Ui::ImplicitPlanePropertyWidget ui;
   ui.setupUi(this);
-  new QDoubleValidator(ui.originX);
-  new QDoubleValidator(ui.originY);
-  new QDoubleValidator(ui.originZ);
-  new QDoubleValidator(ui.normalX);
-  new QDoubleValidator(ui.normalY);
-  new QDoubleValidator(ui.normalZ);
-
   if (vtkSMProperty* origin = smgroup->GetProperty("Origin"))
   {
     this->addPropertyLink(ui.originX, "text2", SIGNAL(textChangedAndEditingFinished()), origin, 0);

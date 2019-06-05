@@ -21,6 +21,8 @@
 #include "vtkGraph.h"
 #include "vtkImageAppend.h"
 #include "vtkImageData.h"
+#include "vtkMolecule.h"
+#include "vtkMoleculeAppend.h"
 #include "vtkMultiProcessController.h"
 #include "vtkMultiProcessStream.h"
 #include "vtkNew.h"
@@ -29,6 +31,8 @@
 #include "vtkStructuredGridAppend.h"
 #include "vtkTrivialProducer.h"
 #include "vtkUnstructuredGrid.h"
+
+#include <vector>
 
 vtkStandardNewMacro(vtkMultiProcessControllerHelper);
 //----------------------------------------------------------------------------
@@ -44,44 +48,39 @@ vtkMultiProcessControllerHelper::~vtkMultiProcessControllerHelper()
 //----------------------------------------------------------------------------
 int vtkMultiProcessControllerHelper::ReduceToAll(vtkMultiProcessController* controller,
   vtkMultiProcessStream& data,
-  void (*operation)(vtkMultiProcessStream& A, vtkMultiProcessStream& B), int tag)
+  void (*operation)(vtkMultiProcessStream& A, vtkMultiProcessStream& B), int vtkNotUsed(tag))
 {
-  int myid = controller->GetLocalProcessId();
   int numProcs = controller->GetNumberOfProcesses();
-  int children[2] = { 2 * myid + 1, 2 * myid + 2 };
-  int parent = myid > 0 ? (myid - 1) / 2 : -1;
-  int childno = 0;
-
-  for (childno = 0; childno < 2; childno++)
+  if (numProcs <= 1)
   {
-    int childid = children[childno];
-    if (childid >= numProcs)
-    {
-      // skip nonexistent children.
-      continue;
-    }
-
-    vtkMultiProcessStream child_stream;
-    controller->Receive(child_stream, childid, tag);
-    (*operation)(child_stream, data);
+    return 1;
   }
 
-  if (parent >= 0)
+  auto raw_data = data.GetRawData();
+  data.Reset();
+
+  std::vector<vtkIdType> counts(numProcs);
+  const auto my_count = static_cast<vtkIdType>(raw_data.size());
+  controller->AllGather(&my_count, &counts[0], 1);
+
+  std::vector<vtkIdType> offsets(numProcs, 0);
+  for (int cc = 1; cc < numProcs; ++cc)
   {
-    controller->Send(data, parent, tag);
-    data.Reset();
-    controller->Receive(data, parent, tag);
+    offsets[cc] = offsets[cc - 1] + counts[cc - 1];
   }
 
-  for (childno = 0; childno < 2; childno++)
+  std::vector<unsigned char> buffer(offsets.back() + counts.back());
+
+  controller->AllGatherV(&raw_data[0], &buffer[0], my_count, &counts[0], &offsets[0]);
+
+  // now perform pair-wise reduction operation locally.
+  data.SetRawData(&buffer[0], static_cast<unsigned int>(counts[0]));
+  for (int cc = 1; cc < numProcs; ++cc)
   {
-    int childid = children[childno];
-    if (childid >= numProcs)
-    {
-      // skip nonexistent children.
-      continue;
-    }
-    controller->Send(data, childid, tag);
+    vtkMultiProcessStream other;
+    other.SetRawData(&buffer[offsets[cc]], static_cast<unsigned int>(counts[cc]));
+    // operation produces result in the second argument.
+    (*operation)(other, data);
   }
   return 1;
 }
@@ -154,6 +153,10 @@ bool vtkMultiProcessControllerHelper::MergePieces(
     appender = vtkStructuredGridAppend::New();
     ;
   }
+  else if (vtkMolecule::SafeDownCast(result))
+  {
+    appender = vtkMoleculeAppend::New();
+  }
   else if (vtkGraph::SafeDownCast(result))
   {
     vtkGenericWarningMacro("Support for vtkGraph has been depreciated.") return false;
@@ -176,12 +179,17 @@ bool vtkMultiProcessControllerHelper::MergePieces(
   for (iter = pieces.begin(); iter != pieces.end(); ++iter)
   {
     vtkDataSet* ds = vtkDataSet::SafeDownCast(iter->GetPointer());
-
     if (ds && ds->GetNumberOfPoints() == 0)
     {
       // skip empty pieces.
       continue;
     }
+    vtkMolecule* mol = vtkMolecule::SafeDownCast(iter->GetPointer());
+    if (mol && mol->GetNumberOfAtoms() == 0)
+    {
+      continue;
+    }
+
     vtkNew<vtkTrivialProducer> tp;
     tp->SetOutput(iter->GetPointer());
     appender->AddInputConnection(0, tp->GetOutputPort());

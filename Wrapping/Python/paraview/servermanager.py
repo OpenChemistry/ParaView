@@ -53,27 +53,27 @@ import paraview, re, os, os.path, types, sys, atexit
 from paraview import vtk
 from paraview import _backwardscompatibilityhelper as _bc
 
-from vtkmodules.vtkPVServerImplementationCore import *
-from vtkmodules.vtkPVClientServerCoreCore import *
-from vtkmodules.vtkPVServerManagerCore import *
+from paraview.modules.vtkPVServerImplementationCore import *
+from paraview.modules.vtkPVClientServerCoreCore import *
+from paraview.modules.vtkPVServerManagerCore import *
 
 try:
-  from vtkmodules.vtkPVServerManagerDefault import *
+  from paraview.modules.vtkPVServerManagerDefault import *
 except:
   paraview.print_error("Error: Cannot import vtkPVServerManagerDefault")
 try:
-  from vtkmodules.vtkPVServerManagerRendering import *
+  from paraview.modules.vtkPVServerManagerRendering import *
 except:
   paraview.print_error("Error: Cannot import vtkPVServerManagerRendering")
 try:
-  from vtkmodules.vtkPVServerManagerApplication import *
+  from paraview.modules.vtkPVServerManagerApplication import *
 except:
   paraview.print_error("Error: Cannot import vtkPVServerManagerApplication")
 try:
-  from vtkmodules.vtkPVAnimation import *
+  from paraview.modules.vtkPVAnimation import *
 except:
   paraview.print_error("Error: Cannot import vtkPVAnimation")
-from vtkmodules.vtkPVCommon import *
+from paraview.modules.vtkPVCore import *
 
 def _wrap_property(proxy, smproperty):
     """ Internal function.
@@ -83,43 +83,36 @@ def _wrap_property(proxy, smproperty):
     property = None
     if paraview.compatibility.GetVersion() >= 3.5 and \
       smproperty.IsA("vtkSMStringVectorProperty"):
-        al = smproperty.GetDomain("array_list")
-        if al and al.IsA("vtkSMArraySelectionDomain") and \
-            smproperty.GetRepeatable():
+        arraySelectionDomain = smproperty.FindDomain("vtkSMArraySelectionDomain")
+        chartSeriesSelectionDomain = smproperty.FindDomain("vtkSMChartSeriesSelectionDomain")
+        subsetInclusionLatticeDomain = smproperty.FindDomain("vtkSMSubsetInclusionLatticeDomain")
+        arrayListDomain = smproperty.FindDomain("vtkSMArrayListDomain")
+        fileListDomain = smproperty.FindDomain("vtkSMFileListDomain")
+        stringListDomain = smproperty.FindDomain("vtkSMStringListDomain")
+        if arraySelectionDomain and smproperty.GetRepeatable():
             property = ArrayListProperty(proxy, smproperty)
-        elif al and al.IsA("vtkSMChartSeriesSelectionDomain") and \
-            smproperty.GetRepeatable() and al.GetDefaultMode() == 1:
+        elif chartSeriesSelectionDomain and smproperty.GetRepeatable() and \
+          chartSeriesSelectionDomain.GetDefaultMode() == 1:
             property = ArrayListProperty(proxy, smproperty)
-        elif al and al.IsA("vtkSMSubsetInclusionLatticeDomain") and \
-            smproperty.GetRepeatable():
+        elif subsetInclusionLatticeDomain and smproperty.GetRepeatable():
             property = SubsetInclusionLatticeProperty(proxy, smproperty)
-        elif al and al.IsA("vtkSMArrayListDomain") and \
-            smproperty.GetRepeatable():
+        elif arrayListDomain and smproperty.GetRepeatable():
             # if it is repeatable, then it is not a single array selection... and if it happens
             # to have 5 elements in the repeatable proxy, avoid an exception by testing this case
             # first.
             property = VectorProperty(proxy, smproperty)
-        elif al and al.IsA("vtkSMArrayListDomain") and smproperty.GetNumberOfElements() == 5:
+        elif arrayListDomain and smproperty.GetNumberOfElements() == 5:
             property = ArraySelectionProperty(proxy, smproperty)
+        elif fileListDomain and fileListDomain.GetIsOptional() == 0:
+            # Refer to BUG #9710 to see why optional domains need to be ignored.
+            property = FileNameProperty(proxy, smproperty)
+        elif stringListDomain:
+            property = StringListProperty(proxy, smproperty)
         else:
-            iter = smproperty.NewDomainIterator()
-            isFileName = False
-            while not iter.IsAtEnd():
-                # Refer to BUG #9710 to see why optional domains need to be
-                # ignored.
-                if iter.GetDomain().IsA("vtkSMFileListDomain") and \
-                  iter.GetDomain().GetIsOptional() == 0 :
-                    isFileName = True
-                    break
-                iter.Next()
-            iter.UnRegister(None)
-            if isFileName:
-                property = FileNameProperty(proxy, smproperty)
-            else:
-                property = VectorProperty(proxy, smproperty)
+            property = VectorProperty(proxy, smproperty)
     elif smproperty.IsA("vtkSMVectorProperty"):
         if smproperty.IsA("vtkSMIntVectorProperty") and \
-          (smproperty.GetDomain("enum") or smproperty.GetDomain("comps")):
+          smproperty.FindDomain("vtkSMEnumerationDomain"):
             property = EnumerationProperty(proxy, smproperty)
         else:
             property = VectorProperty(proxy, smproperty)
@@ -135,7 +128,7 @@ def _wrap_property(proxy, smproperty):
 
 class ParaViewPipelineController(object):
     """ParaViewPipelineController wraps vtkSMParaViewPipelineController class
-    to manage conversion of arguments passed around from Pyhton Proxy objects to
+    to manage conversion of arguments passed around from Python Proxy objects to
     vtkSMProxy instances are vice-versa."""
     def __init__(self):
         """Constructor. Creates a new instance of
@@ -200,7 +193,6 @@ class Proxy(object):
         proxy = Proxy(proxy=smproxy)
         for property in proxy:
             print (property)
-
 
     For advanced users:
     This is a python class that wraps a vtkSMProxy. Makes it easier to
@@ -572,7 +564,6 @@ class SourceProxy(Proxy):
     CellData = property(GetCellDataInformation, None, None, "Returns cell data information")
     FieldData = property(GetFieldDataInformation, None, None, "Returns field data information")
 
-
 class ExodusIIReaderProxy(SourceProxy):
     """Special class to define convenience functions for array
     selection."""
@@ -677,13 +668,14 @@ class Property(object):
             else:
                 repr = "None"
         else:
+            # this happens for command properties i.e. ones that do not store
+            # any state. For those, we use this alternate representation.
             repr = "Property name= "
             name = self.Proxy.GetPropertyName(self.SMProperty)
             if name:
                 repr += name
             else:
                 repr += "Unknown"
-
         return repr
 
     def __call__(self):
@@ -899,39 +891,35 @@ class EnumerationProperty(VectorProperty):
         """Returns the text for the given element if available. Returns
         the numerical values otherwise."""
         val = self.SMProperty.GetElement(index)
-        domain = self.SMProperty.GetDomain("enum")
-        if not domain:
-          domain = self.SMProperty.GetDomain("comps")
-        for i in range(domain.GetNumberOfEntries()):
-            if domain.GetEntryValue(i) == val:
-                return domain.GetEntryText(i)
+        domain = self.SMProperty.FindDomain("vtkSMEnumerationDomain")
+        if domain:
+            for i in range(domain.GetNumberOfEntries()):
+                if domain.GetEntryValue(i) == val:
+                    return domain.GetEntryText(i)
         return val
 
     def ConvertValue(self, value):
         """Converts value to type suitable for vtSMProperty::SetElement()"""
         if type(value) == str:
-            domain = self.SMProperty.GetDomain("enum")
-            if not domain:
-              domain = self.SMProperty.GetDomain("comps")
-            if domain.HasEntryText(value):
-                return domain.GetEntryValueForText(value)
-            else:
-                raise ValueError("%s is not a valid value." % value)
+            domain = self.SMProperty.FindDomain("vtkSMEnumerationDomain")
+            if domain:
+                if domain.HasEntryText(value):
+                    return domain.GetEntryValueForText(value)
+                else:
+                    raise ValueError("%s is not a valid value." % value)
         return VectorProperty.ConvertValue(self, value)
 
     def GetAvailable(self):
-        "Returns the list of available values for the property."
+        "Returns the list of available values for the property, if an enumeration domain is available."
         retVal = []
-        domain = self.SMProperty.GetDomain("enum")
-        if not domain:
-          domain = self.SMProperty.GetDomain("comps")
-        for i in range(domain.GetNumberOfEntries()):
-            retVal.append(domain.GetEntryText(i))
+        domain = self.SMProperty.FindDomain("vtkSMEnumerationDomain")
+        if domain:
+            for i in range(domain.GetNumberOfEntries()):
+                retVal.append(domain.GetEntryText(i))
         return retVal
 
     Available = property(GetAvailable, None, None, \
         "This read-only property contains the list of values that can be applied to this property.")
-
 
 class FileNameProperty(VectorProperty):
     """Property to set/get one or more file names.
@@ -1026,6 +1014,22 @@ class ArraySelectionProperty(VectorProperty):
                 self.SMProperty.SetElement(i, '0')
         self.SMProperty.ResetToDomainDefaults(False)
 
+class StringListProperty(VectorProperty):
+    """Property to set/get the a string with a string list domain.
+    This property provides an interface to get available strings."""
+
+    def GetAvailable(self):
+        "Returns the list of string values available for the property."
+        retVal = []
+        domain = self.SMProperty.FindDomain("vtkSMStringListDomain")
+        if domain:
+            for i in range(domain.GetNumberOfStrings()):
+                retVal.append(domain.GetString(i))
+        return retVal
+
+    Available = property(GetAvailable, None, None, \
+        "This read-only property contains the list of values that can be applied to this property.")
+
 class ArrayListProperty(VectorProperty):
     """This property provides a simpler interface for selecting arrays.
     Simply assign a list of arrays that should be loaded by the reader.
@@ -1037,10 +1041,13 @@ class ArrayListProperty(VectorProperty):
 
     def GetAvailable(self):
         "Returns the list of available arrays"
-        dm = self.GetDomain("array_list")
+        dm = self.SMProperty.FindDomain("vtkSMArraySelectionDomain")
+        if not dm:
+            dm = self.SMProperty.FindDomain("vtkSMChartSeriesSelectionDomain")
         retVal = []
-        for i in range(dm.GetNumberOfStrings()):
-            retVal.append(dm.GetString(i))
+        if dm:
+            for i in range(dm.GetNumberOfStrings()):
+                retVal.append(dm.GetString(i))
         return retVal
 
     Available = property(GetAvailable, None, None, \
@@ -1120,7 +1127,6 @@ class ArrayListProperty(VectorProperty):
             fullvalues.append(val)
             fullvalues.append('1')
 
-
         i = 0
         for value in fullvalues:
             self.SMProperty.SetElement(i, value)
@@ -1141,14 +1147,12 @@ class ArrayListProperty(VectorProperty):
                 self.__arrays.append(self.GetElement(i))
         return list(self.__arrays)
 
-
 class SubsetInclusionLatticeProperty(ArrayListProperty):
     """This property provides a simpler interface for selecting blocks on a
     property with a `vtkSMSubsetInclusionLatticeDomain`."""
     # currently, there's nothing more here. eventually, we'll add support to
     # forward select/deselect requests to a vtkSubsetInclusionLattice instance.
     pass
-
 
 class ProxyProperty(Property):
     """A ProxyProperty provides access to one or more proxies. You can use
@@ -1176,10 +1180,8 @@ class ProxyProperty(Property):
         Property.__init__(self, proxy, smproperty)
         # Check to see if there is a proxy list domain and, if so,
         # initialize ourself. (Should this go in ProxyProperty?)
-        listdomain = self.GetDomain('proxy_list')
+        listdomain = self.FindDomain("vtkSMProxyListDomain")
         if listdomain:
-            if not listdomain.IsA('vtkSMProxyListDomain'):
-                raise ValueError ("Found a 'proxy_list' domain on an InputProperty that is not a ProxyListDomain.")
             pm = ProxyManager()
             group = "pq_helper_proxies." + proxy.GetGlobalIDAsString()
             if listdomain.GetNumberOfProxies() == 0:
@@ -1188,14 +1190,13 @@ class ProxyProperty(Property):
                     name = listdomain.GetProxyName(i)
                     iproxy = CreateProxy(igroup, name)
                     listdomain.AddProxy(iproxy)
-                    pm.RegisterProxy(group, proxy.GetPropertyName(smproperty), iproxy)
                 smproperty.ResetToDomainDefaults(False)
 
     def GetAvailable(self):
         """If this proxy has a list domain, then this function returns the
         strings you can use to select from the domain.  If there is no such
         list domain, the returned list is empty."""
-        listdomain = self.GetDomain('proxy_list')
+        listdomain = self.SMProperty.FindDomain("vtkSMProxyListDomain")
         retval = []
         if listdomain:
             for i in range(listdomain.GetNumberOfProxies()):
@@ -1302,7 +1303,9 @@ class ProxyProperty(Property):
                 position = self.Available.index(values)
             except:
                 raise ValueError (values + " is not a valid object in the domain.")
-            values = self.GetDomain('proxy_list').GetProxy(position)
+            listdomain = self.SMProperty.FindDomain("vtkSMProxyListDomain")
+            if listdomain:
+                values = listdomain.GetProxy(position)
         if not isinstance(values, tuple) and \
            not isinstance(values, list):
             values = (values,)
@@ -1404,7 +1407,6 @@ class InputProperty(ProxyProperty):
         for prop in iter:
             if isinstance(prop, ArraySelectionProperty):
                 prop.UpdateDefault()
-
 
 class DataInformation(object):
     """DataInformation is a contained for meta-data associated with an
@@ -1518,7 +1520,6 @@ class FieldDataInformationIterator(object):
         else:
             return ai
     __next__ = next # Python 3.X compatibility
-
 
 class FieldDataInformation(object):
     """Meta-data for a field of an output object (point data, cell data etc...).
@@ -1902,7 +1903,6 @@ class ProxyDefinitionIterator(object):
         """returns attributes from the vtkPVProxyDefinitionIterator."""
         return getattr(self.SMIterator, name)
 
-
 class ProxyIterator(object):
     """Wrapper for a vtkSMProxyIterator class to satisfy the
      python iterator protocol.
@@ -2063,7 +2063,7 @@ def LoadState(filename, connection=None):
             view.GetRenderWindow().SetSize(view.ViewSize[0], \
                                            view.ViewSize[1])
 
-def Connect(ds_host=None, ds_port=11111, rs_host=None, rs_port=22221):
+def Connect(ds_host=None, ds_port=11111, rs_host=None, rs_port=22221, timeout=60):
     """
     Use this function call to create a new session. On success,
     it returns a vtkSMSession object that abstracts the connection.
@@ -2071,7 +2071,7 @@ def Connect(ds_host=None, ds_port=11111, rs_host=None, rs_port=22221):
 
     There are several ways in which this function can be called:
 
-    * When called with no arguments, it creates a new session
+    * When called with no hosts, it creates a new session
       to the built-in server on the client itself.
 
     * When called with ds_host and ds_port arguments, it
@@ -2081,22 +2081,29 @@ def Connect(ds_host=None, ds_port=11111, rs_host=None, rs_port=22221):
     * When called with ds_host, ds_port, rs_host, rs_port, it
       creates a new connection to the data server on ds_host:ds_port and to the
       render server on rs_host: rs_port.
+
+    * All these connection types support a timeout argument in second.
+      Default is 60. 0 means no retry, -1 means infinite retries.
     """
+    ret = True;
     if ds_host == None:
         session = vtkSMSession()
     elif rs_host == None:
         session = vtkSMSessionClient()
-        session.Connect("cs://%s:%d" % (ds_host, ds_port))
+        ret = session.Connect("cs://%s:%d" % (ds_host, ds_port), timeout)
     else:
         session = vtkSMSessionClient()
-        session.Connect("cdsrs://%s:%d/%s:%d" % (ds_host, ds_port, rs_host, rs_port))
-    id = vtkProcessModule.GetProcessModule().RegisterSession(session)
-    connection = GetConnectionFromId(id)
+        ret = session.Connect("cdsrs://%s:%d/%s:%d" % (ds_host, ds_port, rs_host, rs_port), timeout)
+    if ret:
+      id = vtkProcessModule.GetProcessModule().RegisterSession(session)
+      connection = GetConnectionFromId(id)
 
-    # This shouldn't be needed. However, it's needed for old Python scripts that
-    # directly import servermanager.py without simple.py
-    SetActiveConnection(connection)
-    return connection
+      # This shouldn't be needed. However, it's needed for old Python scripts that
+      # directly import servermanager.py without simple.py
+      SetActiveConnection(connection)
+      return connection
+    else:
+      return None
 
 def ReverseConnect(port=11111):
     """
@@ -2262,7 +2269,6 @@ def LoadXML(xmlstring):
     """DEPRECATED. Given a server manager XML as a string, parse and process it."""
     raise RuntimeError ("Deprecated. Use LoadPlugin(...) instead.")
 
-
 def LoadPlugin(filename,  remote=True, connection=None):
     """ Given a filename and a session (optional, otherwise uses
     ActiveConnection), loads a plugin. It then updates the sources,
@@ -2285,7 +2291,6 @@ def LoadPlugin(filename,  remote=True, connection=None):
     else:
         # we should never have to call this. The modules should update automatically.
         updateModules(connection.Modules)
-
 
 def Fetch(input, arg1=None, arg2=None, idx=0):
     """
@@ -2395,7 +2400,6 @@ def AnimateReader(reader, view):
         tk.TimeSources.append(reader)
     if not view in tk.Views:
         tk.Views.append(view)
-
 
     # with 1 view
     scene.ViewModules = [view]
@@ -2652,7 +2656,7 @@ def _createClass(groupName, proxyName, apxm=None):
     pxm = ProxyManager() if not apxm else apxm
     proto = pxm.GetPrototypeProxy(groupName, proxyName)
     if not proto:
-       paraview.print_error("Error while loading %s/%s %s"%(groupName, i['group'], proxyName))
+       paraview.print_error("Error while loading %s %s"%(groupName, proxyName))
        return None
     pname = proxyName
     if paraview.compatibility.GetVersion() >= 3.5 and proto.GetXMLLabel():
@@ -2735,7 +2739,6 @@ def createModule(groupName, mdl=None):
             # Add it to the modules dictionary
             mdl.__dict__[pname] = cobj
     return mdl
-
 
 def __determineGroup(proxy):
     """Internal method"""
@@ -2834,6 +2837,22 @@ def UnRegister(proxy, **extraArgs):
     else:
         raise RuntimeError ("UnRegistration error.")
     return (registrationGroup, registrationName)
+
+def ResetSession():
+    """Reset the session in the active connection to its initial state."""
+    global ActiveConnection
+
+    # Simulate disconnect
+    pxm = ProxyManager()
+    session = ActiveConnection.Session
+
+    pxm.UnRegisterProxies()
+
+    pm = vtkProcessModule.GetProcessModule()
+    pm.UnRegisterSession(session)
+    id = pm.RegisterSession(session)
+    connection = GetConnectionFromId(id)
+    return connection
 
 def demo1():
     """This simple demonstration creates a sphere, renders it and delivers
@@ -2980,7 +2999,7 @@ def demo3():
         # with a line
         line = sources.LineSource(Resolution=60)
     else:
-        probe = filters.ResampleWithDataset(Input=source)
+        probe = filters.ResampleWithDataset(SourceDataArrays=source)
         # with a line
         line = sources.Line(Resolution=60)
     # that spans the dataset
@@ -3020,7 +3039,6 @@ def demo4(fname="/Users/berk/Work/ParaViewData/Data/can.ex2"):
     c = view.GetActiveCamera()
     c.Elevation(95)
     return AnimateReader(reader, view)
-
 
 def demo5():
     """ Simple sphere animation"""
@@ -3179,7 +3197,6 @@ _pyproxies = {}
 loader = _ModuleLoader()
 sys.meta_path.append(loader)
 
-
 def __exposeActiveModules__():
     """Update servermanager submodules to point to the current
     ActiveConnection.Modules.*"""
@@ -3215,7 +3232,6 @@ def GetConnectionFromSession(session):
         Connections.append(c)
         return c
     return None
-
 
 def __connectionCreatedCallback(obj, string):
     """Callback called when a new session is created."""

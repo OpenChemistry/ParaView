@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMPVRepresentationProxy.h"
 #include "vtkSMParaViewPipelineControllerWithRendering.h"
 #include "vtkSMProxySelectionModel.h"
+#include "vtkSMTrace.h"
 #include "vtkSMTransferFunctionManager.h"
 #include "vtkSMViewProxy.h"
 
@@ -157,6 +158,7 @@ bool pqDeleteReaction::canDeleteSelected()
 //-----------------------------------------------------------------------------
 void pqDeleteReaction::deleteAll()
 {
+  SM_SCOPED_TRACE(CallFunction).arg("ResetSession");
   BEGIN_UNDO_EXCLUDE();
   if (pqServer* server = pqActiveObjects::instance().activeServer())
   {
@@ -172,7 +174,6 @@ void pqDeleteReaction::deleteSelected()
 {
   if (!pqDeleteReaction::canDeleteSelected())
   {
-    qCritical() << "Cannot delete selected ";
     return;
   }
 
@@ -327,7 +328,7 @@ void pqDeleteReaction::onTriggered()
           "Delete All?", tr("The current visualization will be reset \n"
                             "and the state will be discarded.\n\n"
                             "Are you sure you want to continue?"),
-          QMessageBox::Yes | QMessageBox::No | QMessageBox::Save))
+          QMessageBox::Yes | QMessageBox::No))
     {
       pqDeleteReaction::deleteAll();
     }

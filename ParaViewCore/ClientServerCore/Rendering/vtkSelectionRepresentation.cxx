@@ -29,7 +29,6 @@ vtkSelectionRepresentation::vtkSelectionRepresentation()
 {
   this->GeometryRepresentation = vtkGeometryRepresentation::New();
   this->GeometryRepresentation->SetPickable(0);
-  this->GeometryRepresentation->SetDebugString("vtkSelectionRepresentation");
   this->GeometryRepresentation->RequestGhostCellsIfNeededOff();
 
   this->LabelRepresentation = vtkDataLabelRepresentation::New();
@@ -273,6 +272,16 @@ void vtkSelectionRepresentation::SetCellFieldDataArrayName(const char* val)
 {
   this->LabelRepresentation->SetCellFieldDataArrayName(val);
 }
+
+//----------------------------------------------------------------------------
+void vtkSelectionRepresentation::SetLogName(const std::string& name)
+{
+  this->Superclass::SetLogName(name);
+
+  // we need to label GeometryRepresentation since it's not set via public API.
+  this->GeometryRepresentation->SetLogName(this->GetLogName() + "/Geometry");
+}
+
 //----------------------------------------------------------------------------
 unsigned int vtkSelectionRepresentation::Initialize(
   unsigned int minIdAvailable, unsigned int maxIdAvailable)

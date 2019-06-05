@@ -31,10 +31,10 @@ def save_render_buffer(fname):
     w2i.ShouldRerenderOff()
     w2i.SetInput(w)
     w2i.Modified()
-    tiff = TIFFWriter()
-    tiff.Input = w2i.GetOutput()
-    tiff.FileName = fname
-    tiff.UpdatePipeline()
+    png = PNGWriter()
+    png.Input = w2i.GetOutput()
+    png.FileName = fname
+    png.UpdatePipeline()
 
 
 def flush_render_buffer():
@@ -89,11 +89,11 @@ def run(output_basename='log', dimension=100, view_size=(1920, 1080),
 
     view = get_render_view(view_size)
     if ospray:
-        view.EnableOSPRay = 1
+        view.EnableRayTracing = 1
 
     print('Generating wavelet')
     wavelet = Wavelet()
-    d2 = dimension/2
+    d2 = dimension//2
     wavelet.WholeExtent = [-d2, d2, -d2, d2, -d2, d2]
     wavelet.Maximum = 100.0
     waveletDisplay = Show()
@@ -125,7 +125,7 @@ def run(output_basename='log', dimension=100, view_size=(1920, 1080),
     print('Saving frame 0 screenshot')
     import math
     fdigits = int(math.ceil(math.log(num_frames, 10)))
-    frame_fname_fmt = output_basename + '.scene.f%(f)0' + str(fdigits) + 'd.tiff'
+    frame_fname_fmt = output_basename + '.scene.f%(f)0' + str(fdigits) + 'd.png'
     SaveScreenshot(frame_fname_fmt % {'f': 0})
 
     print('Gathering geometry counts')

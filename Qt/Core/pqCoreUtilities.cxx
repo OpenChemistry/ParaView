@@ -44,10 +44,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "pqApplicationCore.h"
 #include "pqSettings.h"
+#include "vtkNumberToString.h"
 #include "vtkObject.h"
 #include "vtkWeakPointer.h"
+#include "vtksys/SystemTools.hxx"
 
+#include <cassert>
 #include <cstdlib>
+#include <sstream>
 
 QPointer<QWidget> pqCoreUtilities::MainWidget = 0;
 
@@ -194,9 +198,9 @@ void pqCoreUtilitiesEventHelper::executeEvent(vtkObject* obj, unsigned long even
 unsigned long pqCoreUtilities::connect(vtkObject* vtk_object, int vtk_event_id, QObject* qobject,
   const char* signal_or_slot, Qt::ConnectionType type /* = Qt::AutoConnection*/)
 {
-  Q_ASSERT(vtk_object != NULL);
-  Q_ASSERT(qobject != NULL);
-  Q_ASSERT(signal_or_slot != NULL);
+  assert(vtk_object != NULL);
+  assert(qobject != NULL);
+  assert(signal_or_slot != NULL);
   if (vtk_object == NULL || qobject == NULL || signal_or_slot == NULL)
   {
     // qCritical is Qt's 'print error message' stream
@@ -220,7 +224,7 @@ unsigned long pqCoreUtilities::connect(vtkObject* vtk_object, int vtk_event_id, 
   // helper. Since pqCoreUtilitiesEventHelper::Interal keeps a weak-pointer to
   // the vtk_object, that gets cleared. So eventually when qobject is destroyed,
   // the pqCoreUtilitiesEventHelper is deleted, but since the vtk_object is
-  // already deleted, it doesnt' do anything special.
+  // already deleted, it doesn't do anything special.
   return eventid;
 }
 
@@ -229,7 +233,7 @@ bool pqCoreUtilities::promptUser(const QString& settingsKey, QMessageBox::Icon i
   const QString& title, const QString& message, QMessageBox::StandardButtons buttons,
   QWidget* parentWdg)
 {
-  if (getenv("DASHBOARD_TEST_FROM_CTEST") != NULL)
+  if (vtksys::SystemTools::GetEnv("DASHBOARD_TEST_FROM_CTEST") != NULL)
   {
     return true;
   }
@@ -273,4 +277,12 @@ bool pqCoreUtilities::promptUser(const QString& settingsKey, QMessageBox::Icon i
     default:
       return false;
   }
+}
+
+//-----------------------------------------------------------------------------
+QString pqCoreUtilities::number(double value)
+{
+  std::ostringstream str;
+  str << vtkNumberToString()(value);
+  return QString::fromLocal8Bit(str.str().c_str());
 }

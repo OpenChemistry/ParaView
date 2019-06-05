@@ -90,11 +90,7 @@ public:
   }
 
 protected:
-  OutputWindow()
-  {
-    this->PromptUserOff();
-    this->UseStdErrorForAllMessagesOff();
-  }
+  OutputWindow() { this->PromptUserOff(); }
   ~OutputWindow() override {}
 
   QPointer<pqOutputWidget> Widget;
@@ -180,6 +176,13 @@ class pqOutputWidget::pqInternals
   static const int COLUMN_COUNT = 1;
   static const int COLUMN_DATA = 0;
 
+  static QStandardItem* newEmptyItem()
+  {
+    auto item = new QStandardItem();
+    item->setFlags(item->flags() ^ Qt::ItemIsEditable);
+    return item;
+  }
+
 public:
   Ui::OutputWidget Ui;
   QPointer<QStandardItemModel> Model;
@@ -257,17 +260,19 @@ public:
     summaryItem->setFlags(summaryItem->flags() ^ Qt::ItemIsEditable);
     summaryItem->setForeground(this->foregroundColor(type));
     summaryItem->setIcon(this->icon(type));
+    summaryItem->setData(QVariant(Qt::AlignLeft | Qt::AlignTop), Qt::TextAlignmentRole);
 
     QStandardItem* messageItem = new QStandardItem(tr(message));
     messageItem->setFlags(messageItem->flags() ^ Qt::ItemIsEditable);
     messageItem->setForeground(this->foregroundColor(type));
+    messageItem->setData(QVariant(Qt::AlignLeft | Qt::AlignTop), Qt::TextAlignmentRole);
 
     QList<QStandardItem*> items;
-    items << messageItem << new QStandardItem();
+    items << messageItem << this->newEmptyItem();
     summaryItem->appendRow(items);
     items.clear();
 
-    items << summaryItem << new QStandardItem();
+    items << summaryItem << this->newEmptyItem();
     rootItem->appendRow(items);
   }
 
@@ -277,6 +282,15 @@ public:
     this->Ui.consoleWidget->clear();
     this->Model->setColumnCount(2);
     this->Ui.treeView->header()->moveSection(COLUMN_COUNT, COLUMN_DATA);
+  }
+
+  void setFontSize(int fontSize)
+  {
+    this->Ui.consoleWidget->setFontSize(fontSize);
+
+    QFont font;
+    font.setPointSize(fontSize);
+    this->Ui.treeView->setFont(font);
   }
 
   QIcon icon(QtMsgType type)
@@ -483,4 +497,10 @@ const QString& pqOutputWidget::settingsKey() const
 {
   const pqInternals& internals = (*this->Internals);
   return internals.settingsKey();
+}
+
+//-----------------------------------------------------------------------------
+void pqOutputWidget::setFontSize(int fontSize)
+{
+  this->Internals->setFontSize(fontSize);
 }

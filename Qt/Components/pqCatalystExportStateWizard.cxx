@@ -30,6 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ========================================================================*/
 #include "pqCatalystExportStateWizard.h"
+#include "pqSGExportStateWizardInternals.h"
 
 #include <vtkCamera.h>
 #include <vtkPVXMLElement.h>
@@ -61,7 +62,7 @@ static const char* cp_python_export_code = "from paraview import cpexport\n"
                                            "   enable_live_viz=%6,\n"
                                            "   live_viz_frequency=%7,\n"
                                            "   cinema_tracks={%8},\n"
-                                           "   array_selection = {%10},\n"
+                                           "   cinema_arrays = {%10},\n"
                                            "   filename='%9')\n";
 }
 
@@ -145,7 +146,7 @@ bool pqCatalystExportStateWizard::getCommandString(QString& command)
   else if (this->Internals->outputRendering->isChecked())
   {
     // Format as defined in cpstate.py
-    QString format("'%1' : ['%2', %3, '%4', '%5', '%6', '%7', '%8']");
+    QString format("'%1' : ['%2', %3, '%4', '%5', '%6', '%7', '%8', -1]");
     rendering_info = this->Internals->wViewSelection->getSelectionAsString(format);
   }
 

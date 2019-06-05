@@ -35,7 +35,7 @@ class VTKPVCLIENTSERVERCORERENDERING_EXPORT vtkPVRenderViewSettings : public vtk
 public:
   static vtkPVRenderViewSettings* New();
   vtkTypeMacro(vtkPVRenderViewSettings, vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Access the singleton.
@@ -56,6 +56,8 @@ public:
    */
   void SetResolveCoincidentTopology(int mode);
   void SetPolygonOffsetParameters(double factor, double units);
+  void SetLineOffsetParameters(double factor, double units);
+  void SetPointOffsetParameter(double units);
   void SetZShift(double a);
   //@}
 
@@ -66,6 +68,20 @@ public:
    */
   vtkSetMacro(OutlineThreshold, vtkIdType);
   vtkGetMacro(OutlineThreshold, vtkIdType);
+  //@}
+
+  enum
+  {
+    AUTOMATIC = 0,
+    ALWAYS_2D = 1,
+    ALWAYS_3D = 2
+  };
+  //@{
+  /**
+   * Set the default interaction mode.
+   */
+  vtkSetMacro(DefaultInteractionMode, int);
+  vtkGetMacro(DefaultInteractionMode, int);
   //@}
 
   //@{
@@ -90,6 +106,7 @@ protected:
   vtkPVRenderViewSettings();
   ~vtkPVRenderViewSettings() override;
 
+  int DefaultInteractionMode;
   vtkIdType OutlineThreshold;
   int PointPickingRadius;
   bool DisableIceT;

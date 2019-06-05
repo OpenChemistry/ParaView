@@ -32,14 +32,14 @@ class VTKPVCLIENTSERVERCORERENDERING_EXPORT vtkQuartileChartRepresentation
 public:
   static vtkQuartileChartRepresentation* New();
   vtkTypeMacro(vtkQuartileChartRepresentation, vtkXYChartRepresentation);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Overridden to format the series name to remove the operation applied e.g.
    * a columnName of "min(EQPS)" and "max(EQPS)" both will return "EQPS".
    */
   vtkStdString GetDefaultSeriesLabel(
-    const vtkStdString& tableName, const vtkStdString& columnName) VTK_OVERRIDE;
+    const vtkStdString& tableName, const vtkStdString& columnName) override;
 
   //@{
   /**
@@ -73,18 +73,35 @@ public:
   vtkGetMacro(MedianVisibility, bool);
   //@}
 
+  //@{
+  /**
+   * When set to true, the min curve is rendered.
+   */
+  vtkSetMacro(MinVisibility, bool);
+  vtkGetMacro(MinVisibility, bool);
+  //@}
+
+  //@{
+  /**
+   * When set to true, the max curve is rendered.
+   */
+  vtkSetMacro(MaxVisibility, bool);
+  vtkGetMacro(MaxVisibility, bool);
+  //@}
+
 protected:
   vtkQuartileChartRepresentation();
   ~vtkQuartileChartRepresentation() override;
 
+  bool AverageVisibility;
+  bool HasOnlyOnePoint;
+  bool MaxVisibility;
+  bool MedianVisibility;
+  bool MinVisibility;
   bool QuartileVisibility;
   bool RangeVisibility;
-  bool AverageVisibility;
-  bool MedianVisibility;
 
-  bool HasOnlyOnePoint;
-
-  void PrepareForRendering() VTK_OVERRIDE;
+  void PrepareForRendering() override;
 
 private:
   vtkQuartileChartRepresentation(const vtkQuartileChartRepresentation&) = delete;

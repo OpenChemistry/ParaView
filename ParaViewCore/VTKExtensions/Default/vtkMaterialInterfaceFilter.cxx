@@ -173,7 +173,7 @@ vtkCxxSetObjectMacro(vtkMaterialInterfaceFilter, ClipFunction, vtkImplicitFuncti
 //      We can do connectivity through the ghost cells (might as well) but
 //      the do not contribute to the integrated values.  We will not create faces
 //      from a ghost layer, but we will use them to place points.
-//      We will use the fragment ids in the ghost layers to create an equivalency realtion
+//      We will use the fragment ids in the ghost layers to create an equivalency relation
 //      and to combine fragments in a post processing step.
 
 // We need to strip off ghost cells that we do not need.
@@ -757,7 +757,7 @@ void vtkMaterialInterfaceFilterBlock::Initialize(int blockId, vtkImageData* imag
 {
   if (this->VolumeFractionArray)
   {
-    vtkGenericWarningMacro("Block alread initialized !!!");
+    vtkGenericWarningMacro("Block already initialized !!!");
     return;
   }
   if (image == 0)
@@ -974,7 +974,7 @@ void vtkMaterialInterfaceFilterBlock::InitializeGhostLayer(unsigned char* volFra
 {
   if (this->VolumeFractionArray)
   {
-    vtkGenericWarningMacro("Block alread initialized !!!");
+    vtkGenericWarningMacro("Block already initialized !!!");
     return;
   }
 
@@ -1041,7 +1041,7 @@ void vtkMaterialInterfaceFilterBlock::InitializeGhostLayer(unsigned char* volFra
 }
 
 //----------------------------------------------------------------------------
-// Flipped a coin.  This method only addes the neighbor relation one way.
+// Flipped a coin.  This method only adds the neighbor relation one way.
 // User needs to call it twice to get the backward connection.
 void vtkMaterialInterfaceFilterBlock::AddNeighbor(
   vtkMaterialInterfaceFilterBlock* neighbor, int axis, int maxFlag)
@@ -3670,7 +3670,7 @@ int vtkMaterialInterfaceFilter::RequestData(vtkInformation* vtkNotUsed(request),
 #ifdef vtkMaterialInterfaceFilterDEBUG
   std::clock_t endTime = std::clock();
   cerr << "[" << __LINE__ << "] " << this->Controller->GetLocalProcessId()
-       << " clock time ellapsed during request data "
+       << " clock time elapsed during request data "
        << (double)(endTime - startTime) / (double)CLOCKS_PER_SEC << " sec." << endl;
   cerr << "[" << __LINE__ << "] " << this->Controller->GetLocalProcessId()
        << " exited request data."
@@ -6680,7 +6680,7 @@ void vtkMaterialInterfaceFilter::ComputeGeometricAttributes()
       // that are split? We can weed out processes that are
       // highly loaded and cycle through the group that
       // remains assigning to each until all work has
-      // been alloted.
+      // been allotted.
       vtkMaterialInterfaceProcessRing procRing;
       procRing.Initialize(heap, this->UpperLoadingBound);
 #ifdef vtkMaterialInterfaceFilterDEBUG
@@ -6763,7 +6763,7 @@ void vtkMaterialInterfaceFilter::ComputeGeometricAttributes()
       ++thisMsgId;
     }
 
-    // Brodcast the transaction matrix
+    // Broadcast the transaction matrix
     TM.Broadcast(comm, controllingProcId);
 
     // Prepare for a bunch of inverse searches through
@@ -7161,7 +7161,7 @@ int vtkMaterialInterfaceFilter::UnPackLoadingArray(
 
 //----------------------------------------------------------------------------
 // Receive all geomteric attribute arrays from all other
-// processes. Conatiners filled with the expected number
+// processes. Containers filled with the expected number
 // of empty data arrays/pointers are expected.
 //
 // return 0 on error
@@ -7558,7 +7558,7 @@ int vtkMaterialInterfaceFilter::ReceiveIntegratedAttributes(const int sourceProc
   this->Controller->Receive(buffer.GetBuffer(), buffer.GetBufferSize(), sourceProcId, thisMsgId);
   ++thisMsgId;
 
-  // unpack attribue data, with an explicit copy
+  // unpack attribute data, with an explicit copy
   // into a local array
   const unsigned int nToUnPack = buffer.GetNumberOfTuples(0);
   // volume

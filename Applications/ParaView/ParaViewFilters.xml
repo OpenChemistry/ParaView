@@ -8,6 +8,7 @@
     <Proxy group="filters" name="Threshold" icon=":/pqWidgets/Icons/pqThreshold24.png"/>
     <Proxy group="filters" name="ExtractGrid" icon=":/pqWidgets/Icons/pqExtractGrid24.png"/>
     <Proxy group="filters" name="Glyph" icon=":/pqWidgets/Icons/pqGlyph24.png"/>
+    <Proxy group="filters" name="NewGlyph" icon=":/pqWidgets/Icons/pqGlyph24.png"/>
     <Proxy group="filters" name="StreamTracer" icon=":/pqWidgets/Icons/pqStreamTracer24.png"/>
     <Proxy group="filters" name="WarpVector" icon=":/pqWidgets/Icons/pqWarp24.png"/>
     <Proxy group="filters" name="GroupDataSets" icon=":/pqWidgets/Icons/pqGroup24.png"/>
@@ -46,8 +47,6 @@
     <Proxy group="filters" name="TransposeTable" omit_from_toolbar="1"/>
     <Proxy group="filters" name="ComputeQuartiles"
             icon=":/pqWidgets/Icons/pqBoxChart16.png" omit_from_toolbar="1"/>
-    <Proxy group="filters" name="ExtractBagPlots"
-            icon=":/pqWidgets/Icons/pqFunctionalBagChart16.png" omit_from_toolbar="1"/>
     <Proxy group="filters" name="ExtractLocation" omit_from_toolbar="1" />
     <Proxy group="filters" name="PlotDataOverTime" omit_from_toolbar="1" />
   </Category>
@@ -61,6 +60,7 @@
     <Proxy group="filters" name="HyperTreeGridDepthLimiter" />
     <Proxy group="filters" name="HyperTreeGridSliceWithPlane" />
     <Proxy group="filters" name="HyperTreeGridThreshold" />
+    <Proxy group="filters" name="HyperTreeGridToDualGrid" />
     <Proxy group="filters" name="HyperTreeGridToUnstructuredGrid" />
   </Category>
 
@@ -147,6 +147,13 @@
     <Proxy group="filters" name="SPHDatasetInterpolator" />
   </Category>
 
+  <Category name="Chemistry" menu_label="Chemistry">
+    <Proxy group="filters" name="AppendMolecule"/>
+    <Proxy group="filters" name="ComputeMoleculeBonds"/>
+    <Proxy group="filters" name="MoleculeToLines"/>
+    <Proxy group="filters" name="PointSetToMolecule"/>
+  </Category>
+
   <Proxy group="filters" name="AggregateDataSet" />
   <Proxy group="filters" name="AppendArcLength" />
   <Proxy group="filters" name="AddFieldArrays" />
@@ -185,6 +192,7 @@
   <Proxy group="filters" name="DecimatePolyline" />
   <Proxy group="filters" name="Delaunay2D" />
   <Proxy group="filters" name="Delaunay3D" />
+  <Proxy group="filters" name="DistributePoints"/>
   <Proxy group="filters" name="ElevationFilter" />
   <Proxy group="filters" name="EvenlySpacedStreamlines2D" />
   <Proxy group="filters" name="ExtractBlock" />
@@ -203,6 +211,7 @@
   <Proxy group="filters" name="GenerateIdScalars"/>
   <Proxy group="filters" name="GhostCellsGenerator" />
   <Proxy group="filters" name="Glyph" />
+  <Proxy group="filters" name="NewGlyph" />
   <Proxy group="filters" name="GlyphWithCustomSource" />
   <Proxy group="filters" name="Gradient" />
   <Proxy group="filters" name="GridConnectivity" />
@@ -270,6 +279,7 @@
   <Proxy group="filters" name="TriangleFilter" />
   <Proxy group="filters" name="TubeFilter" />
   <Proxy group="filters" name="UnstructuredGradient" />
+  <Proxy group="filters" name="ValidateCells" />
   <Proxy group="filters" name="WarpScalar" />
   <Proxy group="filters" name="WarpVector" />
   <Proxy group="filters" name="YoungsMaterialInterface"/>
@@ -285,5 +295,5 @@
   <Proxy group="filters" name="GenericGeometryFilter" />
   <Proxy group="filters" name="SliceAlongPolyLine" />
   <Proxy group="filters" name="SliceWithPlane" />
-  <Proxy group="filters" name="RulerFilter" />
+  <Proxy group="filters" name="RulerFilter" icon=":/pqWidgets/Icons/pqRuler.png"/>
 </ParaViewFilters>

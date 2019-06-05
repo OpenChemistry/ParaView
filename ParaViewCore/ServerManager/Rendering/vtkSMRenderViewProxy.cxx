@@ -381,8 +381,7 @@ void vtkSMRenderViewProxy::CreateVTKObjects()
   {
     vtkSMPropertyHelper(this, "StereoCapableWindow").Set(1);
     vtkSMPropertyHelper(this, "StereoRender").Set(1);
-    vtkSMEnumerationDomain* domain =
-      vtkSMEnumerationDomain::SafeDownCast(this->GetProperty("StereoType")->GetDomain("enum"));
+    auto domain = this->GetProperty("StereoType")->FindDomain<vtkSMEnumerationDomain>();
     if (domain && domain->HasEntryText(pvoptions->GetStereoType()))
     {
       vtkSMPropertyHelper(this, "StereoType")
@@ -876,7 +875,7 @@ static void vtkShrinkSelection(vtkSelection* sel)
 {
   std::map<void*, int> pixelCounts;
   unsigned int numNodes = sel->GetNumberOfNodes();
-  void* choosen = NULL;
+  void* chosen = NULL;
   int maxPixels = -1;
   for (unsigned int cc = 0; cc < numNodes; cc++)
   {
@@ -891,29 +890,29 @@ static void vtkShrinkSelection(vtkSelection* sel)
       if (pixelCounts[source] > maxPixels)
       {
         maxPixels = numPixels;
-        choosen = source;
+        chosen = source;
       }
     }
   }
 
-  std::vector<vtkSmartPointer<vtkSelectionNode> > choosenNodes;
-  if (choosen != NULL)
+  std::vector<vtkSmartPointer<vtkSelectionNode> > chosenNodes;
+  if (chosen != NULL)
   {
     for (unsigned int cc = 0; cc < numNodes; cc++)
     {
       vtkSelectionNode* node = sel->GetNode(cc);
       vtkInformation* properties = node->GetProperties();
       if (properties->Has(vtkSelectionNode::SOURCE()) &&
-        properties->Get(vtkSelectionNode::SOURCE()) == choosen)
+        properties->Get(vtkSelectionNode::SOURCE()) == chosen)
       {
-        choosenNodes.push_back(node);
+        chosenNodes.push_back(node);
       }
     }
   }
   sel->RemoveAllNodes();
-  for (unsigned int cc = 0; cc < choosenNodes.size(); cc++)
+  for (unsigned int cc = 0; cc < chosenNodes.size(); cc++)
   {
-    sel->AddNode(choosenNodes[cc]);
+    sel->AddNode(chosenNodes[cc]);
   }
 }
 }
@@ -1240,17 +1239,6 @@ int vtkSMRenderViewProxy::GetValueRenderingMode()
 void vtkSMRenderViewProxy::SetValueRenderingMode(int mode)
 {
   vtkSMPropertyHelper(this, "ValueRenderingMode").Set(mode);
-}
-
-//----------------------------------------------------------------------------
-double vtkSMRenderViewProxy::GetZBufferValue(int x, int y)
-{
-  this->Session->Activate();
-  vtkPVRenderView* rv = vtkPVRenderView::SafeDownCast(this->GetClientSideObject());
-  double result = rv ? rv->GetZbufferDataAtPoint(x, y) : 1.0;
-  this->Session->DeActivate();
-
-  return result;
 }
 
 //----------------------------------------------------------------------------

@@ -51,7 +51,7 @@ class VTKPVVTKEXTENSIONSRENDERING_EXPORT vtkCSVExporter : public vtkObject
 public:
   static vtkCSVExporter* New();
   vtkTypeMacro(vtkCSVExporter, vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   //@{
   /**
@@ -69,19 +69,21 @@ public:
   vtkGetStringMacro(FieldDelimiter);
   //@}
 
-  //@{
-  /**
-   * Get/Set to filter by column or not
-   */
-  vtkSetMacro(FilterColumnsByVisibility, bool);
-  vtkGetMacro(FilterColumnsByVisibility, bool);
-  //@}
-
   enum ExporterModes
   {
     STREAM_ROWS,
     STREAM_COLUMNS
   };
+
+  //@{
+  /**
+   * In STREAM_ROWS mode, this API can be used to change columns labels
+   * when exporting.
+   */
+  void SetColumnLabel(const char* name, const char* label);
+  void ClearColumnLabels();
+  const char* GetColumnLabel(const char* name);
+  //@}
 
   /**
    * Open the file and set mode in which the exporter is operating.
@@ -126,7 +128,6 @@ protected:
 
   char* FileName;
   char* FieldDelimiter;
-  bool FilterColumnsByVisibility;
   ofstream* FileStream;
   ExporterModes Mode;
 

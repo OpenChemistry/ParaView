@@ -40,8 +40,7 @@
 #include "vtksys/SystemTools.hxx"
 
 // Determine if we can use the MPI controller for asynchronous communication.
-#include "vtkPVConfig.h"
-#ifdef PARAVIEW_USE_MPI
+#if VTK_MODULE_ENABLE_VTK_ParallelMPI
 #define VTK_AMR_DUAL_GRID_USE_MPI_ASYNCHRONOUS
 #include "vtkMPICommunicator.h"
 #include "vtkMPIController.h"
@@ -1022,7 +1021,7 @@ void vtkAMRDualGridHelper::FindExistingFaces(
       {
         for (ii = -1; ii <= 1; ++ii)
         {
-          // Somewhat convoluted logic to determnine if face/edge/corner is external.
+          // Somewhat convoluted logic to determine if face/edge/corner is external.
           if ((ii != -1 || ext3[0] == ext[0]) && (ii != 1 || ext3[1] == ext[1]) &&
             (jj != -1 || ext3[2] == ext[2]) && (jj != 1 || ext3[3] == ext[3]) &&
             (kk != -1 || ext3[4] == ext[4]) && (kk != 1 || ext3[5] == ext[5]))
@@ -1185,7 +1184,7 @@ int vtkAMRDualGridHelper::ClaimBlockSharedRegion(vtkAMRDualGridHelperBlock* bloc
     }
     // If we convert index to lower level and then back and it does
     // not change then, the different level blocks share a face.
-    // Somewhat convoluted logic to determnine if face/edge/corner is external.
+    // Somewhat convoluted logic to determine if face/edge/corner is external.
     if ((regionX == -1 && ext3[0] == ext1[0]) || (regionX == 1 && ext3[1] == ext1[1]) ||
       (regionY == -1 && ext3[2] == ext1[2]) || (regionY == 1 && ext3[3] == ext1[3]) ||
       (regionZ == -1 && ext3[4] == ext1[4]) || (regionZ == 1 && ext3[5] == ext1[5]))

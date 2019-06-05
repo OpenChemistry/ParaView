@@ -42,7 +42,7 @@ class VTKPVSERVERMANAGERRENDERING_EXPORT vtkSMTransferFunctionPresets : public v
 public:
   static vtkSMTransferFunctionPresets* New();
   vtkTypeMacro(vtkSMTransferFunctionPresets, vtkSMObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Returns the number of presets current available (including builtin and
@@ -86,6 +86,11 @@ public:
   vtkStdString GetPresetName(unsigned int index);
 
   /**
+   * Returns true if a present with given name exists.
+   */
+  bool HasPreset(const char* name);
+
+  /**
    * Returns true if the preset has opacities i.e. values for a piecewise function.
    */
   bool GetPresetHasOpacities(const Json::Value& preset);
@@ -111,6 +116,13 @@ public:
   {
     return this->GetPresetHasAnnotations(this->GetPreset(index));
   }
+
+  /**
+   * Returns the preset's JSON-defined default position (if any)
+   * or -1 if none.
+   */
+  bool IsPresetDefault(const Json::Value& preset);
+  bool IsPresetDefault(unsigned int index) { return this->IsPresetDefault(this->GetPreset(index)); }
 
   /**
    * Add a preset give the Json::Value object.

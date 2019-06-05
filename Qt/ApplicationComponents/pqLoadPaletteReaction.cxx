@@ -42,7 +42,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMProxy.h"
 #include "vtkSMProxyDefinitionManager.h"
 #include "vtkSMSessionProxyManager.h"
+#include "vtkSMTrace.h"
 #include "vtkSmartPointer.h"
+
+#include <cassert>
 
 //-----------------------------------------------------------------------------
 pqLoadPaletteReaction::pqLoadPaletteReaction(QAction* parentObject)
@@ -81,10 +84,10 @@ void pqLoadPaletteReaction::populateMenu()
   menu->clear();
 
   vtkSMSessionProxyManager* pxm = pqActiveObjects::instance().proxyManager();
-  Q_ASSERT(pxm);
+  assert(pxm);
 
   vtkSMProxyDefinitionManager* pdmgr = pxm->GetProxyDefinitionManager();
-  Q_ASSERT(pdmgr);
+  assert(pdmgr);
 
   // Add "DefaultBackground" as the first entry.
   if (vtkSMProxy* prototype = pxm->GetPrototypeProxy("palettes", "DefaultBackground"))
@@ -119,15 +122,18 @@ void pqLoadPaletteReaction::actionTriggered(QAction* actn)
   if (actn->property("PV_XML_NAME").isValid())
   {
     vtkSMSessionProxyManager* pxm = pqActiveObjects::instance().proxyManager();
-    Q_ASSERT(pxm);
+    assert(pxm);
 
     vtkSMProxy* paletteProxy = pxm->GetProxy("global_properties", "ColorPalette");
 
     vtkSMProxy* palettePrototype = pxm->GetPrototypeProxy(
       "palettes", actn->property("PV_XML_NAME").toString().toLocal8Bit().data());
-    Q_ASSERT(palettePrototype);
+    assert(palettePrototype);
 
     BEGIN_UNDO_SET("Load color palette");
+    SM_SCOPED_TRACE(CallFunction)
+      .arg("LoadPalette")
+      .arg("paletteName", actn->property("PV_XML_NAME").toString().toLocal8Bit().data());
     paletteProxy->Copy(palettePrototype);
     paletteProxy->UpdateVTKObjects();
     END_UNDO_SET();

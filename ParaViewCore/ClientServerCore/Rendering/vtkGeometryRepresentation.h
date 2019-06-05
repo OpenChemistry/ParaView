@@ -59,7 +59,7 @@ class VTKPVCLIENTSERVERCORERENDERING_EXPORT vtkGeometryRepresentation
 public:
   static vtkGeometryRepresentation* New();
   vtkTypeMacro(vtkGeometryRepresentation, vtkPVDataRepresentation);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * vtkAlgorithm::ProcessRequest() equivalent for rendering passes. This is
@@ -68,7 +68,7 @@ public:
    * PrepareForRendering.
    */
   int ProcessViewRequest(vtkInformationRequestKey* request_type, vtkInformation* inInfo,
-    vtkInformation* outInfo) VTK_OVERRIDE;
+    vtkInformation* outInfo) override;
 
   /**
    * This needs to be called on all instances of vtkGeometryRepresentation when
@@ -76,13 +76,13 @@ public:
    * have any real-input on the client side which messes with the Update
    * requests.
    */
-  void MarkModified() VTK_OVERRIDE;
+  void MarkModified() override;
 
   /**
    * Get/Set the visibility for this representation. When the visibility of
    * representation of false, all view passes are ignored.
    */
-  void SetVisibility(bool val) VTK_OVERRIDE;
+  void SetVisibility(bool val) override;
 
   //@{
   /**
@@ -140,15 +140,7 @@ public:
   /**
    * Returns the data object that is rendered from the given input port.
    */
-  vtkDataObject* GetRenderedDataObject(int port) VTK_OVERRIDE;
-
-  /**
-   * Returns true if this class would like to get ghost-cells if available for
-   * the connection whose information object is passed as the argument.
-   * @deprecated in ParaView 5.5. See
-   * `vtkProcessModule::GetNumberOfGhostLevelsToRequest` instead.
-   */
-  VTK_LEGACY(static bool DoRequestGhostCells(vtkInformation* information));
+  vtkDataObject* GetRenderedDataObject(int port) override;
 
   //@{
   /**
@@ -166,6 +158,7 @@ public:
   virtual void SetUseOutline(int);
   void SetTriangulate(int);
   void SetNonlinearSubdivisionLevel(int);
+  virtual void SetGenerateFeatureEdges(bool);
 
   //***************************************************************************
   // Forwarded to vtkProperty.
@@ -287,6 +280,21 @@ public:
   vtkGetMacro(UseDataPartitions, bool);
   //@}
 
+  //@{
+  /**
+   * Specify whether or not to shader replacements string must be used.
+   */
+  virtual void SetUseShaderReplacements(bool);
+  vtkGetMacro(UseShaderReplacements, bool);
+  //@}
+
+  /**
+   * Specify shader replacements using a Json string.
+   * Please refer to the XML definition of the property for details about
+   * the expected Json string format.
+   */
+  virtual void SetShaderReplacements(const char*);
+
 protected:
   vtkGeometryRepresentation();
   ~vtkGeometryRepresentation() override;
@@ -302,7 +310,7 @@ protected:
   /**
    * Fill input port information.
    */
-  int FillInputPortInformation(int port, vtkInformation* info) VTK_OVERRIDE;
+  int FillInputPortInformation(int port, vtkInformation* info) override;
 
   /**
    * Subclasses should override this to connect inputs to the internal pipeline
@@ -314,27 +322,27 @@ protected:
    * GetInternalSelectionOutputPort should be used to obtain a selection or
    * annotation port whose selections are localized for a particular input data object.
    */
-  int RequestData(vtkInformation*, vtkInformationVector**, vtkInformationVector*) VTK_OVERRIDE;
+  int RequestData(vtkInformation*, vtkInformationVector**, vtkInformationVector*) override;
 
   /**
    * Overridden to request correct ghost-level to avoid internal surfaces.
    */
   int RequestUpdateExtent(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
 
   /**
    * Adds the representation to the view.  This is called from
    * vtkView::AddRepresentation().  Subclasses should override this method.
    * Returns true if the addition succeeds.
    */
-  bool AddToView(vtkView* view) VTK_OVERRIDE;
+  bool AddToView(vtkView* view) override;
 
   /**
    * Removes the representation to the view.  This is called from
    * vtkView::RemoveRepresentation().  Subclasses should override this method.
    * Returns true if the removal succeeds.
    */
-  bool RemoveFromView(vtkView* view) VTK_OVERRIDE;
+  bool RemoveFromView(vtkView* view) override;
 
   /**
    * Passes on parameters to vtkProperty and vtkMapper
@@ -349,7 +357,7 @@ protected:
   /**
    * Overridden to check with the vtkPVCacheKeeper to see if the key is cached.
    */
-  bool IsCached(double cache_key) VTK_OVERRIDE;
+  bool IsCached(double cache_key) override;
 
   // Progress Callback
   void HandleGeometryRepresentationProgress(vtkObject* caller, unsigned long, void*);
@@ -364,10 +372,15 @@ protected:
   void UpdateBlockAttributes(vtkMapper* mapper);
 
   /**
-   * Computes the bounds of the visible data based on the block visiblities in the
+   * Computes the bounds of the visible data based on the block visibilities in the
    * composite data attributes of the mapper.
    */
   void ComputeVisibleDataBounds();
+
+  /**
+   * Update the mapper with the shader replacement strings if feature is enabled.
+   */
+  void UpdateShaderReplacements();
 
   vtkAlgorithm* GeometryFilter;
   vtkAlgorithm* MultiBlockMaker;
@@ -394,6 +407,9 @@ protected:
 
   bool UseDataPartitions;
 
+  bool UseShaderReplacements;
+  std::string ShaderReplacementsString;
+
   bool BlockAttrChanged = false;
   vtkTimeStamp BlockAttributeTime;
   bool UpdateBlockAttrLOD = false;
@@ -404,10 +420,6 @@ protected:
 private:
   vtkGeometryRepresentation(const vtkGeometryRepresentation&) = delete;
   void operator=(const vtkGeometryRepresentation&) = delete;
-
-  friend class vtkSelectionRepresentation;
-  char* DebugString;
-  vtkSetStringMacro(DebugString);
 };
 
 #endif

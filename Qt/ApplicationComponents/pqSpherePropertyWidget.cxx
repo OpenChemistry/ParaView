@@ -38,8 +38,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMPropertyGroup.h"
 #include "vtkSMPropertyHelper.h"
 
-#include <QDoubleValidator>
-
 //-----------------------------------------------------------------------------
 pqSpherePropertyWidget::pqSpherePropertyWidget(
   vtkSMProxy* smproxy, vtkSMPropertyGroup* smgroup, QWidget* parentObject)
@@ -47,14 +45,6 @@ pqSpherePropertyWidget::pqSpherePropertyWidget(
 {
   Ui::SpherePropertyWidget ui;
   ui.setupUi(this);
-
-  new QDoubleValidator(ui.centerX);
-  new QDoubleValidator(ui.centerY);
-  new QDoubleValidator(ui.centerZ);
-  new QDoubleValidator(ui.normalX);
-  new QDoubleValidator(ui.normalY);
-  new QDoubleValidator(ui.normalZ);
-  new QDoubleValidator(ui.radius);
 
   if (vtkSMProperty* center = smgroup->GetProperty("Center"))
   {

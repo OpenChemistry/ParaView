@@ -113,15 +113,18 @@
 #ifndef vtkSMSessionProxyManager_h
 #define vtkSMSessionProxyManager_h
 
-#include "vtkPVServerManagerCoreModule.h" //needed for exports
+#include "vtkPVServerManagerCoreModule.h" // needed for exports
 #include "vtkSMMessageMinimal.h"          // needed for vtkSMMessage.
 #include "vtkSMSessionObject.h"
+
+#include <string> // needed for std::string
 
 class vtkCollection;
 class vtkEventForwarderCommand;
 class vtkPVXMLElement;
 class vtkSMCompoundSourceProxy;
 class vtkSMDocumentation;
+class vtkSMExportProxyDepot;
 class vtkSMLink;
 class vtkSMProperty;
 class vtkSMProxy;
@@ -150,7 +153,7 @@ public:
    */
   static vtkSMSessionProxyManager* New(vtkSMSession* session);
   vtkTypeMacro(vtkSMSessionProxyManager, vtkSMSessionObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
   //@}
 
   /**
@@ -207,7 +210,7 @@ public:
    * This overload register the proxy using an unique name returned by
    * GetUniqueProxyName() and returns the name used.
    */
-  vtkStdString RegisterProxy(const char* groupname, vtkSMProxy* proxy);
+  std::string RegisterProxy(const char* groupname, vtkSMProxy* proxy);
 
   //@{
   /**
@@ -269,7 +272,7 @@ public:
    * Given a group, returns a name not already used for proxies registered in
    * the given group. The prefix is used to come up with a new name.
    */
-  vtkStdString GetUniqueProxyName(const char* groupname, const char* prefix);
+  std::string GetUniqueProxyName(const char* groupname, const char* prefix);
 
   /**
    * If the proxy is in the given group, return its name, otherwise
@@ -430,7 +433,7 @@ public:
   /**
    * Saves the state of the server manager as XML, and returns the
    * vtkPVXMLElement for the root of the state.
-   * Note this this method allocates a new vtkPVXMLElement object,
+   * Note this method allocates a new vtkPVXMLElement object,
    * it's the caller's responsibility to free it by calling Delete().
    */
   vtkPVXMLElement* SaveXMLState();
@@ -573,6 +576,11 @@ public:
    */
   vtkSMProxy* FindProxy(const char* reggroup, const char* xmlgroup, const char* xmltype);
 
+  /**
+   * Get access the the export depot.
+   */
+  vtkGetObjectMacro(ExportDepot, vtkSMExportProxyDepot);
+
 protected:
   vtkSMSessionProxyManager(vtkSMSession*);
   ~vtkSMSessionProxyManager() override;
@@ -637,6 +645,8 @@ private:
   vtkSMSessionProxyManagerInternals* Internals;
   vtkSMProxyManagerObserver* Observer;
   bool InLoadXMLState;
+
+  vtkSMExportProxyDepot* ExportDepot;
 
 #ifndef __WRAP__
   static vtkSMSessionProxyManager* New() { return NULL; }

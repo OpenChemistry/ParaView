@@ -45,6 +45,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <QMessageBox>
 
+#include <cassert>
+
 class pqFindDataDialog::pqInternals
 {
 public:
@@ -103,7 +105,7 @@ void pqFindDataDialog::showing(pqOutputPort* port)
 void pqFindDataDialog::freezeSelection()
 {
   pqOutputPort* port = this->Internals->Ui.currentSelectionFrame->showingPort();
-  Q_ASSERT(port != NULL);
+  assert(port != NULL);
 
   vtkSMSourceProxy* curSelSource = static_cast<vtkSMSourceProxy*>(port->getSelectionInput());
 
@@ -124,7 +126,7 @@ void pqFindDataDialog::freezeSelection()
         (fdType == vtkSelectionNode::CELL && selectedInformation->GetNumberOfCells() > 10000))
       {
         if (QMessageBox::warning(this, tr("Convert Selection"),
-              tr("This selection converion can potentially result in fetching a "
+              tr("This selection conversion can potentially result in fetching a "
                  "large amount of data to the client.\n"
                  "Are you sure you want to continue?"),
               QMessageBox::Ok | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Ok)
@@ -157,7 +159,7 @@ void pqFindDataDialog::freezeSelection()
 void pqFindDataDialog::extractSelection()
 {
   pqOutputPort* port = this->Internals->Ui.currentSelectionFrame->showingPort();
-  Q_ASSERT(port != NULL);
+  assert(port != NULL);
   pqObjectBuilder* builder = pqApplicationCore::instance()->getObjectBuilder();
   builder->createFilter("filters", "ExtractSelection", port->getSource(), port->getPortNumber());
 }
@@ -166,7 +168,7 @@ void pqFindDataDialog::extractSelection()
 void pqFindDataDialog::extractSelectionOverTime()
 {
   pqOutputPort* port = this->Internals->Ui.currentSelectionFrame->showingPort();
-  Q_ASSERT(port != NULL);
+  assert(port != NULL);
   pqObjectBuilder* builder = pqApplicationCore::instance()->getObjectBuilder();
   builder->createFilter(
     "filters", "ExtractSelectionOverTime", port->getSource(), port->getPortNumber());

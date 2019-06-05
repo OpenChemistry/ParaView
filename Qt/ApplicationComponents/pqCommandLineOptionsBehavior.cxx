@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqDeleteReaction.h"
 #include "pqEventDispatcher.h"
 #include "pqFileDialog.h"
+#include "pqLiveInsituManager.h"
 #include "pqLoadDataReaction.h"
 #include "pqLoadStateReaction.h"
 #include "pqObjectBuilder.h"
@@ -67,7 +68,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QString>
 #include <QStringList>
 
-#ifdef PARAVIEW_ENABLE_PYTHON
+#include <cassert>
+
+#if VTK_MODULE_ENABLE_VTK_PythonInterpreter
 #include "vtkPythonInterpreter.h"
 #endif
 
@@ -124,19 +127,7 @@ void pqCommandLineOptionsBehavior::processCommandLineOptions()
   // Now we are assured that some default server connection has been made
   // (either the one requested by the user on the command line or simply the
   // default one).
-  Q_ASSERT(pqActiveObjects::instance().activeServer() != 0);
-
-  // For tile display testing lets enable the dump of images
-  if (options->GetTileImagePath())
-  {
-    vtkSMProxy* proxy =
-      vtkSMProxyManager::GetProxyManager()->NewProxy("tile_helper", "TileDisplayHelper");
-    vtkSMStringVectorProperty* pathProperty =
-      vtkSMStringVectorProperty::SafeDownCast(proxy->GetProperty("DumpImagePath"));
-    pathProperty->SetElement(0, options->GetTileImagePath());
-    proxy->UpdateVTKObjects();
-    proxy->Delete();
-  }
+  assert(pqActiveObjects::instance().activeServer() != 0);
 
   // check for --data option.
   if (options->GetParaViewDataName())
@@ -174,7 +165,7 @@ void pqCommandLineOptionsBehavior::processCommandLineOptions()
   else if (options->GetStateFileName())
   {
     // check for --state option. (Bug #5711)
-    // NOTE: --data and --state cannnot be specifed at the same time.
+    // NOTE: --data and --state cannot be specified at the same time.
 
     // Load state file without fix-filenames dialog.
     pqLoadStateReaction::loadState(options->GetStateFileName(), true);
@@ -182,7 +173,7 @@ void pqCommandLineOptionsBehavior::processCommandLineOptions()
 
   if (options->GetPythonScript())
   {
-#ifdef PARAVIEW_ENABLE_PYTHON
+#if VTK_MODULE_ENABLE_VTK_PythonInterpreter
     QFile file(options->GetPythonScript());
     if (file.open(QIODevice::ReadOnly))
     {
@@ -196,6 +187,15 @@ void pqCommandLineOptionsBehavior::processCommandLineOptions()
 #else
     qCritical() << "Python support not enabled. Cannot run python scripts.";
 #endif
+  }
+
+  // check if a Catalyst Live port was passed in that we should automatically attempt
+  // to establish a connection to.
+  if (options->GetCatalystLivePort() != -1)
+  {
+    pqLiveInsituManager* insituManager = pqLiveInsituManager::instance();
+    insituManager->connect(
+      pqActiveObjects::instance().activeServer(), options->GetCatalystLivePort());
   }
 
   if (options->GetDisableRegistry())

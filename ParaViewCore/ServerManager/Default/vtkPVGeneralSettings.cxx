@@ -16,6 +16,7 @@
 
 #include "vtkCacheSizeKeeper.h"
 #include "vtkObjectFactory.h"
+#include "vtkPVXYChartView.h"
 #include "vtkProcessModuleAutoMPI.h"
 #include "vtkSISourceProxy.h"
 #include "vtkSMArraySelectionDomain.h"
@@ -50,13 +51,17 @@ vtkPVGeneralSettings::vtkPVGeneralSettings()
   , ScalarBarMode(vtkPVGeneralSettings::AUTOMATICALLY_HIDE_SCALAR_BARS)
   , CacheGeometryForAnimation(false)
   , AnimationGeometryCacheLimit(0)
-  , AnimationTimePrecision(17)
+  , AnimationTimePrecision(6)
   , ShowAnimationShortcuts(0)
+  , RealNumberDisplayedNotation(vtkPVGeneralSettings::DISPLAY_REALNUMBERS_USING_FIXED_NOTATION)
+  , RealNumberDisplayedPrecision(6)
+  , ResetDisplayEmptyViews(0)
   , PropertiesPanelMode(vtkPVGeneralSettings::ALL_IN_ONE)
   , LockPanels(false)
   , GUIFontSize(0)
   , GUIOverrideFont(false)
   , ColorByBlockColorsOnApply(true)
+  , AnimationTimeNotation('g')
 {
   this->SetDefaultViewType("RenderView");
 }
@@ -149,6 +154,22 @@ void vtkPVGeneralSettings::SetAnimationGeometryCacheLimit(unsigned long val)
 }
 
 //----------------------------------------------------------------------------
+void vtkPVGeneralSettings::SetIgnoreNegativeLogAxisWarning(bool val)
+{
+  if (vtkPVXYChartView::GetIgnoreNegativeLogAxisWarning() != val)
+  {
+    vtkPVXYChartView::SetIgnoreNegativeLogAxisWarning(val);
+    this->Modified();
+  }
+}
+
+//----------------------------------------------------------------------------
+bool vtkPVGeneralSettings::GetIgnoreNegativeLogAxisWarning()
+{
+  return vtkPVXYChartView::GetIgnoreNegativeLogAxisWarning();
+}
+
+//----------------------------------------------------------------------------
 void vtkPVGeneralSettings::SetScalarBarMode(int val)
 {
   switch (val)
@@ -228,4 +249,21 @@ void vtkPVGeneralSettings::PrintSelf(ostream& os, vtkIndent indent)
   os << indent << "AnimationGeometryCacheLimit: " << this->AnimationGeometryCacheLimit << "\n";
   os << indent << "PropertiesPanelMode: " << this->PropertiesPanelMode << "\n";
   os << indent << "LockPanels: " << this->LockPanels << "\n";
+}
+
+//----------------------------------------------------------------------------
+void vtkPVGeneralSettings::SetAnimationTimeNotation(int notation)
+{
+  switch (notation)
+  {
+    case vtkPVGeneralSettings::SCIENTIFIC:
+      this->SetAnimationTimeNotation('e');
+      break;
+    case vtkPVGeneralSettings::FIXED:
+      this->SetAnimationTimeNotation('f');
+      break;
+    case vtkPVGeneralSettings::MIXED:
+    default:
+      this->SetAnimationTimeNotation('g');
+  }
 }

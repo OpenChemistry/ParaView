@@ -31,6 +31,14 @@ protected:
 protected slots:
   void sendToOpenVR();
 
+  void exportLocationsAsSkyboxes();
+  void exportLocationsAsView();
+
+  void multiSampleChanged(int state);
+  void defaultCropThicknessChanged(const QString& text);
+  void editableFieldChanged(const QString& text);
+  void fieldValuesChanged(const QString& text);
+
   void setActiveView(pqView*);
 
   void loadState(vtkPVXMLElement*, vtkSMProxyLocator*);
@@ -45,6 +53,12 @@ protected slots:
   void onViewAdded(pqView*);
   void onViewRemoved(pqView*);
 
+  void collaborationConnect();
+  void collaborationCallback(std::string const& data, void* cd);
+
 private:
   void constructor();
+
+  class pqInternals;
+  pqInternals* Internals;
 };

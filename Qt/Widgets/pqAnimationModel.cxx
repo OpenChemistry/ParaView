@@ -32,6 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "pqAnimationModel.h"
 
+#include "assert.h"
+
 #include <QEvent>
 #include <QGraphicsSceneMouseEvent>
 #include <QGraphicsView>
@@ -42,6 +44,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqAnimationTrack.h"
 #include "pqCheckBoxPixMaps.h"
 
+#include <cassert>
+#include <iostream>
+
 pqAnimationModel::pqAnimationModel(QGraphicsView* p)
   : QGraphicsScene(QRectF(0, 0, 400, 16 * 6), p)
   , Mode(Real)
@@ -51,10 +56,13 @@ pqAnimationModel::pqAnimationModel(QGraphicsView* p)
   , EndTime(1)
   , Interactive(false)
   , CurrentTimeGrabbed(false)
+  , NewCurrentTime(0)
   , CurrentTrackGrabbed(NULL)
   , CurrentKeyFrameGrabbed(NULL)
   , CurrentKeyFrameEdge(0)
   , EnabledHeaderToolTip("Enable/Disable Track")
+  , TimePrecision(6)
+  , TimeNotation('g')
 {
   QObject::connect(this, SIGNAL(sceneRectChanged(QRectF)), this, SLOT(resizeTracks()));
   p->installEventFilter(this);
@@ -269,7 +277,7 @@ double pqAnimationModel::timeFromTick(int tick)
 {
   if (this->Mode == Custom)
   {
-    Q_ASSERT(tick <= this->CustomTicks.size());
+    assert(tick <= this->CustomTicks.size());
     return this->CustomTicks[tick];
   }
 
@@ -347,19 +355,24 @@ void pqAnimationModel::drawForeground(QPainter* painter, const QRectF&)
   num = num == 0 ? 1 : num;
   double w = labelRect.width() / num;
 
+  painter->save();
+  painter->setPen(QColor(0, 0, 0));
   painter->drawText(QRectF(labelRect.left(), labelRect.top(), w / 2.0, rh),
-    Qt::AlignLeft | Qt::AlignVCenter, QString("%1").arg(this->StartTime, 5, 'e', 3));
+    Qt::AlignLeft | Qt::AlignVCenter,
+    QString::number(this->StartTime, this->TimeNotation.toLatin1(), this->TimePrecision));
 
   for (int i = 1; i < num; i++)
   {
     double time = this->StartTime + (this->EndTime - this->StartTime) * (double)i / (double)num;
     double left = labelRect.left() + w / 2.0 + w * (i - 1);
-    painter->drawText(
-      QRectF(left, labelRect.top(), w, rh), Qt::AlignCenter, QString("%1").arg(time, 5, 'e', 3));
+    painter->drawText(QRectF(left, labelRect.top(), w, rh), Qt::AlignCenter,
+      QString::number(time, this->TimeNotation.toLatin1(), this->TimePrecision));
   }
 
   painter->drawText(QRectF(labelRect.right() - w / 2.0, labelRect.top(), w / 2.0, rh),
-    Qt::AlignRight | Qt::AlignVCenter, QString("%1").arg(this->EndTime, 5, 'e', 3));
+    Qt::AlignRight | Qt::AlignVCenter,
+    QString::number(this->EndTime, this->TimeNotation.toLatin1(), this->TimePrecision));
+  painter->restore();
 
   // if sequence, draw a tick mark for each frame
   if ((this->mode() == Sequence || this->mode() == Custom) && this->currentTicks() > 2)
@@ -687,4 +700,20 @@ double pqAnimationModel::timeToNormalizedTime(double t) const
 double pqAnimationModel::normalizedTimeToTime(double t) const
 {
   return t * (this->endTime() - this->startTime()) + this->startTime();
+}
+
+void pqAnimationModel::setTimePrecision(int precision)
+{
+  this->TimePrecision = precision;
+  this->update();
+}
+
+void pqAnimationModel::setTimeNotation(const QChar& notation)
+{
+  QString possibilities = QString("eEfgG");
+  if (possibilities.contains(notation) && this->TimeNotation != notation)
+  {
+    this->TimeNotation = notation;
+    this->update();
+  }
 }

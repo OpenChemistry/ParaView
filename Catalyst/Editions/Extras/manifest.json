@@ -47,7 +47,8 @@
     { "name":"vtkPVClientServerCoreCore",
       "path":"ParaViewCore/ClientServerCore/Core",
       "include":[
-        { "class":"vtkPVExtractSelection" }
+        { "class":"vtkPVExtractSelection" },
+        { "class":"vtkPythonSelector" }
       ],
       "patches":[
         { "path": "ClientServerCore-restore-extraction.patch",
@@ -57,9 +58,19 @@
       "cswrap":true,
       "pythonwrap":true
     },
+    { "name":"vtkFiltersCore",
+      "path":"VTK/Filters/Core",
+      "include":[
+        { "class":"vtkIdFilter" },
+        { "class":"vtkTriangleFilter" }
+      ],
+      "cswrap":true,
+      "pythonwrap":true
+    },
     { "name":"vtkFiltersExtraction",
       "path":"VTK/Filters/Extraction",
       "include":[
+        { "class":"vtkBlockSelector" },
         { "class":"vtkConvertSelection" },
         { "class":"vtkExtractBlock" },
         { "class":"vtkExtractCells" },
@@ -69,7 +80,11 @@
         { "class":"vtkExtractSelectedThresholds" },
         { "class":"vtkExtractSelectedRows" },
         { "class":"vtkExtractSelection" },
-        { "class":"vtkProbeSelectedLocations" }
+        { "class":"vtkFrustumSelector" },
+        { "class":"vtkLocationSelector" },
+        { "class":"vtkProbeSelectedLocations" },
+        { "class":"vtkSelector" },
+        { "class":"vtkValueSelector" }
       ],
       "cswrap":true,
       "pythonwrap":true
@@ -93,6 +108,7 @@
       "path": "VTK/Filters/Parallel",
       "include": [
         { "class": "vtkAggregateDataSetFilter" },
+        { "class": "vtkIntegrateAttributes" },
         { "class": "vtkPCellDataToPointData" }
       ],
       "replace": [
@@ -123,6 +139,7 @@
     { "name":"vtkFiltersGeneral",
       "path":"VTK/Filters/General",
       "include":[
+        { "class":"vtkDataSetTriangleFilter" },
         { "class":"vtkExtractSelectedFrustum" },
         { "class":"vtkExtractSelectionBase" },
         { "class":"vtkGradientFilter" },
@@ -135,13 +152,24 @@
       "cswrap":true,
       "pythonwrap":true
     },
+    { "name":"vtkPVVTKExtensionsDefault",
+      "path":"ParaViewCore/VTKExtensions/Default",
+      "include":[
+        { "class":"vtkPVGlyphFilter" },
+        { "class":"vtkPVGlyphFilterLegacy" }
+      ],
+      "replace":[
+        { "path":"ParaViewCore/VTKExtensions/Default/module.cmake" }
+      ],
+      "cswrap":true,
+      "pythonwrap":true
+    },
     { "name":"vtkPVVTKExtensionsCore",
       "path":"ParaViewCore/VTKExtensions/Core",
       "include":[
         { "class":"vtkAttributeDataReductionFilter" },
         { "class":"vtkExtractHistogram" },
         { "class":"vtkFileSeriesWriter" },
-        { "class":"vtkIntegrateAttributes" },
         { "class":"vtkParallelSerialWriter" },
         { "class":"vtkPExtractHistogram" },
         { "class":"vtkPVNullSource" },
@@ -250,12 +278,14 @@
   "proxies":[
     { "path":"ParaViewCore/ServerManager/SMApplication/Resources/filters.xml",
       "proxies":[
+        "AggregateDataSet",
         "AppendReductionFilter",
         "CellDataToPointData",
         "DataSetSurfaceFilter",
         "ExtractBlock",
         "ExtractHistogram",
         "Glyph",
+        "GlyphLegacy",
         "ImageDataToPointSet",
         "IntegrateAttributes",
         "PVExtractSelection",

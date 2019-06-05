@@ -31,9 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ========================================================================*/
 #include "pqSILWidget.h"
 
-#include <QDebug>
-
 #include <QAction>
+#include <QDebug>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QMenu>
@@ -88,6 +87,9 @@ pqSILWidget::pqSILWidget(const QString& activeCategory, QWidget* parentObject)
   // setup model
   this->ActiveModel = new pqProxySILModel(activeCategory, this);
   this->SortModel = new QSortFilterProxyModel(this);
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
+  this->SortModel->setRecursiveFilteringEnabled(true);
+#endif
   this->SortModel->setSourceModel(this->ActiveModel);
 }
 
@@ -130,29 +132,16 @@ void pqSILWidget::onModelReset()
   this->Trees.clear();
 
   // First add the active-tree.
-  pqTreeView* activeTree = new pqTreeView(this);
-
-  // pqTreeView create a pqCheckableHeaderView which we don't care for since the
-  // pqSILModel handles header-state on its own. We just need to set the default
-  // header.
-  activeTree->setHeader(new QHeaderView(Qt::Horizontal, activeTree));
+  pqTreeView* activeTree = new pqTreeView(this, /*use_pqHeaderView=*/true);
   activeTree->header()->setStretchLastSection(true);
   activeTree->setRootIsDecorated(false);
-#if QT_VERSION >= 0x050000
-  activeTree->header()->setSectionsClickable(true);
-#else
-  activeTree->header()->setClickable(true);
-#endif
-  activeTree->header()->moveSection(0, 1);
-
-  QObject::connect(activeTree->header(), SIGNAL(sectionClicked(int)), this->ActiveModel,
-    SLOT(toggleRootCheckState()), Qt::QueuedConnection);
   activeTree->setModel(this->SortModel);
   activeTree->expandAll();
-  activeTree->header()->swapSections(0, 1);
-  activeTree->resizeColumnToContents(1);
   this->TabWidget->addTab(activeTree, this->ActiveCategory);
   new pqTreeViewSelectionHelper(activeTree);
+  // even for QT_VERSION < 5.10, we let filtering be enabled on the first widget
+  // since in most cases this will be a flat tree where filtering works fine
+  // even for older Qt versions without support for recursive filtering.
 
   int num_tabs = this->Model->rowCount();
   for (int cc = 0; cc < num_tabs; cc++)
@@ -162,11 +151,7 @@ void pqSILWidget::onModelReset()
       continue;
     }
 
-    pqTreeView* tree = new pqTreeView(this);
-    // pqTreeView create a pqCheckableHeaderView which we don't care for since the
-    // pqSILModel handles header-state on its own. We just need to set the default
-    // header.
-    tree->setHeader(new QHeaderView(Qt::Horizontal, tree));
+    pqTreeView* tree = new pqTreeView(this, /*use_pqHeaderView=*/true);
     tree->header()->setStretchLastSection(true);
     tree->setRootIsDecorated(false);
 
@@ -174,22 +159,22 @@ void pqSILWidget::onModelReset()
     pqProxySILModel* proxyModel = new pqProxySILModel(category, tree);
     proxyModel->setSourceModel(this->Model);
 
-#if QT_VERSION >= 0x050000
-    tree->header()->setSectionsClickable(true);
-#else
-    tree->header()->setClickable(true);
-#endif
-    tree->header()->moveSection(0, 1);
-    QObject::connect(tree->header(), SIGNAL(sectionClicked(int)), proxyModel,
-      SLOT(toggleRootCheckState()), Qt::QueuedConnection);
-
     QSortFilterProxyModel* sortModel = new QSortFilterProxyModel(tree);
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
+    sortModel->setRecursiveFilteringEnabled(true);
+#endif
     sortModel->setSourceModel(proxyModel);
     tree->setModel(sortModel);
     tree->expandAll();
+
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 10, 0))
     new pqTreeViewSelectionHelper(tree);
-    tree->header()->swapSections(0, 1);
-    tree->resizeColumnToContents(1);
+#else
+    // disable filtering for older Qt version where recursive filtering
+    // on a tree is not supported.
+    auto helper = new pqTreeViewSelectionHelper(tree);
+    helper->setFilterable(false);
+#endif
 
     this->TabWidget->addTab(tree, category);
   }

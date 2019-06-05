@@ -25,7 +25,8 @@ foreach (flag CMAKE_C_FLAGS_DEBUG
               CMAKE_CXX_FLAGS_DEBUG
               CMAKE_CXX_FLAGS_RELEASE
               CMAKE_CXX_FLAGS_MINSIZEREL
-              CMAKE_CXX_FLAGS_RELWITHDEBINFO)
+              CMAKE_CXX_FLAGS_RELWITHDEBINFO
+              CMAKE_INSTALL_PREFIX)
   if (${${flag}})
     set (extra_params ${extra_params}
         -D${flag}:STRING=${${flag}})
@@ -61,7 +62,7 @@ function(build_adaptor name languages)
             --build-project ${name}
             --build-generator ${CMAKE_GENERATOR}
             --build-makeprogram ${CMAKE_MAKE_PROGRAM}
-            --build-options -DParaView_DIR:PATH=${ParaView_BINARY_DIR}
+            --build-options -DParaView_DIR:PATH=${CMAKE_BINARY_DIR}/${paraview_cmake_destination}
                             -DQT_QMAKE_EXECUTABLE:FILEPATH=${QT_QMAKE_EXECUTABLE}
                             -DQt5_DIR:PATH=${Qt5_DIR}
                             -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
@@ -69,6 +70,7 @@ function(build_adaptor name languages)
                             -DCMAKE_CXX_FLAGS:STRING=${CMAKE_CXX_FLAGS}
                             -DCMAKE_LIBRARY_OUTPUT_DIRECTORY:PATH=${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
                             -DCMAKE_RUNTIME_OUTPUT_DIRECTORY:PATH=${CMAKE_RUNTIME_OUTPUT_DIRECTORY}
+                            -DCMAKE_PREFIX_PATH:STRING="${CMAKE_PREFIX_PATH}"
                             ${language_options}
                             ${extra_params}
                             --no-warn-unused-cli
@@ -84,16 +86,28 @@ endfunction()
 #------------------------------------------------------------------------------
 # Adaptors
 #------------------------------------------------------------------------------
-build_adaptor(NPICAdaptor
-  "C"
-  COMMENT "Building NPIC Adaptor"
-  DEPENDS vtkPVCatalyst)
+cmake_dependent_option(BUILD_NPIC_ADAPTOR
+  "Build the NPIC Catalyst Adaptor" OFF
+  "PARAVIEW_BUILD_CATALYST_ADAPTORS" OFF)
+mark_as_advanced(BUILD_NPIC_ADAPTOR)
+if(BUILD_NPIC_ADAPTOR)
+  build_adaptor(NPICAdaptor
+    "C"
+    COMMENT "Building NPIC Adaptor"
+    DEPENDS ParaView::Catalyst)
+endif()
 
 if (PARAVIEW_USE_MPI)
-  build_adaptor(ParticleAdaptor
-    "C"
-    COMMENT "Building Particle Adaptor"
-    DEPENDS vtkPVCatalyst)
+  cmake_dependent_option(BUILD_PARTICLE_ADAPTOR
+    "Build the Particle Catalyst Adaptor" OFF
+    "PARAVIEW_BUILD_CATALYST_ADAPTORS" OFF)
+  mark_as_advanced(BUILD_PARTICLE_ADAPTOR)
+  if(BUILD_PARTICLE_ADAPTOR)
+    build_adaptor(ParticleAdaptor
+      "C"
+      COMMENT "Building Particle Adaptor"
+      DEPENDS ParaView::Catalyst)
+  endif()
 endif()
 
 #------------------------------------------------------------------------------
@@ -109,7 +123,7 @@ if (CMAKE_Fortran_COMPILER_WORKS)
     build_adaptor(PhastaAdaptor
       "C;Fortran"
       COMMENT "Building Phasta Adaptor"
-      DEPENDS vtkPVCatalyst)
+      DEPENDS ParaView::Catalyst)
   endif()
 endif()
 
@@ -121,12 +135,26 @@ if (PARAVIEW_ENABLE_PYTHON AND NOT WIN32)
   build_adaptor(CTHAdaptor
     "C"
     COMMENT "Building CTH Adaptor"
-    DEPENDS vtkPVPythonCatalyst)
+    DEPENDS ParaView::PythonCatalyst)
 
   if (PARAVIEW_USE_MPI)
       build_adaptor(CamAdaptor
                     ""
                     COMMENT "Building Cam Adaptor"
-                    DEPENDS vtkPVCatalyst)
+                    DEPENDS ParaView::Catalyst)
   endif()
+
+  #------------------------------------------------------------------------------
+  # Adaptors that need Python and Fortran
+  # The Pagosa adaptor is done as part of the normal ParaView CMake configuration
+  # so that the library can be installed.
+  #------------------------------------------------------------------------------
+  cmake_dependent_option(PARAVIEW_BUILD_PAGOSA_ADAPTOR
+    "Build the Pagosa Catalyst Adaptor" OFF
+    "PARAVIEW_BUILD_CATALYST_ADAPTORS" OFF)
+  mark_as_advanced(PARAVIEW_BUILD_PAGOSA_ADAPTOR)
+  if(PARAVIEW_BUILD_PAGOSA_ADAPTOR)
+    add_subdirectory(CoProcessing/Adaptors/PagosaAdaptor)
+  endif()
+
 endif()

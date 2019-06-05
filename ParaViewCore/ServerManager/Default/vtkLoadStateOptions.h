@@ -32,11 +32,20 @@ class VTKPVSERVERMANAGERDEFAULT_EXPORT vtkLoadStateOptions : public vtkObject
 public:
   static vtkLoadStateOptions* New();
   vtkTypeMacro(vtkLoadStateOptions, vtkObject);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   vtkSetMacro(DataDirectory, std::string);
 
-  std::string LocateFileInDirectory(const std::string& filepath);
+  /**
+   * Attempts to locate a file specified by filepath in the directory
+   * specified by the DataDirectory member variable. If the file
+   * cannot be found, the original filepath is returned. Set the
+   * isPath parameter to 0 if you want to locate a file, and set it
+   * to 1 if your aim is to replace the directory in the filepath with
+   * the DataDirectory member variable if the new directory exists. This
+   * can be useful for determining how a file prefix should be changed.
+   */
+  std::string LocateFileInDirectory(const std::string& filepath, int isPath);
 
 protected:
   vtkLoadStateOptions();

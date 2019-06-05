@@ -22,7 +22,10 @@
  * camera is transformed based on the orientations specified in  the pvx
  * configuration file.
  * This code was previously in class vtkCaveRenderManager.
-*/
+ *
+ * In case of a single display, if the cave bounds are not set, we compute these values
+ * from vtkPVServerOptions::Geometry and the client camera view angle.
+ */
 
 #ifndef vtkCaveSynchronizedRenderers_h
 #define vtkCaveSynchronizedRenderers_h
@@ -39,7 +42,7 @@ class VTKPVCLIENTSERVERCORERENDERING_EXPORT vtkCaveSynchronizedRenderers
 public:
   static vtkCaveSynchronizedRenderers* New();
   vtkTypeMacro(vtkCaveSynchronizedRenderers, vtkSynchronizedRenderers);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
 protected:
   vtkCaveSynchronizedRenderers();
@@ -49,7 +52,7 @@ protected:
    * Called at the start of each render. Overridden to ensure that the camera is
    * updated based on the configuration.
    */
-  void HandleStartRender() VTK_OVERRIDE;
+  void HandleStartRender() override;
 
   /**
    * During constructor, processes the configuration file to setup the display
@@ -74,6 +77,12 @@ protected:
    * Method to update the camera.
    */
   void ComputeCamera(vtkCamera* cam);
+
+  /**
+   * Override Superclass to compute Displays parameters in case
+   * of a single screen cave (e.g. zSpace)
+   */
+  void SetRenderer(vtkRenderer* renderer) override;
 
   double EyeSeparation;
   int NumberOfDisplays;

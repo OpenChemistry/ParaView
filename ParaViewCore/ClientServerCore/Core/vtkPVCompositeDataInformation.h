@@ -39,24 +39,24 @@ class VTKPVCLIENTSERVERCORECORE_EXPORT vtkPVCompositeDataInformation : public vt
 public:
   static vtkPVCompositeDataInformation* New();
   vtkTypeMacro(vtkPVCompositeDataInformation, vtkPVInformation);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Transfer information about a single object into this object.
    */
-  void CopyFromObject(vtkObject*) VTK_OVERRIDE;
+  void CopyFromObject(vtkObject*) override;
 
   /**
    * Merge another information object.
    */
-  void AddInformation(vtkPVInformation*) VTK_OVERRIDE;
+  void AddInformation(vtkPVInformation*) override;
 
   //@{
   /**
    * Manage a serialized version of the information.
    */
-  void CopyToStream(vtkClientServerStream*) VTK_OVERRIDE;
-  void CopyFromStream(const vtkClientServerStream*) VTK_OVERRIDE;
+  void CopyToStream(vtkClientServerStream*) override;
+  void CopyFromStream(const vtkClientServerStream*) override;
   //@}
 
   /**
@@ -100,6 +100,14 @@ public:
   vtkGetMacro(DataIsComposite, int);
   //@}
 
+  //@{
+  /**
+   * Returns the number of levels in the AMR dataset. Only valid for
+   * vtkUniformGridAMR datasets.
+   */
+  vtkGetMacro(NumberOfAMRLevels, unsigned int);
+  //@}
+
   // TODO:
   // Add API to obtain meta data information for each of the children.
 
@@ -118,6 +126,8 @@ protected:
 
   unsigned int NumberOfPieces;
   vtkSetMacro(NumberOfPieces, unsigned int);
+
+  unsigned int NumberOfAMRLevels;
 
   friend class vtkPVDataInformation;
   vtkPVDataInformation* GetDataInformationForCompositeIndex(int* index);

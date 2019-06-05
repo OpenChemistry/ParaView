@@ -121,7 +121,7 @@ public:
   vtkTypeMacro(vtkGSRGeometryFilter, vtkPVGeometryFilter);
 
   int RequestData(vtkInformation* req, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE
+    vtkInformationVector* outputVector) override
   {
     vtkSmartPointer<vtkDataObject> inputDO = vtkDataObject::GetData(inputVector[0]);
     vtkSmartPointer<vtkMatrix4x4> changeOfBasisMatrix =
@@ -220,7 +220,7 @@ void vtkGeometrySliceRepresentation::SetupDefaults()
   vtkMath::UninitializeBounds(this->Internals->OriginalDataBounds);
   this->Superclass::SetupDefaults();
   vtkCompositePolyDataMapper2* mapper = vtkCompositePolyDataMapper2::SafeDownCast(this->Mapper);
-  mapper->SetPointIdArrayName("-");
+  mapper->SetPointIdArrayName("vtkSliceOriginalPointIds");
   mapper->SetCellIdArrayName("vtkSliceOriginalCellIds");
   mapper->SetCompositeIdArrayName("vtkSliceCompositeIndex");
 

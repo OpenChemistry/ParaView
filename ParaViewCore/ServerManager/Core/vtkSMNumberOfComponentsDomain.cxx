@@ -82,7 +82,7 @@ void vtkSMNumberOfComponentsDomain::Update(vtkSMProperty*)
   const char* arrayName = svp->GetUncheckedElement(index);
   if (!arrayName || arrayName[0] == 0)
   {
-    // No array choosen.
+    // No array chosen.
     this->RemoveAllEntries();
     return;
   }
@@ -148,31 +148,31 @@ void vtkSMNumberOfComponentsDomain::Update(
   {
     ai = info->GetPointDataInformation()->GetArrayInformation(arrayName);
   }
-  else if (iadAttributeType == vtkSMInputArrayDomain::CELL ||
+  if (iadAttributeType == vtkSMInputArrayDomain::CELL ||
     ((iadAttributeType == vtkSMInputArrayDomain::ANY ||
        iadAttributeType == vtkSMInputArrayDomain::ANY_EXCEPT_FIELD) &&
-             !ai))
+        !ai))
   {
     ai = info->GetCellDataInformation()->GetArrayInformation(arrayName);
   }
-  else if (iadAttributeType == vtkSMInputArrayDomain::VERTEX ||
+  if (iadAttributeType == vtkSMInputArrayDomain::VERTEX ||
     ((iadAttributeType == vtkSMInputArrayDomain::ANY ||
        iadAttributeType == vtkSMInputArrayDomain::ANY_EXCEPT_FIELD) &&
-             !ai))
+        !ai))
   {
     ai = info->GetVertexDataInformation()->GetArrayInformation(arrayName);
   }
-  else if (iadAttributeType == vtkSMInputArrayDomain::EDGE ||
+  if (iadAttributeType == vtkSMInputArrayDomain::EDGE ||
     ((iadAttributeType == vtkSMInputArrayDomain::ANY ||
        iadAttributeType == vtkSMInputArrayDomain::ANY_EXCEPT_FIELD) &&
-             !ai))
+        !ai))
   {
     ai = info->GetEdgeDataInformation()->GetArrayInformation(arrayName);
   }
-  else if (iadAttributeType == vtkSMInputArrayDomain::ROW ||
+  if (iadAttributeType == vtkSMInputArrayDomain::ROW ||
     ((iadAttributeType == vtkSMInputArrayDomain::ANY ||
        iadAttributeType == vtkSMInputArrayDomain::ANY_EXCEPT_FIELD) &&
-             !ai))
+        !ai))
   {
     ai = info->GetRowDataInformation()->GetArrayInformation(arrayName);
   }

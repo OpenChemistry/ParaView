@@ -39,7 +39,7 @@ class VTKPVCLIENTSERVERCORERENDERING_EXPORT vtkPVCacheKeeper : public vtkDataObj
 public:
   static vtkPVCacheKeeper* New();
   vtkTypeMacro(vtkPVCacheKeeper, vtkDataObjectAlgorithm);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Methods for saving, clearing and updating flip books.
@@ -81,6 +81,7 @@ public:
   static int GetCacheHits();
   static int GetCacheMisses();
   static int GetCacheSkips();
+  static int GetCacheClears();
   //@}
 
 protected:
@@ -97,10 +98,10 @@ protected:
   //@}
 
   int RequestDataObject(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
   int RequestData(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
-  vtkExecutive* CreateDefaultExecutive() VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
+  vtkExecutive* CreateDefaultExecutive() override;
 
   /**
    * Called to save the data in cache. Returns true if data is saved otherwise
@@ -122,6 +123,7 @@ private:
   static int CacheHit;
   static int CacheMiss;
   static int CacheSkips;
+  static int CacheClears;
 };
 
 #endif

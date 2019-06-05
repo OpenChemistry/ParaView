@@ -45,9 +45,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMProxy.h"
 #include "vtkSmartPointer.h"
 
+#include <QHeaderView>
 #include <QItemSelectionModel>
 #include <QLineEdit>
 #include <QRadioButton>
+
+#include <cassert>
 
 class pqChangeInputDialog::pqInternals : public Ui::pqChangeInputDialog
 {
@@ -65,7 +68,7 @@ public:
 pqChangeInputDialog::pqChangeInputDialog(vtkSMProxy* filterProxy, QWidget* parentObject)
   : Superclass(parentObject)
 {
-  Q_ASSERT(filterProxy != NULL);
+  assert(filterProxy != NULL);
 
   this->Internals = new pqInternals();
   this->Internals->Proxy = filterProxy;

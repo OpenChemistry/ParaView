@@ -42,8 +42,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMPropertyGroup.h"
 #include "vtkSMPropertyHelper.h"
 
-#include <QDoubleValidator>
-
 class pqLinePropertyWidget::pqInternals
 {
 public:
@@ -67,13 +65,6 @@ pqLinePropertyWidget::pqLinePropertyWidget(
 #ifdef Q_OS_MAC
   ui.pickLabel->setText(ui.pickLabel->text().replace("Ctrl", "Cmd"));
 #endif
-
-  new QDoubleValidator(ui.point1X);
-  new QDoubleValidator(ui.point1Y);
-  new QDoubleValidator(ui.point1Z);
-  new QDoubleValidator(ui.point2X);
-  new QDoubleValidator(ui.point2Y);
-  new QDoubleValidator(ui.point2Z);
 
   if (vtkSMProperty* p1 = smgroup->GetProperty("Point1WorldPosition"))
   {

@@ -159,7 +159,7 @@ static bool getNetworkSubdirs(const std::string& path, std::vector<std::string>&
 
   static const int MaxTokens = 4;
 
-  std::vector<vtksys::String> pathtokens;
+  std::vector<std::string> pathtokens;
   pathtokens = vtksys::SystemTools::SplitString(path.c_str() + 1, '\\');
 
   static DWORD DisplayType[MaxTokens] = { RESOURCEDISPLAYTYPE_NETWORK, RESOURCEDISPLAYTYPE_DOMAIN,
@@ -231,7 +231,7 @@ static int vtkPVFileInformationGetType(const char* path)
     // this code doesn't give out anything with
     // "Windows Network\..." unless its a directory.
     // that may change
-    std::vector<vtksys::String> pathtokens;
+    std::vector<std::string> pathtokens;
     pathtokens = vtksys::SystemTools::SplitString(realpath.c_str(), '\\');
     if (pathtokens.size() == 1)
     {
@@ -254,7 +254,7 @@ static int vtkPVFileInformationGetType(const char* path)
   // is it the root of a shared folder?
   if (IsUncPath(realpath))
   {
-    std::vector<vtksys::String> parts =
+    std::vector<std::string> parts =
       vtksys::SystemTools::SplitString(realpath.c_str() + 2, '\\', true);
     if (parts.empty())
     {
@@ -479,25 +479,14 @@ void vtkPVFileInformation::CopyFromObject(vtkObject* object)
 //-----------------------------------------------------------------------------
 void vtkPVFileInformation::GetSpecialDirectories()
 {
-  // FIXME: Use vtkPVLibraryInfo (see paraview/paraview!798) once it's available
-  // to get such paths. Hardcoding it for now.
-  if (vtkProcessModule* pm = vtkProcessModule::GetProcessModule())
+  std::string examplesPath = vtkPVFileInformation::GetParaViewExampleFilesDirectory();
+  if (vtksys::SystemTools::FileIsDirectory(examplesPath))
   {
-#if defined(_WIN32) || defined(__APPLE__)
-    std::string dataPath = pm->GetSelfDir() + "/../data";
-#else
-    std::string appdir = pm->GetSelfDir();
-    std::string dataPath = appdir + "/../share/paraview-" PARAVIEW_VERSION "/data";
-#endif
-    dataPath = vtksys::SystemTools::CollapseFullPath(dataPath);
-    if (vtksys::SystemTools::FileIsDirectory(dataPath))
-    {
-      vtkNew<vtkPVFileInformation> info;
-      info->SetFullPath(dataPath.c_str());
-      info->SetName("Examples");
-      info->Type = DIRECTORY;
-      this->Contents->AddItem(info.Get());
-    }
+    vtkNew<vtkPVFileInformation> info;
+    info->SetFullPath(examplesPath.c_str());
+    info->SetName("Examples");
+    info->Type = DIRECTORY;
+    this->Contents->AddItem(info.Get());
   }
 
 #if defined(_WIN32)
@@ -681,7 +670,7 @@ void vtkPVFileInformation::GetWindowsDirectoryListing()
   if (IsUncPath(lfullPath))
   {
     bool didListing = false;
-    std::vector<vtksys::String> parts =
+    std::vector<std::string> parts =
       vtksys::SystemTools::SplitString(this->FullPath + 2, '\\', true);
 
     if (parts.size() == 1)
@@ -772,25 +761,31 @@ void vtkPVFileInformation::GetWindowsDirectoryListing()
       infoD->SetFullPath(vtkPVFileInformationHelper::LocalToUtf8Win32(fullpath).c_str());
       infoD->Type = type;
       infoD->FastFileTypeDetection = this->FastFileTypeDetection;
-      infoD->SetHiddenFlag(); // needs full path set first
+      infoD->Hidden = (data.dwFileAttributes & FILE_ATTRIBUTE_HIDDEN) != 0;
 
-      // Recover status info
-      struct _stat64 status;
-      int res = _stat64(fullpath.c_str(), &status);
-      if (res != -1)
+      if (isfile)
       {
-        if (isfile)
+        std::string::size_type pos = filename.rfind('.');
+        if (pos != std::string::npos)
         {
-          std::string::size_type pos = filename.rfind('.');
-          if (pos != std::string::npos)
-          {
-            std::string ext = filename.substr(pos + 1);
-            infoD->SetExtension(ext.c_str());
-          }
+          std::string ext = filename.substr(pos + 1);
+          infoD->SetExtension(ext.c_str());
         }
-        infoD->Size = status.st_size;
-        infoD->ModificationTime = status.st_mtime;
       }
+
+      // Convert from Windows file size to *nix file size
+      LARGE_INTEGER fileSize;
+      fileSize.HighPart = data.nFileSizeHigh;
+      fileSize.LowPart = data.nFileSizeLow;
+      infoD->Size = fileSize.QuadPart;
+
+      // Convert from FILETIME to time_t
+      // FILETIME: # of 100-nanosecond intervals since January 1, 1601.
+      // time_t: # of seconds since January 1, 1970.
+      ULARGE_INTEGER modTime;
+      modTime.LowPart = data.ftLastWriteTime.dwLowDateTime;
+      modTime.HighPart = data.ftLastWriteTime.dwHighDateTime;
+      infoD->ModificationTime = (modTime.QuadPart / 10000000ULL - 11644473600ULL);
 
       info_set.insert(infoD);
       infoD->Delete();
@@ -1232,7 +1227,7 @@ std::string vtkPVFileInformation::GetParaViewSharedResourcesDirectory()
 //-----------------------------------------------------------------------------
 std::string vtkPVFileInformation::GetParaViewExampleFilesDirectory()
 {
-  return vtkPVFileInformation::GetParaViewSharedResourcesDirectory() + "/data";
+  return vtkPVFileInformation::GetParaViewSharedResourcesDirectory() + "/examples";
 }
 
 //-----------------------------------------------------------------------------

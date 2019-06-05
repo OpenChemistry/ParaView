@@ -15,6 +15,7 @@
 #include "vtkCell.h"
 #include "vtkMultiBlockDataSet.h"
 #include "vtkNew.h"
+#include "vtkStructuredGrid.h"
 #include "vtkTestUtilities.h"
 #include "vtkUnstructuredGrid.h"
 
@@ -49,12 +50,11 @@ int TestOutput(vtkMultiBlockDataSet* mb, int nCells, VTKCellType type)
 
 int TestCGNSReader(int argc, char* argv[])
 {
-
-  char* fname = vtkTestUtilities::ExpandDataFileName(argc, argv, "Example_mixed.cgns");
+  char* fname = vtkTestUtilities::ExpandDataFileName(argc, argv, "Testing/Data/Example_mixed.cgns");
   std::string mixed = fname ? fname : "";
   delete[] fname;
 
-  fname = vtkTestUtilities::ExpandDataFileName(argc, argv, "Example_nface_n.cgns");
+  fname = vtkTestUtilities::ExpandDataFileName(argc, argv, "Testing/Data/Example_nface_n.cgns");
   std::string nfacen = fname ? fname : "";
   delete[] fname;
 

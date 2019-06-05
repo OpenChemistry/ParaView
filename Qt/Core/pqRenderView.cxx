@@ -38,6 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkIntArray.h"
 #include "vtkPVDataInformation.h"
 #include "vtkPVRenderView.h"
+#include "vtkPVRenderViewSettings.h"
 #include "vtkProcessModule.h"
 #include "vtkSMIntVectorProperty.h"
 #include "vtkSMInteractionUndoStackBuilder.h"
@@ -183,10 +184,10 @@ QWidget* pqRenderView::createWidget()
   if (pqQVTKWidgetBase* qvtkwidget = qobject_cast<pqQVTKWidgetBase*>(vtkwidget))
   {
     vtkSMRenderViewProxy* renModule = this->getRenderViewProxy();
-    qvtkwidget->SetRenderWindow(renModule->GetRenderWindow());
+    qvtkwidget->setRenderWindow(renModule->GetRenderWindow());
     // This is needed to ensure that the interactor is initialized with
     // ParaView specific interactor styles etc.
-    renModule->SetupInteractor(qvtkwidget->GetInteractor());
+    renModule->SetupInteractor(qvtkwidget->interactor());
   }
   return vtkwidget;
 }
@@ -807,6 +808,25 @@ void pqRenderView::selectBlock(int rectangle[4], int selectionModifier)
 //-----------------------------------------------------------------------------
 void pqRenderView::updateInteractionMode(pqOutputPort* opPort)
 {
+  // Check default mode
+  vtkPVRenderViewSettings* settings = vtkPVRenderViewSettings::GetInstance();
+  int defaultMode = settings->GetDefaultInteractionMode();
+  if (vtkPVRenderViewSettings::ALWAYS_2D == defaultMode)
+  {
+    vtkSMPropertyHelper(this->getProxy(), "InteractionMode")
+      .Set(vtkPVRenderView::INTERACTION_MODE_2D);
+    this->getProxy()->UpdateProperty("InteractionMode", 0);
+    return;
+  }
+  else if (vtkPVRenderViewSettings::ALWAYS_3D == defaultMode)
+  {
+    vtkSMPropertyHelper(this->getProxy(), "InteractionMode")
+      .Set(vtkPVRenderView::INTERACTION_MODE_3D);
+    this->getProxy()->UpdateProperty("InteractionMode", 1);
+    return;
+  }
+
+  // (else) Set interaction mode based on extents (vtkPVRenderViewSettings::AUTOMATIC)
   vtkPVDataInformation* datainfo = opPort->getDataInformation();
   QString className = datainfo ? datainfo->GetDataClassName() : QString();
 
@@ -874,5 +894,8 @@ void pqRenderView::onInteractionModeChange()
 //-----------------------------------------------------------------------------
 void pqRenderView::setCursor(const QCursor& c)
 {
-  this->widget()->setCursor(c);
+  if (QWidget* wdg = this->widget())
+  {
+    wdg->setCursor(c);
+  }
 }

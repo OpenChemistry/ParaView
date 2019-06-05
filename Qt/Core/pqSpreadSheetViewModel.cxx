@@ -31,8 +31,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ========================================================================*/
 #include "pqSpreadSheetViewModel.h"
 
-// Server Manager Includes.
+#include "vtkArrayDispatch.h"
 #include "vtkCellType.h"
+#include "vtkDataArrayAccessor.h"
 #include "vtkEventQtSlotConnect.h"
 #include "vtkIdList.h"
 #include "vtkIdTypeArray.h"
@@ -71,6 +72,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqSMAdaptor.h"
 #include "pqTimer.h"
 
+#include <cassert>
+
 static uint qHash(pqSpreadSheetViewModel::vtkIndex index)
 {
   return qHash(index.Tuple[2]);
@@ -107,7 +110,6 @@ public:
   QPointer<pqDataRepresentation> ActiveRepresentation;
   vtkWeakPointer<vtkSMProxy> ActiveRepresentationProxy;
   vtkSpreadSheetView* VTKView;
-  QList<bool> ColumnVisibility;
   bool Dirty;
 };
 
@@ -115,7 +117,7 @@ public:
 pqSpreadSheetViewModel::pqSpreadSheetViewModel(vtkSMProxy* view, QObject* parentObject)
   : Superclass(parentObject)
 {
-  Q_ASSERT(view != NULL);
+  assert(view != NULL);
   this->ViewProxy = view;
   this->Internal = new pqInternal(this);
   this->Internal->VTKView = vtkSpreadSheetView::SafeDownCast(view->GetClientSideObject());
@@ -138,6 +140,12 @@ pqSpreadSheetViewModel::pqSpreadSheetViewModel(vtkSMProxy* view, QObject* parent
   QObject::connect(&this->Internal->SelectionModel,
     SIGNAL(selectionChanged(const QItemSelection&, const QItemSelection&)),
     &this->Internal->SelectionTimer, SLOT(start()));
+
+  // QueuedConnection is needed to avoid updating the UI before property has
+  // been "pushed".
+  this->Internal->VTKConnect->Connect(view->GetProperty("HiddenColumnLabels"),
+    vtkCommand::ModifiedEvent, this, SLOT(hiddenColumnsChanged()), nullptr, 0.0,
+    Qt::QueuedConnection);
 }
 
 //-----------------------------------------------------------------------------
@@ -193,11 +201,7 @@ int pqSpreadSheetViewModel::columnCount(const QModelIndex&) const
 //-----------------------------------------------------------------------------
 int pqSpreadSheetViewModel::getFieldType() const
 {
-  if (this->activeRepresentationProxy())
-  {
-    return vtkSMPropertyHelper(this->activeRepresentationProxy(), "FieldAssociation").GetAsInt();
-  }
-  return -1;
+  return this->GetView()->GetFieldAssociation();
 }
 
 //-----------------------------------------------------------------------------
@@ -284,7 +288,55 @@ void pqSpreadSheetViewModel::onDataFetched(vtkObject*, unsigned long, void*, voi
   // we always invalidate header data, just to be on a safe side.
   this->headerDataChanged(Qt::Horizontal, 0, this->columnCount() - 1);
 }
+namespace
+{
+struct ArrayTupleToStringConvertor
+{
+private:
+  QTextStream Stream;
+  const char* Separator;
+  bool Fixed;
+  int Precision;
 
+public:
+  ArrayTupleToStringConvertor(QString& string, const char* sep, bool fixed, int precision)
+    : Stream(&string, QIODevice::WriteOnly)
+    , Separator(sep)
+    , Fixed(fixed)
+    , Precision(precision)
+  {
+  }
+
+  template <typename ArrayType>
+  void operator()(ArrayType* darray)
+  {
+    vtkDataArrayAccessor<ArrayType> accessor(darray);
+    if (darray->GetNumberOfTuples() == 1)
+    {
+      for (int cc = 0; cc < darray->GetNumberOfComponents(); ++cc)
+      {
+        this->Stream << (cc > 0 ? this->Separator : "") << this->number(accessor.Get(0, cc));
+      }
+    }
+  }
+
+  template <typename ValueType>
+  QString number(const ValueType& val) const
+  {
+    return QString::number(val);
+  }
+
+  QString number(const double& val) const
+  {
+    return QString::number(val, this->Fixed ? 'f' : 'g', this->Precision);
+  }
+
+  QString number(const float& val) const
+  {
+    return QString::number(val, this->Fixed ? 'f' : 'g', this->Precision);
+  }
+};
+};
 //-----------------------------------------------------------------------------
 QVariant pqSpreadSheetViewModel::data(const QModelIndex& idx, int role /*=Qt::DisplayRole*/) const
 {
@@ -330,7 +382,7 @@ QVariant pqSpreadSheetViewModel::data(const QModelIndex& idx, int role /*=Qt::Di
   QString str = value.ToString().c_str();
   if (value.IsChar() || value.IsUnsignedChar() || value.IsSignedChar())
   {
-    // Don't show ASCII characted for char arrays.
+    // Don't show ASCII character for char arrays.
     const char* column_name = view->GetColumnName(column);
     if (column_name && strcmp(column_name, "Cell Type") == 0)
     {
@@ -348,56 +400,11 @@ QVariant pqSpreadSheetViewModel::data(const QModelIndex& idx, int role /*=Qt::Di
   }
   else if (value.IsArray())
   {
-    // it's possible that it's a char array, then too we need to do the
-    // number magic.
-    vtkDataArray* array = vtkDataArray::SafeDownCast(value.ToArray());
-    if (array)
-    {
-      switch (array->GetDataType())
-      {
-        case VTK_CHAR:
-        case VTK_UNSIGNED_CHAR:
-        case VTK_SIGNED_CHAR:
-        {
-          str = QString();
-          for (vtkIdType cc = 0; cc < array->GetNumberOfTuples(); cc++)
-          {
-            double* tuple = array->GetTuple(cc);
-            for (vtkIdType kk = 0; kk < array->GetNumberOfComponents(); kk++)
-            {
-              str += QString::number(static_cast<int>(tuple[kk])) + " ";
-            }
-            str = str.trimmed();
-          }
-          break;
-        }
-        case VTK_DOUBLE:
-        case VTK_FLOAT:
-        {
-          str = QString();
-          for (vtkIdType cc = 0; cc < array->GetNumberOfTuples(); cc++)
-          {
-            double* tuple = array->GetTuple(cc);
-            for (vtkIdType kk = 0; kk < array->GetNumberOfComponents(); kk++)
-            {
-              str += QString::number(static_cast<double>(tuple[kk]),
-                       this->Internal->FixedRepresentation ? 'f' : 'g',
-                       this->Internal->DecimalPrecision) +
-                " ";
-            }
-            str = str.trimmed();
-          }
-          break;
-          break;
-        }
-        default:
-          break;
-      }
-    }
-  }
-  if (!value.IsString() && !value.IsUnicodeString())
-  {
-    str.replace(" ", "\t");
+    str = QString();
+    ArrayTupleToStringConvertor convertor(
+      str, ", ", this->Internal->FixedRepresentation, this->Internal->DecimalPrecision);
+    vtkArrayDispatch::DispatchByValueType<vtkArrayDispatch::AllTypes>::Execute(
+      vtkDataArray::SafeDownCast(value.ToArray()), convertor);
   }
   return str;
 }
@@ -442,63 +449,23 @@ bool pqSpreadSheetViewModel::isSortable(int section)
 QVariant pqSpreadSheetViewModel::headerData(
   int section, Qt::Orientation orientation, int role /*=Qt::DisplayRole*/) const
 {
-  if (orientation == Qt::Horizontal && role == Qt::DisplayRole)
+  if (orientation == Qt::Horizontal)
   {
     // No need to get updated data, simply get the current data.
     vtkSpreadSheetView* view = this->Internal->VTKView;
     if (view->GetNumberOfColumns() > section)
     {
-      QString title = view->GetColumnName(section);
-      // Convert names of some standard arrays to user-friendly ones.
-      if (title == "vtkOriginalProcessIds")
+      switch (role)
       {
-        title = "Process ID";
+        case Qt::DisplayRole:
+          return QString(view->GetColumnLabel(section).c_str());
+        case SectionInternal:
+          return view->IsColumnInternal(section);
+        case SectionVisible:
+          return view->GetColumnVisibility(section);
       }
-      else if (title == "vtkOriginalIndices")
-      {
-        switch (this->getFieldType())
-        {
-          case vtkDataObject::FIELD_ASSOCIATION_POINTS:
-            title = "Point ID";
-            break;
-
-          case vtkDataObject::FIELD_ASSOCIATION_CELLS:
-            title = "Cell ID";
-            break;
-
-          case vtkDataObject::FIELD_ASSOCIATION_VERTICES:
-            title = "Vertex ID";
-            break;
-
-          case vtkDataObject::FIELD_ASSOCIATION_EDGES:
-            title = "Edge ID";
-            break;
-
-          case vtkDataObject::FIELD_ASSOCIATION_ROWS:
-            title = "Row ID";
-            break;
-        }
-      }
-      else if (title == "vtkOriginalCellIds" && view->GetShowExtractedSelection())
-      {
-        title = "Cell ID";
-      }
-      else if (title == "vtkOriginalPointIds" && view->GetShowExtractedSelection())
-      {
-        title = "Point ID";
-      }
-      else if (title == "vtkOriginalRowIds" && view->GetShowExtractedSelection())
-      {
-        title = "Row ID";
-      }
-      else if (title == "vtkCompositeIndexArray")
-      {
-        title = "Block Number";
-      }
-
-      return QVariant(title);
     }
-    return "__BUG__";
+    return QVariant();
   }
   else if (orientation == Qt::Vertical && role == Qt::DisplayRole)
   {
@@ -506,7 +473,6 @@ QVariant pqSpreadSheetViewModel::headerData(
     QVariant rowNo = this->Superclass::headerData(section, orientation, role);
     return QVariant(rowNo.toUInt() - 1);
   }
-
   return this->Superclass::headerData(section, orientation, role);
 }
 
@@ -521,7 +487,7 @@ QSet<pqSpreadSheetViewModel::vtkIndex> pqSpreadSheetViewModel::getVTKIndices(
   QSet<vtkIndex> vtkindices;
 
   vtkSpreadSheetView* view = this->GetView();
-  Q_ASSERT(view->GetShowExtractedSelection() == 0);
+  assert(view->GetShowExtractedSelection() == 0);
 
   vtkIdType numrows = view->GetNumberOfRows();
   foreach (QModelIndex idx, indexes)
@@ -545,7 +511,7 @@ QSet<pqSpreadSheetViewModel::vtkIndex> pqSpreadSheetViewModel::getVTKIndices(
       if (cid.IsArray())
       {
         vtkUnsignedIntArray* array = vtkUnsignedIntArray::SafeDownCast(cid.ToArray());
-        Q_ASSERT(array->GetNumberOfTuples() * array->GetNumberOfComponents() == 2);
+        assert(array->GetNumberOfTuples() * array->GetNumberOfComponents() == 2);
         value.Tuple[0] = static_cast<vtkIdType>(array->GetValue(0));
         value.Tuple[1] = static_cast<vtkIdType>(array->GetValue(1));
       }
@@ -578,23 +544,11 @@ bool pqSpreadSheetViewModel::isDataValid(const QModelIndex& idx) const
     return false;
   }
 
-  vtkPVDataInformation* info = repr->getInputDataInformation();
-  int field_type = this->getFieldType();
-
-  // Get the appropriate attribute information object
-  vtkPVDataSetAttributesInformation* attrInfo =
-    info ? info->GetAttributeInformation(field_type) : 0;
-
-  if (attrInfo)
+  // Ensure that the row of this index is less than the length of the
+  // data array associated with its column
+  if (idx.row() < this->Internal->VTKView->GetNumberOfRows())
   {
-    // Ensure that the row of this index is less than the length of the
-    // data array associated with its column
-    vtkPVArrayInformation* arrayInfo =
-      attrInfo->GetArrayInformation(this->GetView()->GetColumnName(idx.column()));
-    if (arrayInfo && idx.row() < arrayInfo->GetNumberOfTuples())
-    {
-      return true;
-    }
+    return true;
   }
 
   return false;
@@ -694,33 +648,15 @@ Qt::ItemFlags pqSpreadSheetViewModel::flags(const QModelIndex& idx) const
 bool pqSpreadSheetViewModel::setData(const QModelIndex&, const QVariant&, int)
 {
   // Do nothing, we are not supposed to change our data...
-  return true;
+  return false;
 }
 
 //-----------------------------------------------------------------------------
-void pqSpreadSheetViewModel::clearVisible()
+void pqSpreadSheetViewModel::hiddenColumnsChanged()
 {
-  this->Internal->ColumnVisibility.clear();
-  emit this->headerDataChanged(Qt::Horizontal, 0, this->columnCount());
-}
-
-//-----------------------------------------------------------------------------
-void pqSpreadSheetViewModel::setVisible(int section, bool visibility)
-{
-  while (this->Internal->ColumnVisibility.size() <= section)
+  const int numCols = this->columnCount();
+  if (numCols > 0)
   {
-    this->Internal->ColumnVisibility.append(true);
+    emit this->headerDataChanged(Qt::Horizontal, 0, this->columnCount() - 1);
   }
-  this->Internal->ColumnVisibility[section] = visibility;
-  emit this->headerDataChanged(Qt::Horizontal, section - 1, section);
-}
-
-//-----------------------------------------------------------------------------
-bool pqSpreadSheetViewModel::isVisible(int section)
-{
-  if (this->Internal->ColumnVisibility.size() > section)
-  {
-    return this->Internal->ColumnVisibility.at(section);
-  }
-  return true;
 }

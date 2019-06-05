@@ -36,13 +36,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqCoreUtilities.h"
 #include "pqFileDialog.h"
 #include "pqPVApplicationCore.h"
+#include "pqProxyWidgetDialog.h"
 #include "pqServer.h"
+#include "pqServerManagerModel.h"
 #include "pqStandardRecentlyUsedResourceLoaderImplementation.h"
 #include "vtkNew.h"
 #include "vtkPVConfig.h"
 #include "vtkPVXMLParser.h"
-
-#include "pqProxyWidgetDialog.h"
 #include "vtkSMLoadStateOptionsProxy.h"
 #include "vtkSMParaViewPipelineController.h"
 #include "vtkSMPropertyHelper.h"
@@ -116,11 +116,20 @@ void pqLoadStateReaction::loadState(const QString& filename, bool dialogBlocked,
           server, filename);
       }
       pqPVApplicationCore::instance()->setLoadingState(false);
+      // activate a view in the state.
+      // this is needed since XML state currently does not save active view.
+
+      auto smmodel = pqApplicationCore::instance()->getServerManagerModel();
+      auto views = smmodel->findItems<pqView*>(server);
+      if (views.size())
+      {
+        pqActiveObjects::instance().setActiveView(views[0]);
+      }
     }
   }
   else
   { // python file
-#ifdef PARAVIEW_ENABLE_PYTHON
+#if VTK_MODULE_ENABLE_ParaView_pqPython
     pqPVApplicationCore::instance()->loadStateFromPythonFile(filename, server);
     pqStandardRecentlyUsedResourceLoaderImplementation::addStateFileToRecentResources(
       server, filename);
@@ -135,7 +144,7 @@ void pqLoadStateReaction::loadState()
 {
   pqFileDialog fileDialog(NULL, pqCoreUtilities::mainWidget(), tr("Load State File"), QString(),
     "ParaView state file (*.pvsm"
-#ifdef PARAVIEW_ENABLE_PYTHON
+#if VTK_MODULE_ENABLE_ParaView_pqPython
     " *.py"
 #endif
     ");;All files (*)");

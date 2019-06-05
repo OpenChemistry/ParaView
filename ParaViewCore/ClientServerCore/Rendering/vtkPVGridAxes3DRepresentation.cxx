@@ -20,6 +20,7 @@
 #include "vtkCommunicator.h"
 #include "vtkCompositeDataIterator.h"
 #include "vtkCompositeDataSet.h"
+#include "vtkHyperTreeGrid.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkMath.h"
@@ -37,10 +38,9 @@
 
 #include <algorithm>
 
-vtkStandardNewMacro(vtkPVGridAxes3DRepresentation)
-
-  //------------------------------------------------------------------------------
-  void vtkPVGridAxes3DRepresentation::PrintSelf(std::ostream& os, vtkIndent indent)
+vtkStandardNewMacro(vtkPVGridAxes3DRepresentation);
+//------------------------------------------------------------------------------
+void vtkPVGridAxes3DRepresentation::PrintSelf(std::ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os, indent);
 }
@@ -187,8 +187,8 @@ int vtkPVGridAxes3DRepresentation::ProcessViewRequest(
     vtkPVRenderView* rview = vtkPVRenderView::SafeDownCast(this->GetView());
     if (rview)
     {
-      forceOpaque = (rview->GetUseDistributedRenderingForInteractiveRender() ||
-                      rview->GetUseDistributedRenderingForStillRender()) &&
+      forceOpaque = (rview->GetUseDistributedRenderingForLODRender() ||
+                      rview->GetUseDistributedRenderingForRender()) &&
         !rview->GetUseOrderedCompositing();
     }
     this->GridAxes->SetForceOpaque(forceOpaque);
@@ -219,6 +219,7 @@ int vtkPVGridAxes3DRepresentation::FillInputPortInformation(int, vtkInformation*
   info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkCompositeDataSet");
   info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkDataSet");
   info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkMolecule");
+  info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkHyperTreeGrid");
   info->Set(vtkAlgorithm::INPUT_IS_OPTIONAL(), 1);
   return 1;
 }
@@ -238,6 +239,8 @@ int vtkPVGridAxes3DRepresentation::RequestData(
     vtkDataSet* ds = vtkDataSet::GetData(inInfoVec[0], 0);
     vtkCompositeDataSet* cds = vtkCompositeDataSet::GetData(inInfoVec[0], 0);
     vtkMolecule* mol = vtkMolecule::SafeDownCast(
+      inInfoVec[0]->GetInformationObject(0)->Get(vtkDataObject::DATA_OBJECT()));
+    vtkHyperTreeGrid* htg = vtkHyperTreeGrid::SafeDownCast(
       inInfoVec[0]->GetInformationObject(0)->Get(vtkDataObject::DATA_OBJECT()));
 
     if (ds)
@@ -264,6 +267,10 @@ int vtkPVGridAxes3DRepresentation::RequestData(
     else if (mol)
     {
       mol->GetBounds(bounds);
+    }
+    else if (htg)
+    {
+      htg->GetBounds(bounds);
     }
     else
     {

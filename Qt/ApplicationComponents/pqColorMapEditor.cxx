@@ -59,6 +59,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QDebug>
 #include <QKeyEvent>
 #include <QPointer>
+#include <QStyle>
 #include <QVBoxLayout>
 
 class pqColorMapEditor::pqInternals
@@ -261,7 +262,7 @@ void pqColorMapEditor::setColorTransferFunction(vtkSMProxy* ctf)
   this->Internals->ProxyWidget = widget;
   this->updatePanel();
 
-  QObject::connect(widget, SIGNAL(changeAvailable()), this, SLOT(updateIfNeeded()));
+  QObject::connect(widget, SIGNAL(changeFinished()), this, SLOT(updateIfNeeded()));
 }
 
 //-----------------------------------------------------------------------------

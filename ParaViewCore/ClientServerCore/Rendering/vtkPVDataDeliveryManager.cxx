@@ -25,17 +25,18 @@
 #include "vtkOrderedCompositeDistributor.h"
 #include "vtkPKdTree.h"
 #include "vtkPVDataRepresentation.h"
+#include "vtkPVLogger.h"
 #include "vtkPVRenderView.h"
 #include "vtkPVStreamingMacros.h"
 #include "vtkPVTrivialProducer.h"
 #include "vtkSmartPointer.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
-#include "vtkTimerLog.h"
 #include "vtkWeakPointer.h"
 
-#include <assert.h>
+#include <cassert>
 #include <map>
 #include <queue>
+#include <sstream>
 #include <utility>
 
 //*****************************************************************************
@@ -111,7 +112,7 @@ public:
     vtkWeakPointer<vtkDataObject> DataObject;
 
     // Data object available after delivery to the "rendering" node.
-    vtkSmartPointer<vtkDataObject> DeliveredDataObject;
+    std::map<int, vtkSmartPointer<vtkDataObject> > DeliveredDataObjects;
 
     // Data object after re-distributing when using ordered compositing, for
     // example.
@@ -135,6 +136,10 @@ public:
 
     vtkItem()
       : Producer(vtkSmartPointer<vtkPVTrivialProducer>::New())
+      , DataObject{}
+      , DeliveredDataObjects{}
+      , RedistributedDataObject{}
+      , StreamedPiece{}
       , TimeStamp(0)
       , ActualMemorySize(0)
       , CloneDataToAllNodes(false)
@@ -149,7 +154,7 @@ public:
     void SetDataObject(vtkDataObject* data, vtkInternals* helper)
     {
       this->DataObject = data;
-      this->DeliveredDataObject = nullptr;
+      this->DeliveredDataObjects.clear();
       this->RedistributedDataObject = nullptr;
       this->ActualMemorySize = data ? data->GetActualMemorySize() : 0;
       // This method gets called when data is entirely changed. That means that any
@@ -172,34 +177,172 @@ public:
     void SetActualMemorySize(unsigned long size) { this->ActualMemorySize = size; }
     unsigned long GetActualMemorySize() const { return this->ActualMemorySize; }
 
-    void SetDeliveredDataObject(vtkDataObject* data) { this->DeliveredDataObject = data; }
+    /**
+     * called to move data from the DataObject to DeliveredDataObject via a
+     * vtkMPIMoveData instance, if needed based on the requested
+     * data_distribution_mode passed in. The item may override the
+     * data_distribution_mode based on its attributes.
+     */
+    void Deliver(int data_distribution_mode)
+    {
+      auto dataObj = this->GetDataObject();
+      assert(dataObj != nullptr);
 
-    void SetRedistributedDataObject(vtkDataObject* data) { this->RedistributedDataObject = data; }
+      const int real_mode = this->GetItemDataDistributionMode(data_distribution_mode);
+      vtkNew<vtkMPIMoveData> dataMover;
+      dataMover->InitializeForCommunicationForParaView();
+      dataMover->SetOutputDataType(dataObj->GetDataObjectType());
+      dataMover->SetMoveMode(real_mode);
+      if (this->DeliverToClientAndRenderingProcesses)
+      {
+        dataMover->SetSkipDataServerGatherToZero(this->GatherBeforeDeliveringToClient == false);
+      }
+      dataMover->SetInputData(dataObj);
+      dataMover->Update();
 
-    vtkDataObject* GetDeliveredDataObject() { return this->DeliveredDataObject.GetPointer(); }
+      // Save the delivered data object. We store it in a map where key is the
+      // delivery mode. This is essential to avoid clobbering data when in
+      // collaboration mode and different clients have different delivery modes.
+      this->DeliveredDataObjects[real_mode] = dataMover->GetOutputDataObject(0);
+    }
+
+    /**
+     * called to redistribute, typically for cases where ordered compositing is
+     * needed. Currently, we only support redistribution when data_distribution_mode is
+     * PASS_THROUGH or COLLECT_AND_PASS_THROUGH i.e. remote rendering is being employed.
+     *
+     * @returns false if redistribution was skipped (or not needed) and true if
+     *          data was redistributed.
+     */
+    bool Redistribute(int data_distribution_mode, vtkPKdTree* tree, const std::string debugName)
+    {
+      assert(tree != nullptr);
+
+      const int real_mode = this->GetItemDataDistributionMode(data_distribution_mode);
+      if ((real_mode != vtkMPIMoveData::PASS_THROUGH &&
+            real_mode != vtkMPIMoveData::COLLECT_AND_PASS_THROUGH) ||
+        this->Redistributable == false)
+      {
+        // nothing to do, item is either non-redistributable or mode is not
+        // PASS_THROUGH or COLLECT_AND_PASS_THROUGH -- the only modes in which we support data
+        // redistribution.
+        return false;
+      }
+
+      vtkDataObject* deliveredDataObject = this->GetDeliveredDataObject(real_mode);
+      if (deliveredDataObject == nullptr)
+      {
+        return false;
+      }
+
+      if (this->RedistributedDataObject == nullptr ||
+        this->RedistributedDataObject->GetMTime() < tree->GetMTime() ||
+        this->RedistributedDataObject->GetMTime() < deliveredDataObject->GetMTime())
+      {
+        // release old memory (not necessarily, but no harm).
+        this->RedistributedDataObject = nullptr;
+
+        vtkVLogF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(), "redistribute: %s", debugName.c_str());
+
+        vtkNew<vtkOrderedCompositeDistributor> redistributor;
+        redistributor->SetController(vtkMultiProcessController::GetGlobalController());
+        redistributor->SetInputData(deliveredDataObject);
+        redistributor->SetPKdTree(tree);
+        redistributor->SetPassThrough(0);
+        redistributor->SetBoundaryMode(this->RedistributionMode);
+        redistributor->Update();
+        this->RedistributedDataObject = redistributor->GetOutputDataObject(0);
+        return true;
+      }
+
+      return false;
+    }
+
+    /**
+     * cleanup the redistributed data object, on demand.
+     */
+    void ClearRedistributedData() { this->RedistributedDataObject = nullptr; }
+
+    vtkDataObject* GetDeliveredDataObject(int data_distribution_mode) const
+    {
+      try
+      {
+        const int real_mode = this->GetItemDataDistributionMode(data_distribution_mode);
+        return this->DeliveredDataObjects.at(real_mode);
+      }
+      catch (std::out_of_range&)
+      {
+        return nullptr;
+      }
+    }
 
     vtkDataObject* GetRedistributedDataObject()
     {
       return this->RedistributedDataObject.GetPointer();
     }
 
-    vtkPVTrivialProducer* GetProducer(bool use_redistributed_data)
+    vtkPVTrivialProducer* GetProducer(bool use_redistributed_data, int data_distribution_mode)
     {
-      if (use_redistributed_data && this->Redistributable)
+      vtkDataObject* prev = this->Producer->GetOutputDataObject(0);
+      vtkDataObject* cur = prev;
+      if (use_redistributed_data && this->Redistributable &&
+        this->RedistributedDataObject != nullptr)
       {
-        this->Producer->SetOutput(this->RedistributedDataObject);
+        cur = this->RedistributedDataObject;
       }
       else
       {
-        this->Producer->SetOutput(this->DeliveredDataObject);
+        cur = this->GetDeliveredDataObject(data_distribution_mode);
+      }
+      this->Producer->SetOutput(cur);
+      if (cur != prev && cur != nullptr)
+      {
+        // this is only needed to overcome a bug in the mapper where they are
+        // using input's mtime incorrectly.
+        cur->Modified();
       }
       return this->Producer.GetPointer();
     }
 
     vtkDataObject* GetDataObject() const { return this->DataObject.GetPointer(); }
     vtkMTimeType GetTimeStamp() const { return this->TimeStamp; }
+    vtkMTimeType GetDeliveryTimeStamp(int distribution_mode) const
+    {
+      if (auto dobj = this->GetDeliveredDataObject(distribution_mode))
+      {
+        return dobj->GetMTime();
+      }
+      return vtkMTimeType{ 0 };
+    }
     void SetNextStreamedPiece(vtkDataObject* data) { this->StreamedPiece = data; }
     vtkDataObject* GetStreamedPiece() { return this->StreamedPiece; }
+
+  private:
+    /**
+     * Each item may have overrides to the data delivery mode. This method can
+     * be called to update the requested_mode based on the representation
+     * specific overrides specified.
+     */
+    int GetItemDataDistributionMode(int requested_mode) const
+    {
+      if (this->CloneDataToAllNodes)
+      {
+        return vtkMPIMoveData::CLONE;
+      }
+      else if (this->DeliverToClientAndRenderingProcesses)
+      {
+        if (requested_mode == vtkMPIMoveData::PASS_THROUGH)
+        {
+          return vtkMPIMoveData::COLLECT_AND_PASS_THROUGH;
+        }
+        else
+        {
+          // nothing to do, since the data is going to be delivered to the client
+          // anyways.
+        }
+      }
+      return requested_mode;
+    }
   };
 
   // First is repr unique id, second is the input port.
@@ -481,7 +624,8 @@ vtkAlgorithmOutput* vtkPVDataDeliveryManager::GetProducer(
     return NULL;
   }
 
-  return item->GetProducer(this->RenderView->GetUseOrderedCompositing())->GetOutputPort(0);
+  const int mode = this->GetViewDataDistributionMode(low_res);
+  return item->GetProducer(this->RenderView->GetUseOrderedCompositing(), mode)->GetOutputPort(0);
 }
 
 //----------------------------------------------------------------------------
@@ -531,27 +675,47 @@ vtkAlgorithmOutput* vtkPVDataDeliveryManager::GetProducer(unsigned int id, bool 
     return NULL;
   }
 
-  return item->GetProducer(this->RenderView->GetUseOrderedCompositing())->GetOutputPort(0);
+  const int mode = this->GetViewDataDistributionMode(low_res);
+  return item->GetProducer(this->RenderView->GetUseOrderedCompositing(), mode)->GetOutputPort(0);
+}
+
+//----------------------------------------------------------------------------
+int vtkPVDataDeliveryManager::GetViewDataDistributionMode(bool use_lod)
+{
+  assert(this->RenderView);
+  const bool use_distributed_rendering = use_lod
+    ? this->RenderView->GetUseDistributedRenderingForLODRender()
+    : this->RenderView->GetUseDistributedRenderingForRender();
+  return this->RenderView->GetDataDistributionMode(use_distributed_rendering);
 }
 
 //----------------------------------------------------------------------------
 bool vtkPVDataDeliveryManager::NeedsDelivery(
-  vtkMTimeType timestamp, std::vector<unsigned int>& keys_to_deliver, bool use_low)
+  vtkMTimeType timestamp, std::vector<unsigned int>& keys_to_deliver, bool interactive)
 {
+  vtkVLogScopeF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(), "check for delivery (interactive=%s)",
+    (interactive ? "true" : "false"));
+  assert(this->RenderView);
+  const bool use_lod = interactive && this->RenderView->GetUseLODForInteractiveRender();
+  const int data_distribution_mode = this->GetViewDataDistributionMode(use_lod);
   vtkInternals::ItemsMapType::iterator iter;
   for (iter = this->Internals->ItemsMap.begin(); iter != this->Internals->ItemsMap.end(); ++iter)
   {
     if (this->Internals->IsRepresentationVisible(iter->first.first))
     {
-      vtkInternals::vtkItem& item = use_low ? iter->second.second : iter->second.first;
-      if (item.GetTimeStamp() > timestamp)
+      vtkInternals::vtkItem& item = use_lod ? iter->second.second : iter->second.first;
+      if (item.GetTimeStamp() > timestamp ||
+        item.GetDeliveryTimeStamp(data_distribution_mode) < item.GetTimeStamp())
       {
+        vtkVLogF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(), "needs-delivery: %s",
+          this->GetRepresentation(iter->first.first)->GetLogName().c_str());
         // FIXME: convert keys_to_deliver to a vector of pairs.
         keys_to_deliver.push_back(iter->first.first);
         keys_to_deliver.push_back(static_cast<unsigned int>(iter->first.second));
       }
     }
   }
+  vtkVLogIfF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(), keys_to_deliver.size() == 0, "none");
   return keys_to_deliver.size() > 0;
 }
 
@@ -573,18 +737,16 @@ void vtkPVDataDeliveryManager::Deliver(int use_lod, unsigned int size, unsigned 
 
   assert(size % 2 == 0);
 
-  vtkTimerLog::MarkStartEvent(use_lod ? "LowRes Data Migration" : "FullRes Data Migration");
-
-  bool using_remote_rendering = use_lod
-    ? this->RenderView->GetUseDistributedRenderingForInteractiveRender()
-    : this->RenderView->GetUseDistributedRenderingForStillRender();
-  int mode = this->RenderView->GetDataDistributionMode(using_remote_rendering);
+  vtkVLogScopeF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(), "%s data migration",
+    (use_lod ? "low-resolution" : "full resolution"));
+  const int mode = this->GetViewDataDistributionMode(use_lod != 0);
 
   for (unsigned int cc = 0; cc < size; cc += 2)
   {
-    int port = static_cast<int>(values[cc + 1]);
+    const unsigned int id = values[cc];
+    const int port = static_cast<int>(values[cc + 1]);
 
-    vtkInternals::vtkItem* item = this->Internals->GetItem(values[cc], use_lod != 0, port);
+    vtkInternals::vtkItem* item = this->Internals->GetItem(id, use_lod != 0, port);
     vtkDataObject* data = item ? item->GetDataObject() : NULL;
     if (!data)
     {
@@ -593,66 +755,38 @@ void vtkPVDataDeliveryManager::Deliver(int use_lod, unsigned int size, unsigned 
       continue;
     }
 
-    //    if (data != NULL && data->IsA("vtkUniformGridAMR"))
-    //      {
-    //      // we are dealing with AMR datasets.
-    //      // We assume for now we're not running in render-server mode. We can
-    //      // ensure that at some point in future.
-    //      // So we are either in pass-through or collect mode.
-
-    //      // FIXME: check that the mode flags are "suitable" for AMR.
-    //      }
-
-    vtkNew<vtkMPIMoveData> dataMover;
-    dataMover->InitializeForCommunicationForParaView();
-    dataMover->SetOutputDataType(data ? data->GetDataObjectType() : VTK_POLY_DATA);
-    dataMover->SetMoveMode(mode);
-    if (item->CloneDataToAllNodes)
-    {
-      dataMover->SetMoveModeToClone();
-    }
-    else if (item->DeliverToClientAndRenderingProcesses)
-    {
-      if (mode == vtkMPIMoveData::PASS_THROUGH)
-      {
-        dataMover->SetMoveMode(vtkMPIMoveData::COLLECT_AND_PASS_THROUGH);
-      }
-      else
-      {
-        // nothing to do, since the data is going to be delivered to the client
-        // anyways.
-      }
-      dataMover->SetSkipDataServerGatherToZero(item->GatherBeforeDeliveringToClient == false);
-    }
-    dataMover->SetInputData(data);
-    dataMover->Update();
-    if (dataMover->GetOutputGeneratedOnProcess())
-    {
-      item->SetDeliveredDataObject(dataMover->GetOutputDataObject(0));
-    }
+    vtkVLogScopeF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(), "move-data: %s",
+      this->GetRepresentation(id)->GetLogName().c_str());
+    item->Deliver(mode);
   }
-
-  vtkTimerLog::MarkEndEvent(use_lod ? "LowRes Data Migration" : "FullRes Data Migration");
 }
 
 //----------------------------------------------------------------------------
 void vtkPVDataDeliveryManager::RedistributeDataForOrderedCompositing(bool use_lod)
 {
+  const int mode = this->GetViewDataDistributionMode(use_lod);
   if (this->RenderView->GetUpdateTimeStamp() > this->RedistributionTimeStamp)
   {
-    vtkTimerLog::MarkStartEvent("Regenerate Kd-Tree");
-    // need to re-generate the kd-tree.
     this->RedistributionTimeStamp.Modified();
 
+    // looks like the view has been `update`d since we last came here. However,
+    // that still doesn't imply that the geometry changed enough to require us
+    // to re-generate kd-tree. So we build a token that helps us determine if
+    // something significant changed.
+    std::ostringstream token_stream;
     vtkNew<vtkKdTreeManager> cutsGenerator;
-    vtkInternals::ItemsMapType::iterator iter;
-    for (iter = this->Internals->ItemsMap.begin(); iter != this->Internals->ItemsMap.end(); ++iter)
+    for (auto iter = this->Internals->ItemsMap.begin(); iter != this->Internals->ItemsMap.end();
+         ++iter)
     {
       vtkInternals::vtkItem& item = iter->second.first;
       if (this->Internals->IsRepresentationVisible(iter->first.first))
       {
         if (item.OrderedCompositingInfo.Translator)
         {
+          token_stream << ";a" << iter->first.first << "=" << item.GetTimeStamp();
+          // cout << "use structured info: ";
+          // cout << this->GetRepresentation(iter->first.first)->GetLogName() << "("
+          // <<iter->first.second<<")" << endl;
           // implies that the representation is providing us with means to
           // override how the ordered compositing happens.
           const vtkInternals::vtkOrderedCompositingInfo& info = item.OrderedCompositingInfo;
@@ -661,64 +795,57 @@ void vtkPVDataDeliveryManager::RedistributeDataForOrderedCompositing(bool use_lo
         }
         else if (item.Redistributable)
         {
-          cutsGenerator->AddDataObject(item.GetDeliveredDataObject());
+          token_stream << "b" << iter->first.first << "=" << item.GetTimeStamp() << ","
+                       << item.GetDeliveryTimeStamp(mode);
+          // cout << "redistribute: ";
+          // cout << this->GetRepresentation(iter->first.first)->GetLogName() << "("
+          // <<iter->first.second<<") = "
+          //   << item.GetDeliveredDataObject()
+          //   << endl;
+          cutsGenerator->AddDataObject(item.GetDeliveredDataObject(mode));
         }
       }
     }
-    cutsGenerator->GenerateKdTree();
-    this->KdTree = cutsGenerator->GetKdTree();
-    vtkTimerLog::MarkEndEvent("Regenerate Kd-Tree");
+
+    if (this->LastCutsGeneratorToken != token_stream.str())
+    {
+      vtkVLogScopeF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(), "regenerate kd-tree");
+      cutsGenerator->GenerateKdTree();
+      this->KdTree = cutsGenerator->GetKdTree();
+      this->LastCutsGeneratorToken = token_stream.str();
+    }
+    else
+    {
+      vtkVLogF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(),
+        "skipping kd-tree regeneration (nothing relevant changed).");
+    }
   }
 
-  if (this->KdTree == NULL)
+  if (this->KdTree == nullptr)
   {
     return;
   }
 
-  vtkTimerLog::MarkStartEvent("Redistributing Data for Ordered Compositing");
+  bool anything_moved = false;
   vtkInternals::ItemsMapType::iterator iter;
   for (iter = this->Internals->ItemsMap.begin(); iter != this->Internals->ItemsMap.end(); ++iter)
   {
-    if (!this->Internals->IsRepresentationVisible(iter->first.first))
+    const auto id = iter->first.first;
+    if (!this->Internals->IsRepresentationVisible(id))
     {
       // skip hidden representations;
       continue;
     }
 
+    const auto debugName = this->GetRepresentation(id)->GetLogName();
     vtkInternals::vtkItem& item = use_lod ? iter->second.second : iter->second.first;
-    if (!item.Redistributable ||
-      // delivered object can be null in case we're updating lod and the
-      // representation doeesn't have any LOD data.
-      item.GetDeliveredDataObject() == NULL)
-    {
-      continue;
-    }
-
-    if (item.GetRedistributedDataObject() &&
-
-      // input-data didn't change
-      (item.GetDeliveredDataObject()->GetMTime() < item.GetRedistributedDataObject()->GetMTime()) &&
-
-      // kd-tree didn't change
-      (item.GetRedistributedDataObject()->GetMTime() > this->KdTree->GetMTime()))
-    {
-      // skip redistribution.
-      continue;
-    }
-
-    // release old memory (not necessarily, but try).
-    item.SetRedistributedDataObject(NULL);
-
-    vtkNew<vtkOrderedCompositeDistributor> redistributor;
-    redistributor->SetController(vtkMultiProcessController::GetGlobalController());
-    redistributor->SetInputData(item.GetDeliveredDataObject());
-    redistributor->SetPKdTree(this->KdTree);
-    redistributor->SetPassThrough(0);
-    redistributor->SetBoundaryMode(item.RedistributionMode);
-    redistributor->Update();
-    item.SetRedistributedDataObject(redistributor->GetOutputDataObject(0));
+    anything_moved = item.Redistribute(mode, this->KdTree, debugName) || anything_moved;
   }
-  vtkTimerLog::MarkEndEvent("Redistributing Data for Ordered Compositing");
+
+  if (!anything_moved)
+  {
+    vtkVLogF(PARAVIEW_LOG_DATA_MOVEMENT_VERBOSITY(), "no redistribution was done.");
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -736,14 +863,7 @@ void vtkPVDataDeliveryManager::ClearRedistributedData(bool use_lod)
       continue;
     }
     vtkInternals::vtkItem& item = use_lod ? iter->second.second : iter->second.first;
-    if (!item.Redistributable ||
-      // delivered object can be null in case we're updating lod and the
-      // representation doeesn't have any LOD data.
-      item.GetDeliveredDataObject() == NULL)
-    {
-      continue;
-    }
-    item.SetRedistributedDataObject(item.GetDeliveredDataObject());
+    item.ClearRedistributedData();
   }
 }
 
@@ -828,9 +948,7 @@ void vtkPVDataDeliveryManager::DeliverStreamedPieces(unsigned int size, unsigned
   // with only delivering pieces for streaming.
   assert(size % 2 == 0);
 
-  bool using_remote_rendering = this->RenderView->GetUseDistributedRenderingForStillRender();
-  int mode = this->RenderView->GetDataDistributionMode(using_remote_rendering);
-
+  const int mode = this->GetViewDataDistributionMode(/*use_lod*/ false);
   for (unsigned int cc = 0; cc < size; cc += 2)
   {
     unsigned int rid = values[cc];

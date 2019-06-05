@@ -40,6 +40,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMPropertyHelper.h"
 #include "vtkSMTransferFunctionProxy.h"
 
+// This is required to get the mangled name for `Json::Value` used below.
+#include "vtk_jsoncpp_fwd.h"
+
+#include <cassert>
+
+QPointer<pqPresetDialog> pqChooseColorPresetReaction::PresetDialog;
+
 namespace pvInternals
 {
 vtkSMProxy* lutProxy(vtkSMProxy* reprProxy)
@@ -128,16 +135,36 @@ bool pqChooseColorPresetReaction::choosePreset(const char* presetName)
 
   bool indexedLookup = vtkSMPropertyHelper(lut, "IndexedLookup", true).GetAsInt() != 0;
 
-  pqPresetDialog dialog(pqCoreUtilities::mainWidget(), indexedLookup
-      ? pqPresetDialog::SHOW_INDEXED_COLORS_ONLY
-      : pqPresetDialog::SHOW_NON_INDEXED_COLORS_ONLY);
-  dialog.setCurrentPreset(presetName);
-  dialog.setCustomizableLoadColors(!indexedLookup);
-  dialog.setCustomizableLoadOpacities(!indexedLookup);
-  dialog.setCustomizableUsePresetRange(!indexedLookup);
-  dialog.setCustomizableLoadAnnotations(indexedLookup);
-  this->connect(&dialog, SIGNAL(applyPreset(const Json::Value&)), SLOT(applyCurrentPreset()));
-  dialog.exec();
+  if (PresetDialog)
+  {
+    PresetDialog->setMode(indexedLookup ? pqPresetDialog::SHOW_INDEXED_COLORS_ONLY
+                                        : pqPresetDialog::SHOW_NON_INDEXED_COLORS_ONLY);
+  }
+  else
+  {
+    // This should be deleted when the mainWidget is closed and it should be impossible
+    // to get back here with the preset dialog open due to the event filtering done by
+    // the preset dialog.
+    PresetDialog = new pqPresetDialog(pqCoreUtilities::mainWidget(), indexedLookup
+        ? pqPresetDialog::SHOW_INDEXED_COLORS_ONLY
+        : pqPresetDialog::SHOW_NON_INDEXED_COLORS_ONLY);
+  }
+
+  PresetDialog->setCurrentPreset(presetName);
+  PresetDialog->setCustomizableLoadColors(!indexedLookup);
+  PresetDialog->setCustomizableLoadOpacities(!indexedLookup);
+  PresetDialog->setCustomizableUsePresetRange(!indexedLookup);
+  PresetDialog->setCustomizableLoadAnnotations(indexedLookup);
+// XXX(Qt): For some reason, on Windows, this signal is not hooked up
+// properly because the name is never mangled. Instead, just handle the
+// mangling here manually.
+#if VTK_MODULE_USE_EXTERNAL_vtkjsoncpp
+  this->connect(PresetDialog, SIGNAL(applyPreset(const Json::Value&)), SLOT(applyCurrentPreset()));
+#else
+  this->connect(
+    PresetDialog, SIGNAL(applyPreset(const vtkJson::Value&)), SLOT(applyCurrentPreset()));
+#endif
+  PresetDialog->show();
   return true;
 }
 
@@ -145,7 +172,8 @@ bool pqChooseColorPresetReaction::choosePreset(const char* presetName)
 void pqChooseColorPresetReaction::applyCurrentPreset()
 {
   pqPresetDialog* dialog = qobject_cast<pqPresetDialog*>(this->sender());
-  Q_ASSERT(dialog);
+  assert(dialog);
+  assert(dialog == PresetDialog);
 
   vtkSMProxy* lut = this->TransferFunctionProxy;
   if (!lut)

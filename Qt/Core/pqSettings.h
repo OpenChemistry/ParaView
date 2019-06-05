@@ -35,8 +35,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqCoreModule.h"
 #include <QSettings>
 
-#include "vtkSetGet.h" //for VTK_LEGACY
-
 class QDialog;
 class QMainWindow;
 class QDockWidget;
@@ -62,17 +60,6 @@ public:
   pqSettings(QObject* parent = nullptr);
   ~pqSettings() override;
 
-#ifndef VTK_LEGACY_REMOVE
-  //@{
-  /**
-   * @deprecated ParaView 5.5. Ability to create temporary files for settings is
-   * no longer available (and is rarely necessary). See
-   * `pqApplicationCore::settings` for alternative approaches.
-   */
-  VTK_LEGACY(pqSettings(const QString& filename, bool temporary, QObject* parent = NULL));
-//@}
-#endif // VTK_LEGACY_REMOVE
-
   void saveState(const QMainWindow& window, const QString& key);
   void saveState(const QDialog& dialog, const QString& key);
 
@@ -80,7 +67,7 @@ public:
   void restoreState(const QString& key, QDialog& dialog);
 
   /**
-  * Calling this method will cause the modified signal to be emited.
+  * Calling this method will cause the modified signal to be emitted.
   */
   void alertSettingsModified();
 

@@ -37,7 +37,7 @@ class VTKPVVTKEXTENSIONSCORE_EXPORT vtkParallelSerialWriter : public vtkDataObje
 public:
   static vtkParallelSerialWriter* New();
   vtkTypeMacro(vtkParallelSerialWriter, vtkDataObjectAlgorithm);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   //@{
   /**
@@ -50,7 +50,7 @@ public:
   /**
    * Return the MTime also considering the internal writer.
    */
-  vtkMTimeType GetMTime() VTK_OVERRIDE;
+  vtkMTimeType GetMTime() override;
 
   //@{
   /**
@@ -134,16 +134,28 @@ public:
    */
   void SetInterpreter(vtkClientServerInterpreter* interp) { this->Interpreter = interp; }
 
+  //@{
+  /**
+   * Provides an option to pad the time step when writing out time series data.
+   * Only allow this format: ABC%.Xd where ABC is an arbitrary string which may
+   * or may not exist and d must exist and d must be the last character
+   * '.' and X may or may not exist, X must be an integer if it exists.
+   * Default is nullptr.
+   */
+  vtkGetStringMacro(FileNameSuffix);
+  vtkSetStringMacro(FileNameSuffix);
+  //@}
+
 protected:
   vtkParallelSerialWriter();
   ~vtkParallelSerialWriter() override;
 
   int RequestInformation(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
   int RequestUpdateExtent(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
   int RequestData(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
 
 private:
   vtkParallelSerialWriter(const vtkParallelSerialWriter&) = delete;
@@ -170,6 +182,7 @@ private:
 
   // The name of the output file.
   char* FileName;
+  char* FileNameSuffix;
 
   vtkClientServerInterpreter* Interpreter;
 };

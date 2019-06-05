@@ -203,66 +203,42 @@ int vtkPVProminentValuesInformation::Compare(vtkPVProminentValuesInformation* in
 //----------------------------------------------------------------------------
 void vtkPVProminentValuesInformation::CopyFromObject(vtkObject* obj)
 {
-  vtkPVDataRepresentation* repr = vtkPVDataRepresentation::SafeDownCast(obj);
-  // Locate named array in dataset(s).
-  // (This bit adapted from vtkPVDataInformation.)
-  vtkDataObject* dobj = vtkDataObject::SafeDownCast(repr->GetRenderedDataObject(0));
-  vtkInformation* info = NULL;
-  // Handle the case where the a vtkAlgorithmOutput is passed instead of
-  // the data object. vtkSMPart uses vtkAlgorithmOutput.
-  if (!dobj)
-  {
-    vtkAlgorithmOutput* algOutput = vtkAlgorithmOutput::SafeDownCast(obj);
-    vtkAlgorithm* algo = vtkAlgorithm::SafeDownCast(obj);
-    if (algOutput && algOutput->GetProducer())
-    {
-      if (strcmp(algOutput->GetProducer()->GetClassName(), "vtkPVNullSource") == 0)
-      {
-        // Don't gather any data information from the hypothetical null source.
-        return;
-      }
+  // vtkPVProminentValuesInformation may be collected info from a
+  // `vtkPVDataRepresentation` subclass (in which case we're collecting
+  // representation data information) or a `vtkAlgorithm`.
+  // So we handle the two cases here.
 
-      if (algOutput->GetProducer()->IsA("vtkPVPostFilter"))
-      {
-        algOutput = algOutput->GetProducer()->GetInputConnection(0, 0);
-      }
-      info = algOutput->GetProducer()->GetOutputInformation(this->PortNumber);
-      dobj = algOutput->GetProducer()->GetOutputDataObject(algOutput->GetIndex());
-    }
-    else if (algo)
+  vtkDataObject* dobj = nullptr;
+  if (vtkPVDataRepresentation* repr = vtkPVDataRepresentation::SafeDownCast(obj))
+  {
+    dobj = vtkDataObject::SafeDownCast(repr->GetRenderedDataObject(0));
+  }
+  else if (auto algo = vtkAlgorithm::SafeDownCast(obj))
+  {
+    // We don't use vtkAlgorithm::GetOutputDataObject() since that calls a
+    // UpdateDataObject() pass, which may raise errors if the algo is not
+    // fully setup yet.
+    if (strcmp(algo->GetClassName(), "vtkPVNullSource") == 0)
     {
-      // We don't use vtkAlgorithm::GetOutputDataObject() since that calls a
-      // UpdateDataObject() pass, which may raise errors if the algo is not
-      // fully setup yet.
-      if (strcmp(algo->GetClassName(), "vtkPVNullSource") == 0)
-      {
-        // Don't gather any data information from the hypothetical null source.
-        return;
-      }
-      info = algo->GetExecutive()->GetOutputInformation(this->PortNumber);
-      if (!info || vtkDataObject::GetData(info) == NULL)
-      {
-        return;
-      }
-      dobj = algo->GetOutputDataObject(this->PortNumber);
+      // Don't gather any data information from the hypothetical null source.
+      return;
     }
+    auto info = algo->GetExecutive()->GetOutputInformation(this->PortNumber);
+    if (!info || vtkDataObject::GetData(info) == NULL)
+    {
+      return;
+    }
+    dobj = algo->GetOutputDataObject(this->PortNumber);
   }
 
-  if (!dobj)
-  {
-    vtkErrorMacro(
-      "Could not cast object to a known data set: " << (obj ? obj->GetClassName() : "(null)"));
-    return;
-  }
-
-  vtkCompositeDataSet* cds = vtkCompositeDataSet::SafeDownCast(dobj);
-  if (cds)
+  if (vtkCompositeDataSet* cds = vtkCompositeDataSet::SafeDownCast(dobj))
   {
     this->CopyFromCompositeDataSet(cds);
-    return;
   }
-
-  this->CopyFromLeafDataObject(dobj);
+  else if (dobj)
+  {
+    this->CopyFromLeafDataObject(dobj);
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -317,44 +293,23 @@ void vtkPVProminentValuesInformation::CopyFromLeafDataObject(vtkDataObject* dobj
     return;
   }
 
-  vtkAbstractArray* array = 0;
-  vtkFieldData* fieldData;
-  int fieldAssoc = vtkDataObject::GetAssociationTypeFromString(this->FieldAssociation);
-  vtkDataSet* dset = vtkDataSet::SafeDownCast(dobj);
-  vtkGraph* graph = vtkGraph::SafeDownCast(dobj);
-  vtkTable* table = vtkTable::SafeDownCast(dobj);
+  vtkFieldData* fieldData = nullptr;
+  const int fieldAssoc = vtkDataObject::GetAssociationTypeFromString(this->FieldAssociation);
   switch (fieldAssoc)
   {
-    case vtkDataObject::FIELD_ASSOCIATION_POINTS:
-      fieldData = dset ? dset->GetPointData() : 0;
-      break;
-    case vtkDataObject::FIELD_ASSOCIATION_CELLS:
-      fieldData = dset ? dset->GetCellData() : 0;
-      break;
-    case vtkDataObject::FIELD_ASSOCIATION_NONE:
-      fieldData = dset ? dset->GetFieldData() : 0;
-      break;
     case vtkDataObject::FIELD_ASSOCIATION_POINTS_THEN_CELLS:
-      fieldData = dset ? dset->GetPointData() : 0;
-      array = fieldData ? fieldData->GetAbstractArray(this->FieldName) : 0;
-      fieldData = dset ? dset->GetCellData() : 0;
-      break;
-    case vtkDataObject::FIELD_ASSOCIATION_VERTICES:
-      fieldData = graph ? graph->GetVertexData() : 0;
-      break;
-    case vtkDataObject::FIELD_ASSOCIATION_EDGES:
-      fieldData = graph ? graph->GetEdgeData() : 0;
-      break;
-    case vtkDataObject::FIELD_ASSOCIATION_ROWS:
-      fieldData = table ? table->GetRowData() : 0;
+      // try points first, then cells.
+      fieldData = dobj->GetAttributesAsFieldData(vtkDataObject::FIELD_ASSOCIATION_POINTS);
+      if (fieldData == nullptr || fieldData->GetAbstractArray(this->FieldName) == nullptr)
+      {
+        fieldData = dobj->GetAttributesAsFieldData(vtkDataObject::FIELD_ASSOCIATION_CELLS);
+      }
       break;
     default:
-      fieldData = 0;
-      array = 0;
+      fieldData = dobj->GetAttributesAsFieldData(fieldAssoc);
       break;
   }
-  array = array ? array : (fieldData ? fieldData->GetAbstractArray(this->FieldName) : 0);
-  if (array)
+  if (auto array = fieldData ? fieldData->GetAbstractArray(this->FieldName) : nullptr)
   {
     this->CopyDistinctValuesFromObject(array);
   }

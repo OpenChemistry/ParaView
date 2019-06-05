@@ -39,7 +39,7 @@ public:
   static vtkSMSession* New(vtkPVSessionBase* otherSession);
   static vtkSMSession* New(vtkPVSessionCore* otherSessionCore);
   vtkTypeMacro(vtkSMSession, vtkPVSessionBase);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   //---------------------------------------------------------------------------
   // API for collaboration management
@@ -128,7 +128,7 @@ public:
   /**
    * Builtin session is always alive.
    */
-  bool GetIsAlive() VTK_OVERRIDE { return true; }
+  bool GetIsAlive() override { return true; }
 
   /**
    * Returns a ServerFlags indicate the nature of the current processes. e.g. if
@@ -137,23 +137,23 @@ public:
    * The implementation provided by this class returns
    * vtkPVSession::CLIENT_AND_SERVERS suitable for builtin-mode.
    */
-  ServerFlags GetProcessRoles() VTK_OVERRIDE;
+  ServerFlags GetProcessRoles() override;
 
   /**
    * Push the state message. Overridden to ensure that the information in the
    * undo-redo state manager is updated.
    */
-  void PushState(vtkSMMessage* msg) VTK_OVERRIDE;
+  void PushState(vtkSMMessage* msg) override;
 
   /**
    * Sends the message to all clients.
    */
-  void NotifyAllClients(const vtkSMMessage* msg) VTK_OVERRIDE { this->ProcessNotification(msg); }
+  void NotifyAllClients(const vtkSMMessage* msg) override { this->ProcessNotification(msg); }
 
   /**
    * Sends the message to all but the active client-session.
    */
-  void NotifyOtherClients(const vtkSMMessage*) VTK_OVERRIDE { /* nothing to do. */}
+  void NotifyOtherClients(const vtkSMMessage*) override { /* nothing to do. */}
 
   //---------------------------------------------------------------------------
   // API for Collaboration management
@@ -177,18 +177,20 @@ public:
   /**
    * These are static helper methods that help create standard ParaView
    * sessions. They register the session with the process module and return the
-   * session id. Returns 0 on failure.
+   * session id. It will try to connect for timeout seconds, -1 meaning infinite retries.
+   * and 0 means no retry. Returns 0 on failure.
    * This overload is used to create a built-in session.
    */
-  static vtkIdType ConnectToSelf();
+  static vtkIdType ConnectToSelf(int timeout = 60);
 
   /**
    * These are static helper methods that help create standard ParaView
    * sessions. They register the session with the process module and return the
-   * session id. Returns 0 on failure.
+   * session id. It will try to connect for timeout seconds, -1 meaning infinite retries.
+   * and 0 means no retry. Returns 0 on failure. Returns 0 on failure.
    * This overload is used to create a client-server session on client.
    */
-  static vtkIdType ConnectToRemote(const char* hostname, int port);
+  static vtkIdType ConnectToRemote(const char* hostname, int port, int timeout = 60);
 
   /**
    * Same as ConnectToRemote() except that it waits for a reverse connection.
@@ -206,11 +208,12 @@ public:
   /**
    * These are static helper methods that help create standard ParaView
    * sessions. They register the session with the process module and return the
-   * session id. Returns 0 on failure.
-   * This overload is used to create a client-dataserver-renderserver session on
-   * client.
+   * session id. It will try to connect for timeout seconds, -1 meaning infinite retries.
+   * and 0 means no retry. Returns 0 on failure.
+   * This overload is used to create a client-dataserver-renderserver session on client.
    */
-  static vtkIdType ConnectToRemote(const char* dshost, int dsport, const char* rshost, int rsport);
+  static vtkIdType ConnectToRemote(
+    const char* dshost, int dsport, const char* rshost, int rsport, int timeout = 60);
 
   /**
    * Same as ConnectToRemote() except that it waits for a reverse connection.
@@ -256,7 +259,8 @@ protected:
   /**
    * Internal method used by ConnectToRemote().
    */
-  static vtkIdType ConnectToRemoteInternal(const char* hostname, int port, bool is_auto_mpi);
+  static vtkIdType ConnectToRemoteInternal(
+    const char* hostname, int port, bool is_auto_mpi, int timeout = 60);
 
   /**
    * Process the Notifation message sent using API to communicate from

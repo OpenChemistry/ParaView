@@ -35,6 +35,12 @@ vtkPVGridAxes3DActor::vtkPVGridAxes3DActor()
   this->ModelBounds[0] = this->ModelBounds[2] = this->ModelBounds[4] = -1.0;
   this->ModelBounds[1] = this->ModelBounds[3] = this->ModelBounds[5] = 1.0;
   this->ModelTransformMatrix->Identity();
+
+  this->UseCustomTransformedBounds = false;
+  this->CustomTransformedBounds[0] = this->CustomTransformedBounds[2] =
+    this->CustomTransformedBounds[4] = -1.0;
+  this->CustomTransformedBounds[1] = this->CustomTransformedBounds[3] =
+    this->CustomTransformedBounds[5] = 1.0;
 }
 
 //----------------------------------------------------------------------------
@@ -96,7 +102,8 @@ void vtkPVGridAxes3DActor::UpdateGridBoundsUsingModelTransform()
 //----------------------------------------------------------------------------
 void vtkPVGridAxes3DActor::UpdateGridBoundsUsingDataBounds()
 {
-  vtkBoundingBox bbox(this->TransformedBounds);
+  vtkBoundingBox bbox(
+    this->UseCustomTransformedBounds ? this->CustomTransformedBounds : this->TransformedBounds);
   if (bbox.IsValid())
   {
     if (this->DataPosition[0] != 0 || this->DataPosition[1] != 0 || this->DataPosition[2] != 0)
@@ -126,17 +133,24 @@ void vtkPVGridAxes3DActor::UpdateGridBoundsUsingDataBounds()
       this->SetScale(1, 1, 1);
     }
 
-    double scaleArray[3] = { this->DataBoundsScaleFactor, this->DataBoundsScaleFactor,
-      this->DataBoundsScaleFactor };
-    bbox.Scale(scaleArray);
-
+    double center[3];
     double bds[6];
     bbox.GetBounds(bds);
+
+    // correct the bounds for the data bounds scale factor
+    for (int i = 0; i < 3; i++)
+    {
+      center[i] = (bds[2 * i] + bds[2 * i + 1]) / 2;
+      bds[2 * i] = center[i] - ((center[i] - bds[2 * i]) * this->DataBoundsScaleFactor);
+      bds[2 * i + 1] = center[i] + ((bds[2 * i + 1] - center[i]) * this->DataBoundsScaleFactor);
+    }
+
     this->SetGridBounds(bds);
   }
   else
   {
-    this->SetGridBounds(this->TransformedBounds);
+    this->SetGridBounds(
+      this->UseCustomTransformedBounds ? this->CustomTransformedBounds : this->TransformedBounds);
     this->SetPosition(0, 0, 0);
     this->SetScale(1, 1, 1);
   }

@@ -39,14 +39,14 @@ public:
   void SetLossLessMode(int mode) { this->LossLessMode = mode; }
   int GetLossLessMode() { return this->LossLessMode; }
   // Description:
-  // This is used to control weather or not alpha chanel
+  // This is used to control whether or not alpha channel
   // is stripped during the pre-processing (i.e. RGBA -> RGB).
   void SetStripAlpha(int status) { this->StripAlpha = status; }
   int GetStripAlpha() { return this->StripAlpha; }
   // Description:
   // Pre-process the provided image, pre-processed data is return
   // via the "out" parameter. A flag is returned through the "freeOut"
-  // parameter indicating weather or not the caller needs to call free
+  // parameter indicating whether or not the caller needs to call free
   // on the returned array.
   void PreProcess(vtkUnsignedCharArray* in, unsigned char*& out, int& nCompsOut, vtkIdType& outSize,
     int& freeOut);
@@ -69,7 +69,7 @@ private:
   // Apply selected mask to RGBA data, do not pass alpha.
   void MaskRGBStripA(const unsigned char* in, const unsigned char* inEnd, unsigned char* out);
   // Description:
-  // Do not apply the selcted mask, copy RGBA, into RGB.
+  // Do not apply the selected mask, copy RGBA, into RGB.
   void CopyRGBStripA(const unsigned char* in, const unsigned char* inEnd, unsigned char* out);
   // Description:
   // Copy RGB and add alpha 0xff

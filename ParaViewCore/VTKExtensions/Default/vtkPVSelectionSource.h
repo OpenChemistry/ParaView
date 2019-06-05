@@ -33,12 +33,12 @@ class VTKPVVTKEXTENSIONSDEFAULT_EXPORT vtkPVSelectionSource : public vtkSelectio
 public:
   static vtkPVSelectionSource* New();
   vtkTypeMacro(vtkPVSelectionSource, vtkSelectionAlgorithm);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   /**
    * Set a frustum to choose within.
    */
-  void SetFrustum(double vertices[32]);
+  void AddFrustum(double vertices[32]);
 
   //@{
   /**
@@ -162,9 +162,9 @@ protected:
   ~vtkPVSelectionSource() override;
 
   int RequestInformation(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
   int RequestData(vtkInformation* request, vtkInformationVector** inputVector,
-    vtkInformationVector* outputVector) VTK_OVERRIDE;
+    vtkInformationVector* outputVector) override;
 
   enum Modes
   {

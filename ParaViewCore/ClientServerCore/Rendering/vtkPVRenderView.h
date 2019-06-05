@@ -76,7 +76,7 @@ class VTKPVCLIENTSERVERCORERENDERING_EXPORT vtkPVRenderView : public vtkPVView
 public:
   static vtkPVRenderView* New();
   vtkTypeMacro(vtkPVRenderView, vtkPVView);
-  void PrintSelf(ostream& os, vtkIndent indent) VTK_OVERRIDE;
+  void PrintSelf(ostream& os, vtkIndent indent) override;
 
   enum InteractionModes
   {
@@ -104,20 +104,13 @@ public:
   vtkGetMacro(InteractionMode, int);
   //@}
 
-  /**
-   * Initialize the view with an identifier. Unless noted otherwise, this method
-   * must be called before calling any other methods on this class.
-   * \note CallOnAllProcesses
-   */
-  void Initialize(unsigned int id) VTK_OVERRIDE;
-
   //@{
   /**
    * Overridden to call InvalidateCachedSelection() whenever the render window
    * parameters change.
    */
-  void SetSize(int, int) VTK_OVERRIDE;
-  void SetPosition(int, int) VTK_OVERRIDE;
+  void SetSize(int, int) override;
+  void SetPosition(int, int) override;
   //@}
 
   //@{
@@ -155,11 +148,6 @@ public:
   //@}
 
   /**
-   * Returns the render window.
-   */
-  vtkRenderWindow* GetRenderWindow() VTK_OVERRIDE;
-
-  /**
    * Returns the interactor.
    */
   vtkRenderWindowInteractor* GetInteractor();
@@ -192,7 +180,7 @@ public:
    * \note Can be called on processes involved in rendering i.e those returned
    * by `this->GetStillRenderProcesses()`.
    */
-  void StillRender() VTK_OVERRIDE;
+  void StillRender() override;
 
   /**
    * Triggers a interactive render. Based on the settings on the view, this may
@@ -200,7 +188,21 @@ public:
    * \note Can be called on processes involved in rendering i.e those returned
    * by `this->GetInteractiveRenderProcesses()`.
    */
-  void InteractiveRender() VTK_OVERRIDE;
+  void InteractiveRender() override;
+
+  //@{
+  /**
+   * SuppressRendering can be used to suppress the render within a StillRender
+   * or InteractiveRender. This is useful in cases where you want the
+   * representations mappers to be setup for rendering and have their data ready
+   * but not actually do the render. For example if you want to export the scene
+   * but not render it you must turn on SuppressRendering and then call
+   * StillRender
+   */
+  vtkSetMacro(SuppressRendering, bool);
+  vtkGetMacro(SuppressRendering, bool);
+  vtkBooleanMacro(SuppressRendering, bool);
+  //@}
 
   //@{
   /**
@@ -432,12 +434,6 @@ public:
    */
   void InvalidateCachedSelection();
 
-  /**
-   * Returns the z-buffer value at the given location.
-   * \note CallOnClientOnly
-   */
-  double GetZbufferDataAtPoint(int x, int y);
-
   //@{
   /**
    * Convenience methods used by representations to pass represented data.
@@ -514,7 +510,6 @@ public:
     vtkExtentTranslator* translator, const int whole_extents[6], const double origin[3],
     const double spacing[3]);
   static void SetOrderedCompositingInformation(vtkInformation* info, const double bounds[6]);
-  void ClearOrderedCompositingInformation();
   //@}
 
   //@{
@@ -535,6 +530,7 @@ public:
   }
   //@}
 
+  //@{
   /**
    * This is an temporary/experimental option and may be removed without notice.
    * This is intended to be used within some experimental representations that
@@ -548,6 +544,9 @@ public:
    * ordered compositing will also be disabled.
    */
   static void SetForceDataDistributionMode(vtkInformation* info, int flag);
+  bool IsForceDataDistributionModeSet() const { return this->ForceDataDistributionMode != -1; }
+  int GetForceDataDistributionMode() const { return this->ForceDataDistributionMode; }
+  //@}
 
   //@{
   /**
@@ -658,7 +657,7 @@ public:
    * their inputs. Hence it's okay to do some extra inter-process communication
    * here.
    */
-  void Update() VTK_OVERRIDE;
+  void Update() override;
 
   /**
    * Asks representations to update their LOD geometries.
@@ -677,19 +676,19 @@ public:
   //@{
   /**
    * Returns whether the view will use distributed rendering for the next
-   * StillRender() call based on the geometry sizes determined by the most
-   * recent call to Update().
+   * full-resolution render. This uses the full resolution geometry sizes as
+   * determined by the most recent call to `Update`.
    */
-  vtkGetMacro(UseDistributedRenderingForStillRender, bool);
+  vtkGetMacro(UseDistributedRenderingForRender, bool);
   //@}
 
   //@{
   /**
    * Returns whether the view will use distributed rendering for the next
-   * InteractiveRender() call based on the geometry sizes determined by the most
-   * recent calls to Update() and UpdateLOD().
+   * low-resolution render. This uses the low-resolution (or LOD) geometry sizes
+   * as determined by the most recent call to `UpdateLOD`.
    */
-  vtkGetMacro(UseDistributedRenderingForInteractiveRender, bool);
+  vtkGetMacro(UseDistributedRenderingForLODRender, bool);
   //@}
 
   //@{
@@ -877,6 +876,14 @@ public:
   bool GetOSPRayContinueStreaming();
   //@{
   /**
+   * Controls whether to use image denoising to improve appearance.
+   */
+  void SetDenoise(bool);
+  bool GetDenoise();
+  //@}
+
+  //@{
+  /**
    * Dimish or Amplify all lights in the scene.
    */
   void SetLightScale(double);
@@ -898,7 +905,7 @@ public:
    * For OSPRay, set the library of materials.
    */
   virtual void SetMaterialLibrary(vtkPVMaterialLibrary*);
-  void SetViewTime(double value) VTK_OVERRIDE;
+  void SetViewTime(double value) override;
   //@{
   /**
    * Set the size of OSPRay's temporal cache.
@@ -941,6 +948,17 @@ public:
   // Get the RenderViewBase used by this
   vtkGetObjectMacro(RenderView, vtkRenderViewBase);
 
+  /**
+   * Overridden to scale the OrientationWidget appropriately.
+   */
+  void ScaleRendererViewports(const double viewport[4]) override;
+
+  /**
+   * This is used by vtkPVHardwareSelector to synchronize element ids between
+   * all ranks involved in selection.
+   */
+  void SynchronizeMaximumIds(vtkIdType* maxPointId, vtkIdType* maxCellId);
+
 protected:
   vtkPVRenderView();
   ~vtkPVRenderView() override;
@@ -954,8 +972,8 @@ protected:
    * does any data-delivery, we don't assign IDs for these, nor affect the ID
    * uniquifier when a vtk3DWidgetRepresentation is added.
    */
-  void AddRepresentationInternal(vtkDataRepresentation* rep) VTK_OVERRIDE;
-  void RemoveRepresentationInternal(vtkDataRepresentation* rep) VTK_OVERRIDE;
+  void AddRepresentationInternal(vtkDataRepresentation* rep) override;
+  void RemoveRepresentationInternal(vtkDataRepresentation* rep) override;
   //@}
 
   /**
@@ -1075,6 +1093,15 @@ protected:
   bool ShowAnnotation;
   bool UpdateAnnotation;
 
+  // this ivar can be used to suppress the render within
+  // a StillRender or InteractiveRender. This is useful
+  // in cases where you want the representations mappers
+  // to be setup for rendering and have their data ready
+  // but not actually do the render. For example if you
+  // want to export the scene but not render it you must
+  // turn on SuppressRendering and then call StillRender
+  bool SuppressRendering;
+
   // 2D and 3D interactor style
   vtkPVInteractorStyle* TwoDInteractorStyle;
   vtkPVInteractorStyle* ThreeDInteractorStyle;
@@ -1106,8 +1133,8 @@ protected:
   bool UsedLODForLastRender;
   bool UseLODForInteractiveRender;
   bool UseOutlineForLODRendering;
-  bool UseDistributedRenderingForStillRender;
-  bool UseDistributedRenderingForInteractiveRender;
+  bool UseDistributedRenderingForRender;
+  bool UseDistributedRenderingForLODRender;
 
   vtkTypeUInt32 StillRenderProcesses;
   vtkTypeUInt32 InteractiveRenderProcesses;

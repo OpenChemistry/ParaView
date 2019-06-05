@@ -25,6 +25,7 @@
 #include "vtkObjectFactory.h"
 #include "vtkPVCompositeDataPipeline.h"
 #include "vtkPVInstantiator.h"
+#include "vtkPVLogger.h"
 #include "vtkPVPostFilter.h"
 #include "vtkPVXMLElement.h"
 #include "vtkPolyData.h"
@@ -92,6 +93,24 @@ bool vtkSISourceProxy::CreateVTKObjects()
     return true;
   }
 
+  // Register observer to record the execution time for each algorithm in the
+  // local timer-log.
+  algorithm->AddObserver(vtkCommand::StartEvent, this, &vtkSISourceProxy::MarkStartEvent);
+  algorithm->AddObserver(vtkCommand::EndEvent, this, &vtkSISourceProxy::MarkEndEvent);
+  return true;
+}
+
+//----------------------------------------------------------------------------
+void vtkSISourceProxy::OnCreateVTKObjects()
+{
+  this->Superclass::OnCreateVTKObjects();
+
+  vtkAlgorithm* algorithm = vtkAlgorithm::SafeDownCast(this->GetVTKObject());
+  if (algorithm == NULL)
+  {
+    return;
+  }
+
   // Create the right kind of executive.
   if (this->ExecutiveName && !this->GetVTKObject()->IsA("vtkPVDataRepresentation"))
   {
@@ -106,12 +125,6 @@ bool vtkSISourceProxy::CreateVTKObjects()
       }
     }
   }
-
-  // Register observer to record the execution time for each algorithm in the
-  // local timer-log.
-  algorithm->AddObserver(vtkCommand::StartEvent, this, &vtkSISourceProxy::MarkStartEvent);
-  algorithm->AddObserver(vtkCommand::EndEvent, this, &vtkSISourceProxy::MarkEndEvent);
-  return true;
 }
 
 //----------------------------------------------------------------------------
@@ -210,6 +223,10 @@ void vtkSISourceProxy::UpdatePipeline(int port, double time, bool doTime)
   {
     return;
   }
+
+  vtkVLogScopeF(PARAVIEW_LOG_PIPELINE_VERBOSITY(), "%s: update pipeline(%d, %f, %s) ",
+    this->GetLogNameOrDefault(), port, time, (doTime ? "true" : "false"));
+
   vtkAlgorithm* algo = output_port->GetProducer();
   assert(algo);
 
@@ -245,6 +262,9 @@ void vtkSISourceProxy::UpdatePipelineInformation()
     return;
   }
 
+  vtkVLogScopeF(PARAVIEW_LOG_PIPELINE_VERBOSITY(), "%s: update pipeline information",
+    this->GetLogNameOrDefault());
+
   if (this->GetVTKObject())
   {
     vtkAlgorithm* algo = vtkAlgorithm::SafeDownCast(this->GetVTKObject());
@@ -276,19 +296,20 @@ void vtkSISourceProxy::SetupSelectionProxy(int port, vtkSIProxy* extractSelectio
 void vtkSISourceProxy::MarkStartEvent()
 {
   std::ostringstream filterName;
-  filterName << "Execute "
-             << (this->GetVTKClassName() ? this->GetVTKClassName() : this->GetClassName())
-             << " id: " << this->GetGlobalID();
+  filterName << "Execute " << this->GetLogNameOrDefault() << " id: " << this->GetGlobalID();
   vtkTimerLog::MarkStartEvent(filterName.str().c_str());
+
+  vtkVLogStartScopeF(PARAVIEW_LOG_PIPELINE_VERBOSITY(), vtkLogIdentifier(this), "%s: execute",
+    this->GetLogNameOrDefault());
 }
 
 //----------------------------------------------------------------------------
 void vtkSISourceProxy::MarkEndEvent()
 {
+  vtkLogEndScope(vtkLogIdentifier(this));
+
   std::ostringstream filterName;
-  filterName << "Execute "
-             << (this->GetVTKClassName() ? this->GetVTKClassName() : this->GetClassName())
-             << " id: " << this->GetGlobalID();
+  filterName << "Execute " << this->GetLogNameOrDefault() << " id: " << this->GetGlobalID();
   vtkTimerLog::MarkEndEvent(filterName.str().c_str());
 }
 

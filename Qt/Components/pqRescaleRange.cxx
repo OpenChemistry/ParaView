@@ -36,7 +36,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqRescaleRange.h"
 #include "ui_pqRescaleRangeDialog.h"
 
-#include <QDoubleValidator>
+#include "pqCoreUtilities.h"
 
 class pqRescaleRangeForm : public Ui::pqRescaleRangeDialog
 {
@@ -50,11 +50,6 @@ pqRescaleRange::pqRescaleRange(QWidget* widgetParent)
 
   // Set up the ui.
   this->Form->setupUi(this);
-
-  // Make sure the line edits only allow number inputs.
-  QDoubleValidator* validator = new QDoubleValidator(this);
-  this->Form->MinimumScalar->setValidator(validator);
-  this->Form->MaximumScalar->setValidator(validator);
 
   // Connect the gui elements.
   this->connect(
@@ -82,8 +77,8 @@ void pqRescaleRange::setRange(double min, double max)
   }
 
   // Update the displayed range.
-  this->Form->MinimumScalar->setText(QString::number(min, 'g', 6));
-  this->Form->MaximumScalar->setText(QString::number(max, 'g', 6));
+  this->Form->MinimumScalar->setText(pqCoreUtilities::number(min));
+  this->Form->MaximumScalar->setText(pqCoreUtilities::number(max));
 }
 
 double pqRescaleRange::minimum() const
@@ -98,13 +93,9 @@ double pqRescaleRange::maximum() const
 
 void pqRescaleRange::validate()
 {
-  int dummy;
   QString tmp1 = this->Form->MinimumScalar->text();
   QString tmp2 = this->Form->MaximumScalar->text();
-
-  if (this->Form->MinimumScalar->validator()->validate(tmp1, dummy) == QValidator::Acceptable &&
-    this->Form->MaximumScalar->validator()->validate(tmp2, dummy) == QValidator::Acceptable &&
-    tmp1.toDouble() <= tmp2.toDouble())
+  if (tmp1.toDouble() <= tmp2.toDouble())
   {
     this->Form->RescaleButton->setEnabled(true);
     this->Form->RescaleOnlyButton->setEnabled(true);

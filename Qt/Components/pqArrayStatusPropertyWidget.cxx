@@ -31,7 +31,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ========================================================================*/
 #include "pqArrayStatusPropertyWidget.h"
 
-#include "pqExodusIIVariableSelectionWidget.h"
+#include "pqArraySelectionWidget.h"
+#include "pqTreeViewSelectionHelper.h"
 #include "vtkSMProperty.h"
 #include "vtkSMPropertyGroup.h"
 #include "vtkSMProxy.h"
@@ -40,54 +41,57 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 //-----------------------------------------------------------------------------
 pqArrayStatusPropertyWidget::pqArrayStatusPropertyWidget(
-  vtkSMProxy* activeProxy, vtkSMPropertyGroup* group, QWidget* parentObject)
-  : Superclass(activeProxy, parentObject)
+  vtkSMProxy* smproxy, vtkSMPropertyGroup* smgroup, QWidget* parentObject)
+  : Superclass(smproxy, parentObject)
 {
-  pqExodusIIVariableSelectionWidget* selectorWidget = new pqExodusIIVariableSelectionWidget(this);
+  auto selectorWidget = new pqArraySelectionWidget(this);
   selectorWidget->setObjectName("SelectionWidget");
-  selectorWidget->setRootIsDecorated(false);
-  selectorWidget->setHeaderLabel(group->GetXMLLabel());
-  selectorWidget->setMaximumRowCountBeforeScrolling(group);
+  selectorWidget->setHeaderLabel(smgroup->GetXMLLabel());
+  selectorWidget->setMaximumRowCountBeforeScrolling(
+    pqPropertyWidget::hintsWidgetHeightNumberOfRows(smgroup->GetHints()));
+
+  // add context menu and custom indicator for sorting and filtering.
+  new pqTreeViewSelectionHelper(selectorWidget);
 
   QHBoxLayout* hbox = new QHBoxLayout(this);
   hbox->addWidget(selectorWidget);
   hbox->setMargin(0);
   hbox->setSpacing(4);
 
-  for (unsigned int cc = 0; cc < group->GetNumberOfProperties(); cc++)
+  for (unsigned int cc = 0; cc < smgroup->GetNumberOfProperties(); cc++)
   {
-    vtkSMProperty* prop = group->GetProperty(cc);
+    vtkSMProperty* prop = smgroup->GetProperty(cc);
     if (prop && prop->GetInformationOnly() == 0)
     {
-      const char* property_name = activeProxy->GetPropertyName(prop);
+      const char* property_name = smproxy->GetPropertyName(prop);
       this->addPropertyLink(selectorWidget, property_name, SIGNAL(widgetModified()), prop);
     }
   }
 
-  // dont show label
+  // don't show label
   this->setShowLabel(false);
 }
 
+//-----------------------------------------------------------------------------
 pqArrayStatusPropertyWidget::pqArrayStatusPropertyWidget(
-  vtkSMProxy* activeProxy, vtkSMProperty* proxyProperty, QWidget* parentObject)
-  : Superclass(activeProxy, parentObject)
+  vtkSMProxy* smproxy, vtkSMProperty* smproperty, QWidget* parentObject)
+  : Superclass(smproxy, parentObject)
 {
-  pqExodusIIVariableSelectionWidget* selectorWidget = new pqExodusIIVariableSelectionWidget(this);
+  auto selectorWidget = new pqArraySelectionWidget(this);
   selectorWidget->setObjectName("SelectionWidget");
-
-  selectorWidget->setRootIsDecorated(false);
-  selectorWidget->setHeaderLabel(proxyProperty->GetXMLLabel());
-  selectorWidget->setMaximumRowCountBeforeScrolling(proxyProperty);
+  selectorWidget->setHeaderLabel(smproperty->GetXMLLabel());
+  selectorWidget->setMaximumRowCountBeforeScrolling(
+    pqPropertyWidget::hintsWidgetHeightNumberOfRows(smproperty->GetHints()));
 
   QHBoxLayout* hbox = new QHBoxLayout(this);
   hbox->addWidget(selectorWidget);
   hbox->setMargin(0);
   hbox->setSpacing(4);
 
-  const char* property_name = activeProxy->GetPropertyName(proxyProperty);
-  this->addPropertyLink(selectorWidget, property_name, SIGNAL(widgetModified()), proxyProperty);
+  const char* property_name = smproxy->GetPropertyName(smproperty);
+  this->addPropertyLink(selectorWidget, property_name, SIGNAL(widgetModified()), smproperty);
 
-  // dont show label
+  // don't show label
   this->setShowLabel(false);
 }
 

@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqTreeViewExpandState.h"
 #include "pqUndoStack.h"
 #include "pqView.h"
+#include "vtkPVLogger.h"
 #include "vtkSMDoubleMapProperty.h"
 #include "vtkSMDoubleMapPropertyIterator.h"
 #include "vtkSMPropertyHelper.h"
@@ -53,7 +54,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkSMSourceProxy.h"
 #include "vtkScalarsToColors.h"
 #include "vtkSmartPointer.h"
-#include "vtkTimerLog.h"
 
 #include <QColorDialog>
 #include <QIdentityProxyModel>
@@ -64,6 +64,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QScopedValueRollback>
 #include <QSignalBlocker>
 #include <QStyle>
+
+#include <cassert>
 
 namespace
 {
@@ -262,6 +264,8 @@ public:
 
   QColor color(const QModelIndex& idx) const
   {
+    assert(idx.column() == this->ColorColumn);
+
     const QModelIndex srcIdx = this->mapToSource(idx);
     QColor dcolor = this->sourceModel()->data(srcIdx, Qt::DisplayRole).value<QColor>();
     if (!dcolor.isValid() && this->LUT)
@@ -281,7 +285,7 @@ public:
 
   QPixmap colorPixmap(const QModelIndex& idx) const
   {
-    Q_ASSERT(idx.column() == this->ColorColumn);
+    assert(idx.column() == this->ColorColumn);
 
     const QModelIndex srcIdx = this->mapToSource(idx);
     QColor dcolor = this->sourceModel()->data(srcIdx, Qt::DisplayRole).value<QColor>();
@@ -309,19 +313,19 @@ public:
 
   void setColor(const QModelIndex& idx, const QColor& acolor)
   {
-    Q_ASSERT(idx.column() == this->ColorColumn);
+    assert(idx.column() == this->ColorColumn);
     this->sourceModel()->setData(this->mapToSource(idx), acolor, Qt::DisplayRole);
   }
 
   void setColor(const QModelIndex& idx, const QVariant& acolor)
   {
-    Q_ASSERT(idx.column() == this->ColorColumn);
+    assert(idx.column() == this->ColorColumn);
     this->sourceModel()->setData(this->mapToSource(idx), acolor, Qt::DisplayRole);
   }
 
   double opacity(const QModelIndex& idx) const
   {
-    Q_ASSERT(idx.column() == this->OpacityColumn);
+    assert(idx.column() == this->OpacityColumn);
     const QModelIndex srcIdx = this->mapToSource(idx);
     const QVariant vval = this->sourceModel()->data(srcIdx, Qt::DisplayRole);
     return vval.isValid() ? vval.toDouble() : 1.0;
@@ -329,7 +333,7 @@ public:
 
   QPixmap opacityPixmap(const QModelIndex& idx) const
   {
-    Q_ASSERT(idx.column() == this->OpacityColumn);
+    assert(idx.column() == this->OpacityColumn);
     const QModelIndex srcIdx = this->mapToSource(idx);
     const QVariant vval = this->sourceModel()->data(srcIdx, Qt::DisplayRole);
     double dval = vval.isValid() ? vval.toDouble() : -1.0;
@@ -341,13 +345,13 @@ public:
 
   void setOpacity(const QModelIndex& idx, double aopacity)
   {
-    Q_ASSERT(idx.column() == this->OpacityColumn);
+    assert(idx.column() == this->OpacityColumn);
     this->sourceModel()->setData(this->mapToSource(idx), aopacity, Qt::DisplayRole);
   }
 
   void setOpacity(const QModelIndex& idx, const QVariant& aopacity)
   {
-    Q_ASSERT(idx.column() == this->OpacityColumn);
+    assert(idx.column() == this->OpacityColumn);
     this->sourceModel()->setData(this->mapToSource(idx), aopacity, Qt::DisplayRole);
   }
 
@@ -523,18 +527,22 @@ public:
 
     QItemSelection aselection;
     const QAbstractProxyModel* amodel = qobject_cast<const QAbstractProxyModel*>(this->model());
-
-    vtkSMSourceProxy* selSource = port ? port->getSelectionInput() : nullptr;
-    if (selSource && strcmp(selSource->GetXMLName(), "BlockSelectionSource") == 0)
+    // amodel's source model may be null if the data is not a composite dataset
+    // BUG #18939.
+    if (amodel->sourceModel() != nullptr)
     {
-      vtkSMPropertyHelper blocksHelper(selSource, "Blocks");
-      for (unsigned int cc = 0, max = blocksHelper.GetNumberOfElements(); cc < max; ++cc)
+      vtkSMSourceProxy* selSource = port ? port->getSelectionInput() : nullptr;
+      if (selSource && strcmp(selSource->GetXMLName(), "BlockSelectionSource") == 0)
       {
-        const QModelIndex midx = this->CDTModel->find(blocksHelper.GetAsIdType(cc));
-        if (midx.isValid())
+        vtkSMPropertyHelper blocksHelper(selSource, "Blocks");
+        for (unsigned int cc = 0, max = blocksHelper.GetNumberOfElements(); cc < max; ++cc)
         {
-          const QModelIndex idx = amodel->mapFromSource(midx);
-          aselection.select(idx, idx);
+          const QModelIndex midx = this->CDTModel->find(blocksHelper.GetAsIdType(cc));
+          if (midx.isValid())
+          {
+            const QModelIndex idx = amodel->mapFromSource(midx);
+            aselection.select(idx, idx);
+          }
         }
       }
     }
@@ -544,7 +552,7 @@ public:
 private:
   void selectBlocks(const std::vector<vtkIdType>& ids)
   {
-    Q_ASSERT(this->BlockSelectionPropagation == false);
+    assert(this->BlockSelectionPropagation == false);
     QScopedValueRollback<bool> r(this->BlockSelectionPropagation, true);
 
     pqOutputPort* port = this->MBWidget->outputPort();
@@ -620,10 +628,17 @@ public:
   QPointer<pqView> View;
   QPointer<pqOutputPort> OutputPort;
   QPointer<pqDataRepresentation> Representation;
+  void* RepresentationVoidPtr; // used to check if the ptr changed.
 
   QList<QPair<unsigned int, bool> > BlockVisibilities;
   QList<QPair<unsigned int, QVariant> > BlockColors;
   QList<QPair<unsigned int, QVariant> > BlockOpacities;
+
+  // These are set when this->Representation is setup to match
+  // the capabilities available on the representation.
+  bool UserCheckable;
+  bool HasColors;
+  bool HasOpacities;
 
   pqPropertyLinks Links;
   pqTimer ColoringTimer;
@@ -633,7 +648,10 @@ public:
     : CDTModel(new pqCompositeDataInformationTreeModel(self))
     , ProxyModel(new MultiBlockInspectorModel(self))
     , SelectionModel(new MultiBlockInspectorSelectionModel(this->ProxyModel, this->CDTModel, self))
-
+    , RepresentationVoidPtr(nullptr)
+    , UserCheckable(false)
+    , HasColors(false)
+    , HasOpacities(false)
   {
     this->Ui.setupUi(self);
     this->Ui.treeView->header()->setDefaultSectionSize(this->ProxyModel->iconSize() + 4);
@@ -682,29 +700,30 @@ public:
 
   void resetModel()
   {
-    vtkTimerLogScope mark("resetModel");
-    (void)mark;
+    vtkVLogScopeFunction(PARAVIEW_LOG_APPLICATION_VERBOSITY());
 
     pqTreeViewExpandState expandState;
-
-    vtkTimerLog::MarkStartEvent("Expand state: save");
     expandState.save(this->Ui.treeView);
-    vtkTimerLog::MarkEndEvent("Expand state: save");
 
     bool prev = this->SelectionModel->blockSelectionPropagation(true);
     pqOutputPort* port = this->OutputPort;
-    pqRepresentation* repr = this->Representation;
     this->CDTModel->clearColumns();
-    if (repr)
+    this->CDTModel->setUserCheckable(this->UserCheckable);
+    if (this->HasColors && this->Representation != nullptr)
     {
-      this->CDTModel->setUserCheckable(true);
-      this->CDTModel->setDefaultCheckState(true);
       this->ProxyModel->setColorColumn(this->CDTModel->addColumn("color"));
+    }
+    else
+    {
+      this->HasColors = false;
+    }
+    if (this->HasOpacities && this->Representation != nullptr)
+    {
       this->ProxyModel->setOpacityColumn(this->CDTModel->addColumn("opacity"));
     }
     else
     {
-      this->CDTModel->setUserCheckable(false);
+      this->HasOpacities = false;
     }
     this->updateRootLabel();
     bool is_composite =
@@ -716,9 +735,7 @@ public:
     else
     {
       this->ProxyModel->setSourceModel(this->CDTModel);
-      vtkTimerLog::MarkStartEvent("QTreeView::expandToDepth");
       this->Ui.treeView->expandToDepth(1);
-      vtkTimerLog::MarkEndEvent("QTreeView::expandToDepth");
 
       QHeaderView* header = this->Ui.treeView->header();
       if (header->count() == 3 && header->logicalIndex(2) != 0)
@@ -727,9 +744,7 @@ public:
       }
     }
 
-    vtkTimerLog::MarkStartEvent("Expand state: restore");
     expandState.restore(this->Ui.treeView);
-    vtkTimerLog::MarkEndEvent("Expand state: restore");
     this->SelectionModel->blockSelectionPropagation(prev);
   }
 
@@ -744,14 +759,25 @@ public:
 
   void restoreCachedValues()
   {
-    vtkTimerLogScope mark("restoreCachedValues");
-    (void)mark;
+    vtkVLogScopeFunction(PARAVIEW_LOG_APPLICATION_VERBOSITY());
     if (this->Representation)
     {
       // restore check-state, property state, if possible.
-      this->CDTModel->setCheckStates(this->BlockVisibilities);
-      this->CDTModel->setColumnStates("color", this->BlockColors);
-      this->CDTModel->setColumnStates("opacity", this->BlockOpacities);
+      if (this->UserCheckable)
+      {
+        assert(this->CDTModel->userCheckable());
+        this->CDTModel->setCheckStates(this->BlockVisibilities);
+      }
+      if (this->HasColors)
+      {
+        assert(this->CDTModel->columnIndex("color") != -1);
+        this->CDTModel->setColumnStates("color", this->BlockColors);
+      }
+      if (this->HasOpacities)
+      {
+        assert(this->CDTModel->columnIndex("opacity") != -1);
+        this->CDTModel->setColumnStates("opacity", this->BlockOpacities);
+      }
     }
   }
 };
@@ -924,7 +950,7 @@ void pqMultiBlockInspectorWidget::setOutputPortInternal(pqOutputPort* port)
 void pqMultiBlockInspectorWidget::setRepresentation(pqDataRepresentation* repr)
 {
   pqInternals& internals = (*this->Internals);
-  if (internals.Representation != repr)
+  if (internals.RepresentationVoidPtr != repr)
   {
     if (internals.Representation)
     {
@@ -933,7 +959,9 @@ void pqMultiBlockInspectorWidget::setRepresentation(pqDataRepresentation* repr)
     }
     internals.Links.clear();
     internals.clearCache();
+    internals.UserCheckable = internals.HasColors = internals.HasOpacities = false;
     internals.Representation = repr;
+    internals.RepresentationVoidPtr = repr;
     this->updateScalarColoring();
     if (repr)
     {
@@ -944,18 +972,41 @@ void pqMultiBlockInspectorWidget::setRepresentation(pqDataRepresentation* repr)
       vtkSMProxy* reprProxy = repr->getProxy();
       if (vtkSMProperty* prop = reprProxy->GetProperty("BlockColor"))
       {
+        internals.HasColors = true;
         internals.Links.addPropertyLink<CConnectionType>(
           this, "blockColors", SIGNAL(blockColorsChanged()), reprProxy, prop);
       }
       if (vtkSMProperty* prop = reprProxy->GetProperty("BlockOpacity"))
       {
+        internals.HasOpacities = true;
         internals.Links.addPropertyLink<CConnectionType>(
           this, "blockOpacities", SIGNAL(blockOpacitiesChanged()), reprProxy, prop);
       }
       if (vtkSMProperty* prop = reprProxy->GetProperty("BlockVisibility"))
       {
+        internals.UserCheckable = true;
+        if (internals.CDTModel->defaultCheckState() == false)
+        {
+          internals.CDTModel->setDefaultCheckState(true);
+          // init check states to ensure the `setBlockVisibilities()` gets
+          // called appropriately when the link is added.
+          internals.CDTModel->setCheckStates(QList<QPair<unsigned int, bool> >());
+        }
         internals.Links.addPropertyLink(
           this, "blockVisibilities", SIGNAL(blockVisibilitiesChanged()), reprProxy, prop);
+      }
+      else if (vtkSMProperty* prop2 = reprProxy->GetProperty("CompositeDataSetIndex"))
+      {
+        internals.UserCheckable = true;
+        if (internals.CDTModel->defaultCheckState() == true)
+        {
+          internals.CDTModel->setDefaultCheckState(false);
+          // int check states to ensure the `setVisibleBlocks()` gets
+          // called appropriately when the link is added.
+          internals.CDTModel->setChecked(QList<unsigned int>());
+        }
+        internals.Links.addPropertyLink(
+          this, "visibleBlocks", SIGNAL(blockVisibilitiesChanged()), reprProxy, prop2);
       }
     }
     this->resetEventually();
@@ -999,8 +1050,7 @@ void pqMultiBlockInspectorWidget::resetEventually()
 //-----------------------------------------------------------------------------
 void pqMultiBlockInspectorWidget::resetNow()
 {
-  vtkTimerLogScope mark("pqMultiBlockInspectorWidget::resetNow");
-  (void)mark;
+  vtkVLogScopeFunction(PARAVIEW_LOG_APPLICATION_VERBOSITY());
 
   QSignalBlocker b(this);
   pqInternals& internals = (*this->Internals);
@@ -1041,6 +1091,35 @@ void pqMultiBlockInspectorWidget::setBlockVisibilities(const QList<QVariant>& bv
   }
 
   internals.CDTModel->setCheckStates(states);
+}
+
+//-----------------------------------------------------------------------------
+QList<QVariant> pqMultiBlockInspectorWidget::visibleBlocks() const
+{
+  QList<QVariant> retval;
+  pqInternals& internals = (*this->Internals);
+  auto checkedNodes = internals.CDTModel->checkedNodes();
+  for (const auto& val : checkedNodes)
+  {
+    retval.push_back(val);
+  }
+  return retval;
+}
+
+//-----------------------------------------------------------------------------
+void pqMultiBlockInspectorWidget::setVisibleBlocks(const QList<QVariant>& vbs)
+{
+  QSignalBlocker b(this);
+
+  QList<unsigned int> indices;
+  for (const auto& vval : vbs)
+  {
+    indices.push_back(vval.value<unsigned int>());
+  }
+
+  pqInternals& internals = (*this->Internals);
+  internals.CDTModel->setChecked(indices);
+  internals.BlockVisibilities = internals.CDTModel->checkStates();
 }
 
 //-----------------------------------------------------------------------------
@@ -1142,11 +1221,7 @@ void pqMultiBlockInspectorWidget::itemDoubleClicked(const QModelIndex& idx)
       QColorDialog::getColor(color, this, "Select Color", QColorDialog::DontUseNativeDialog);
     if (newColor.isValid())
     {
-      BEGIN_UNDO_SET("Change Block Colors");
-      internals.ProxyModel->setColor(idx, newColor);
-      emit this->blockColorsChanged();
-      emit this->requestRender();
-      END_UNDO_SET();
+      this->setColor(idx, newColor);
     }
   }
   else if (idx.column() == 2)
@@ -1157,11 +1232,7 @@ void pqMultiBlockInspectorWidget::itemDoubleClicked(const QModelIndex& idx)
     dialog.setValue(opacity);
     if (dialog.exec() == QDialog::Accepted)
     {
-      BEGIN_UNDO_SET("Change Block Opacities");
-      internals.ProxyModel->setOpacity(idx, dialog.value());
-      emit this->blockOpacitiesChanged();
-      emit this->requestRender();
-      END_UNDO_SET();
+      this->setOpacity(idx, qBound(0.0, dialog.value(), 1.0));
     }
   }
 }
@@ -1171,10 +1242,9 @@ void pqMultiBlockInspectorWidget::modelDataChanged(const QModelIndex& start, con
 {
   if (start.column() <= 0 && end.column() >= 0)
   {
-    BEGIN_UNDO_SET("Change Block Visibilities");
+    SCOPED_UNDO_SET("Change Block Visibilities");
     emit this->blockVisibilitiesChanged();
     emit this->requestRender();
-    END_UNDO_SET();
   }
 }
 
@@ -1210,6 +1280,7 @@ void pqMultiBlockInspectorWidget::contextMenu(const QPoint& pos)
 
   if (QAction* selAction = menu.exec(internals.Ui.treeView->mapToGlobal(pos)))
   {
+    QModelIndex idx = internals.SelectionModel->currentIndex();
     if (selAction == showBlocks || selAction == hideBlocks)
     {
       const QModelIndexList sRows = internals.SelectionModel->selectedRows(0);
@@ -1223,74 +1294,88 @@ void pqMultiBlockInspectorWidget::contextMenu(const QPoint& pos)
     }
     else if (selAction == setColors)
     {
+      QColor color =
+        internals.ProxyModel->color(idx.sibling(idx.row(), internals.ProxyModel->colorColumn()));
       QColor newColor =
-        QColorDialog::getColor(QColor(), this, "Select Color", QColorDialog::DontUseNativeDialog);
+        QColorDialog::getColor(color, this, "Select Color", QColorDialog::DontUseNativeDialog);
       if (newColor.isValid())
       {
-        const QVariant val(newColor);
-        BEGIN_UNDO_SET("Set Block Colors");
-        const QModelIndexList sRows =
-          internals.SelectionModel->selectedRows(internals.ProxyModel->colorColumn());
-        for (auto iter = sRows.begin(); iter != sRows.end(); ++iter)
-        {
-          internals.ProxyModel->setColor(*iter, val);
-        }
-        END_UNDO_SET();
-        emit this->blockColorsChanged();
-        emit this->requestRender();
+        this->setColor(idx, newColor);
       }
     }
     else if (selAction == resetColors)
     {
-      const QVariant val;
-      BEGIN_UNDO_SET("Reset Block Colors");
-      const QModelIndexList sRows =
-        internals.SelectionModel->selectedRows(internals.ProxyModel->colorColumn());
-      for (auto iter = sRows.begin(); iter != sRows.end(); ++iter)
-      {
-        internals.ProxyModel->setColor(*iter, val);
-      }
-      END_UNDO_SET();
-      emit this->blockColorsChanged();
-      emit this->requestRender();
+      this->setColor(idx, QColor());
     }
     else if (selAction == setOpacities)
     {
+      double opacity = internals.ProxyModel->opacity(
+        idx.sibling(idx.row(), internals.ProxyModel->opacityColumn()));
       pqDoubleRangeDialog dialog("Opacity:", 0.0, 1.0, this);
       dialog.setWindowTitle("Select Opacity");
-      dialog.setValue(1.0);
+      dialog.setValue(opacity);
       if (dialog.exec() == QDialog::Accepted)
       {
-        const QVariant val(dialog.value());
-        BEGIN_UNDO_SET("Set Block Opacities");
-        const QModelIndexList sRows =
-          internals.SelectionModel->selectedRows(internals.ProxyModel->opacityColumn());
-        for (auto iter = sRows.begin(); iter != sRows.end(); ++iter)
-        {
-          internals.ProxyModel->setOpacity(*iter, val);
-        }
-        END_UNDO_SET();
-        emit this->blockOpacitiesChanged();
-        emit this->requestRender();
+        this->setOpacity(idx, qBound(0.0, dialog.value(), 1.0));
       }
     }
     else if (selAction == resetOpacities)
     {
-      const QVariant val;
-      BEGIN_UNDO_SET("Reset Block Opacities");
-      const QModelIndexList sRows =
-        internals.SelectionModel->selectedRows(internals.ProxyModel->opacityColumn());
-      for (auto iter = sRows.begin(); iter != sRows.end(); ++iter)
-      {
-        internals.ProxyModel->setOpacity(*iter, val);
-      }
-      END_UNDO_SET();
-      emit this->blockOpacitiesChanged();
-      emit this->requestRender();
+      // -ve opacity causes the value be cleared.
+      this->setOpacity(idx, -1.0);
     }
     else if (selAction == expandAll)
     {
       internals.Ui.treeView->expandAll();
     }
   }
+}
+
+//-----------------------------------------------------------------------------
+void pqMultiBlockInspectorWidget::setColor(const QModelIndex& idx, const QColor& newcolor)
+{
+  pqInternals& internals = (*this->Internals);
+
+  QModelIndexList sRows =
+    internals.SelectionModel->selectedRows(internals.ProxyModel->colorColumn());
+  if (idx.isValid() && !sRows.contains(idx))
+  {
+    // if idx not part of active selection, we don't update the all selected
+    // nodes, only the current item.
+    sRows.clear();
+    sRows.push_back(idx.sibling(idx.row(), internals.ProxyModel->colorColumn()));
+  }
+
+  const QVariant val = newcolor.isValid() ? QVariant::fromValue(newcolor) : QVariant();
+  SCOPED_UNDO_SET(newcolor.isValid() ? "Set Block Colors" : "Reset Block Colors");
+  for (const QModelIndex& itemIdx : sRows)
+  {
+    internals.ProxyModel->setColor(itemIdx, val);
+  }
+  emit this->blockColorsChanged();
+  emit this->requestRender();
+}
+
+//-----------------------------------------------------------------------------
+void pqMultiBlockInspectorWidget::setOpacity(const QModelIndex& idx, double opacity)
+{
+  pqInternals& internals = (*this->Internals);
+  const QVariant val = (opacity >= 0 && opacity <= 1.0) ? QVariant(opacity) : QVariant();
+  QModelIndexList sRows =
+    internals.SelectionModel->selectedRows(internals.ProxyModel->opacityColumn());
+  if (idx.isValid() && !sRows.contains(idx))
+  {
+    // if idx not part of active selection, we don't update the all selected
+    // nodes, only the current item.
+    sRows.clear();
+    sRows.push_back(idx.sibling(idx.row(), internals.ProxyModel->opacityColumn()));
+  }
+
+  SCOPED_UNDO_SET(val.isValid() ? "Set Block Opacities" : "Reset Block Opacities");
+  for (const QModelIndex& itemIdx : sRows)
+  {
+    internals.ProxyModel->setOpacity(itemIdx, val);
+  }
+  emit this->blockOpacitiesChanged();
+  emit this->requestRender();
 }

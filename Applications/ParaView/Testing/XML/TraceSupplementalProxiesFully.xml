@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <pqevents>
-  <pqevent object="pqClientMainWindow/menubar/menuSources" command="activate" arguments="SphereSource" />
+  <pqevent object="pqClientMainWindow/menubar/menuSources/Alphabetical" command="activate" arguments="SphereSource" />
   <pqevent object="pqClientMainWindow/propertiesDock/propertiesPanel/scrollArea/qt_scrollarea_viewport/scrollAreaWidgetContents/PropertiesFrame/ProxyPanel/ThetaResolution/LineEdit0" command="set_string" arguments="80" />
   <pqevent object="pqClientMainWindow/propertiesDock/propertiesPanel/scrollArea/qt_scrollarea_viewport/scrollAreaWidgetContents/PropertiesFrame/ProxyPanel/PhiResolution/LineEdit0" command="set_string" arguments="80" />
   <pqevent object="pqClientMainWindow/propertiesDock/propertiesPanel/Accept" command="activate" arguments="" />
@@ -11,8 +11,9 @@
   <pqevent object="pqClientMainWindow/colorMapEditorDock/colorMapEditorPanel/scrollArea/qt_scrollarea_viewport/scrollAreaWidgetContents/PropertiesFrame/Properties/ColorOpacityEditor/ChoosePreset" command="activate" arguments="" />
   <pqevent object="pqClientMainWindow/pqPresetDialog/gradients/qt_scrollarea_viewport" command="mouseWheel" arguments="-120,0,0,261,27" />
   <pqevent object="pqClientMainWindow/pqPresetDialog/gradients/qt_scrollarea_vcontainer/1QScrollBar0" command="mouseWheel" arguments="-120,0,0,261,417" />
-  <pqevent object="pqClientMainWindow/pqPresetDialog/gradients" command="mousePress" arguments="1,1,0,266,17,/15:0" />
-  <pqevent object="pqClientMainWindow/pqPresetDialog/gradients" command="mouseRelease" arguments="1,0,0,266,17,/15:0" />
+  <pqevent object="pqClientMainWindow/pqPresetDialog/widget/groupChooser" command="activated" arguments="All" />
+  <!-- Choose "Red to Blue Rainbow" -->
+  <pqevent object="pqClientMainWindow/pqPresetDialog/gradients" command="setCurrent" arguments="11.1" />
   <pqevent object="pqClientMainWindow/pqPresetDialog/apply" command="activate" arguments="" />
   <pqevent object="pqClientMainWindow/pqPresetDialog/close" command="activate" arguments="" />
   <pqevent object="pqClientMainWindow/colorMapEditorDock/qt_dockwidget_closebutton" command="activate" arguments="" />
@@ -35,7 +36,7 @@
   <pqevent object="pqClientMainWindow/menubar/menu_Edit" command="activate" arguments="actionDelete_All" />
 
   <!-- bring back to the state where we recorded in the trace i.e. create the sphere source and color it -->
-  <pqevent object="pqClientMainWindow/menubar/menuSources" command="activate" arguments="SphereSource" />
+  <pqevent object="pqClientMainWindow/menubar/menuSources/Alphabetical" command="activate" arguments="SphereSource" />
   <pqevent object="pqClientMainWindow/propertiesDock/propertiesPanel/Accept" command="activate" arguments="" />
   <pqevent object="pqClientMainWindow/variableToolbar/displayColor/Variables" command="set_string" arguments="Normals" />
   <pqevent object="pqClientMainWindow/variableToolbar/displayColor/Components" command="set_string" arguments="Y" />
