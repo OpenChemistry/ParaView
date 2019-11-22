@@ -122,7 +122,15 @@ void vtkSMPVRepresentationProxy::SetPropertyModifiedFlag(const char* name, int f
         }
         else
         {
-          vtkSMPropertyHelper(selectionRepr, "Input").Set(esProxy);
+          int port = 0;
+          if (vtkPVXMLElement* hints = selectionRepr->GetHints()
+              ? selectionRepr->GetHints()->FindNestedElementByName("ConnectToPortIndex")
+              : nullptr)
+          {
+            hints->GetScalarAttribute("value", &port);
+          }
+
+          vtkSMPropertyHelper(selectionRepr, "Input").Set(esProxy, port);
           selectionRepr->UpdateVTKObjects();
         }
       }
@@ -750,7 +758,8 @@ bool vtkSMPVRepresentationProxy::IsScalarBarVisible(vtkSMProxy* view)
 }
 
 //----------------------------------------------------------------------------
-vtkPVArrayInformation* vtkSMPVRepresentationProxy::GetArrayInformationForColorArray()
+vtkPVArrayInformation* vtkSMPVRepresentationProxy::GetArrayInformationForColorArray(
+  bool checkRepresentedData)
 {
   if (!this->GetUsingScalarColoring())
   {
@@ -764,19 +773,42 @@ vtkPVArrayInformation* vtkSMPVRepresentationProxy::GetArrayInformationForColorAr
   unsigned int port = inputHelper.GetOutputPort();
   if (input)
   {
-    vtkPVArrayInformation* arrayInfoFromData = input->GetDataInformation(port)->GetArrayInformation(
+    vtkPVArrayInformation* arrayInfoFromData = nullptr;
+    arrayInfoFromData = input->GetDataInformation(port)->GetArrayInformation(
       colorArrayHelper.GetInputArrayNameToProcess(), colorArrayHelper.GetInputArrayAssociation());
     if (arrayInfoFromData)
     {
       return arrayInfoFromData;
     }
+
+    if (colorArrayHelper.GetInputArrayAssociation() == vtkDataObject::POINT_THEN_CELL)
+    {
+      // Try points...
+      arrayInfoFromData = input->GetDataInformation(port)->GetArrayInformation(
+        colorArrayHelper.GetInputArrayNameToProcess(), vtkDataObject::POINT);
+      if (arrayInfoFromData)
+      {
+        return arrayInfoFromData;
+      }
+
+      // ... then cells
+      arrayInfoFromData = input->GetDataInformation(port)->GetArrayInformation(
+        colorArrayHelper.GetInputArrayNameToProcess(), vtkDataObject::CELL);
+      if (arrayInfoFromData)
+      {
+        return arrayInfoFromData;
+      }
+    }
   }
 
-  vtkPVArrayInformation* arrayInfo = this->GetRepresentedDataInformation()->GetArrayInformation(
-    colorArrayHelper.GetInputArrayNameToProcess(), colorArrayHelper.GetInputArrayAssociation());
-  if (arrayInfo)
+  if (checkRepresentedData)
   {
-    return arrayInfo;
+    vtkPVArrayInformation* arrayInfo = this->GetRepresentedDataInformation()->GetArrayInformation(
+      colorArrayHelper.GetInputArrayNameToProcess(), colorArrayHelper.GetInputArrayAssociation());
+    if (arrayInfo)
+    {
+      return arrayInfo;
+    }
   }
 
   return NULL;

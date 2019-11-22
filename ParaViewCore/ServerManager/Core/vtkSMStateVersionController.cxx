@@ -627,7 +627,8 @@ struct Process_5_6_to_5_7
   bool operator()(xml_document& document)
   {
     return ConvertResampleWithDataset(document) && ConvertIdsFilter(document) &&
-      ConvertOSPRayNames(document) && ConvertBox(document);
+      ConvertOSPRayNames(document) && ConvertBox(document) &&
+      ConvertExodusLegacyBlockNamesWithElementTypes(document) && RemoveColorPropertyLinks(document);
   }
 
   static bool ConvertResampleWithDataset(xml_document& document)
@@ -722,6 +723,41 @@ struct Process_5_6_to_5_7
         }
       }
     }
+
+    return true;
+  }
+
+  static bool ConvertExodusLegacyBlockNamesWithElementTypes(xml_document& document)
+  {
+    pugi::xpath_node_set elements =
+      document.select_nodes("//ServerManagerState/Proxy[@group='sources' and "
+                            "(@type='ExodusIIReader' or @type='ExodusRestartReader')]");
+    for (auto iter = elements.begin(); iter != elements.end(); ++iter)
+    {
+      pugi::xml_node proxy_node = iter->node();
+      std::string id_string(proxy_node.attribute("id").value());
+
+      // add a `UseLegacyBlockNamesWithElementTypes=1` property to each one.
+      auto node = proxy_node.append_child("Property");
+      node.append_attribute("name").set_value("UseLegacyBlockNamesWithElementTypes");
+      node.append_attribute("id").set_value(
+        (id_string + ".UseLegacyBlockNamesWithElementTypes").c_str());
+      node.append_attribute("number_of_elements").set_value("1");
+
+      auto elem = node.append_child("Element");
+      elem.append_attribute("index").set_value("0");
+      elem.append_attribute("value").set_value("1");
+    }
+
+    return true;
+  }
+
+  static bool RemoveColorPropertyLinks(xml_document& document)
+  {
+    pugi::xpath_node_set elements =
+      document.select_nodes("//ServerManagerState/Links/GlobalPropertyLink"
+                            "[@property='Color']");
+    PurgeElements(elements);
 
     return true;
   }

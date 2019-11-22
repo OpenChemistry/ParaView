@@ -55,7 +55,6 @@ set(classes
   pqCatalystExportReaction
   pqCatalystPauseSimulationReaction
   pqCatalystRemoveBreakpointReaction
-  pqCatalystScriptGeneratorReaction
   pqCatalystSetBreakpointReaction
   pqCategoryToolbarsBehavior
   pqChangePipelineInputReaction
@@ -107,6 +106,7 @@ set(classes
   pqImportCinemaReaction
   pqInputDataTypeDecorator
   pqInteractivePropertyWidget
+  pqLightPropertyWidget
   pqLinePropertyWidget
   pqLinkSelectionReaction
   pqListPropertyWidget
@@ -196,6 +196,14 @@ set(classes
   pqWelcomeDialog
   pqYoungsMaterialPropertyWidget)
 
+set(built_shared 0)
+if (BUILD_SHARED_LIBS)
+  set(built_shared 1)
+endif ()
+set_property(SOURCE pqApplicationComponentsInit.cxx APPEND
+  PROPERTY
+    COMPILE_DEFINITIONS "BUILD_SHARED_LIBS=${built_shared}")
+
 set(headers
   pqCatalystContinueReaction.h)
 
@@ -231,6 +239,7 @@ set(ui_files
   Resources/UI/pqHandlePropertyWidget.ui
   Resources/UI/pqImageCompressorWidget.ui
   Resources/UI/pqImplicitPlanePropertyWidget.ui
+  Resources/UI/pqLightPropertyWidget.ui
   Resources/UI/pqLinePropertyWidget.ui
   Resources/UI/pqMainControlsToolbar.ui
   Resources/UI/pqMoleculePropertyWidget.ui

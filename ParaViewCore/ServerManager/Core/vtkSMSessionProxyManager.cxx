@@ -578,7 +578,8 @@ std::string vtkSMSessionProxyManager::RegisterProxy(const char* groupname, vtkSM
 }
 
 //---------------------------------------------------------------------------
-std::string vtkSMSessionProxyManager::GetUniqueProxyName(const char* groupname, const char* prefix)
+std::string vtkSMSessionProxyManager::GetUniqueProxyName(
+  const char* groupname, const char* prefix, bool alwaysAppend)
 {
   if (!groupname || !prefix)
   {
@@ -589,9 +590,13 @@ std::string vtkSMSessionProxyManager::GetUniqueProxyName(const char* groupname, 
     this->Internals->RegisteredProxyMap.find(groupname);
   if (it == this->Internals->RegisteredProxyMap.end())
   {
-    int suffix = 1;
     std::ostringstream name_stream;
-    name_stream << prefix << suffix;
+    name_stream << prefix;
+    if (alwaysAppend)
+    {
+      int suffix = 1;
+      name_stream << suffix;
+    }
     return name_stream.str();
   }
 
@@ -601,6 +606,14 @@ std::string vtkSMSessionProxyManager::GetUniqueProxyName(const char* groupname, 
        it2++)
   {
     existingNames.insert(it2->first);
+  }
+
+  if (!alwaysAppend)
+  {
+    if (existingNames.find(prefix) == existingNames.end())
+    {
+      return prefix;
+    }
   }
 
   for (int suffix = 1; suffix < VTK_INT_MAX; ++suffix)
@@ -659,11 +672,14 @@ const char* vtkSMSessionProxyManager::GetProxyName(const char* groupname, unsign
     vtkSMProxyManagerProxyMapType::iterator it2 = it->second.begin();
     for (; it2 != it->second.end(); it2++)
     {
-      if (counter == idx)
+      if (idx < counter + it2->second.size())
       {
+        // idx is between counter and the size of the next vector of
+        // proxies, so return the current proxy map key
         return it2->first.c_str();
       }
-      counter++;
+
+      counter += static_cast<unsigned int>(it2->second.size());
     }
   }
 

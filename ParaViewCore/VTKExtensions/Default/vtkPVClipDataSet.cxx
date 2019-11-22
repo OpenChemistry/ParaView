@@ -22,16 +22,23 @@
 #include "vtkDemandDrivenPipeline.h"
 #include "vtkHierarchicalBoxDataIterator.h"
 #include "vtkHierarchicalBoxDataSet.h"
+#include "vtkHyperTreeGrid.h"
+#include "vtkHyperTreeGridAxisClip.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
+#include "vtkMathUtilities.h"
 #include "vtkMultiBlockDataSet.h"
 #include "vtkNew.h"
 #include "vtkObjectFactory.h"
 #include "vtkPVBox.h"
+#include "vtkPVCylinder.h"
+#include "vtkPVPlane.h"
+#include "vtkPVThreshold.h"
 #include "vtkPlane.h"
+#include "vtkQuadric.h"
 #include "vtkSmartPointer.h"
+#include "vtkSphere.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
-#include "vtkThreshold.h"
 #include "vtkTransform.h"
 #include "vtkUnstructuredGrid.h"
 
@@ -155,7 +162,7 @@ int vtkPVClipDataSet::RequestData(
       return this->ClipUsingSuperclass(request, inputVector, outputVector);
     }
   }
-  else // For vtkDataSet.
+  else if (vtkDataSet::SafeDownCast(inDataObj)) // For vtkDataSet.
   {
     if (this->GetClipFunction())
     {
@@ -185,7 +192,104 @@ int vtkPVClipDataSet::RequestData(
       vtkErrorMacro("Unhandled association: " << association);
     }
   } // End for vtkDataSet.
-
+  else if (vtkHyperTreeGrid::SafeDownCast(inDataObj))
+  {
+    //  Using Scalar
+    if (!this->ClipFunction)
+    {
+      return this->ClipUsingThreshold(request, inputVector, outputVector);
+    }
+    vtkPVPlane* plane = vtkPVPlane::SafeDownCast(this->ClipFunction);
+    vtkPVBox* box = vtkPVBox::SafeDownCast(this->ClipFunction);
+    vtkSphere* sphere = vtkSphere::SafeDownCast(this->ClipFunction);
+    vtkQuadric* quadric = vtkQuadric::SafeDownCast(this->ClipFunction);
+    vtkPVCylinder* cylinder = vtkPVCylinder::SafeDownCast(this->ClipFunction);
+    vtkNew<vtkHyperTreeGridAxisClip> htgClip;
+    if (plane)
+    {
+      double* normal = plane->GetNormal();
+      if (!vtkMathUtilities::NearlyEqual(normal[0], 1.0) &&
+        !vtkMathUtilities::NearlyEqual(normal[1], 1.0) &&
+        !vtkMathUtilities::NearlyEqual(normal[2], 1.0))
+      {
+        htgClip->SetClipTypeToQuadric();
+        htgClip->SetQuadricCoefficients(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, normal[0], normal[1],
+          normal[2], plane->EvaluateFunction(0.0, 0.0, 0.0));
+      }
+      else
+      {
+        htgClip->SetClipTypeToPlane();
+        htgClip->SetPlanePosition(-plane->EvaluateFunction(0.0, 0.0, 0.0));
+        int planeNormalAxis = 0;
+        if (normal[1] > normal[0])
+        {
+          planeNormalAxis = 1;
+        }
+        if (normal[2] > normal[0])
+        {
+          planeNormalAxis = 2;
+        }
+        htgClip->SetPlanePosition(-plane->EvaluateFunction(0.0, 0.0, 0.0));
+        htgClip->SetPlaneNormalAxis(planeNormalAxis);
+      }
+    }
+    else if (box)
+    {
+      htgClip->SetClipTypeToBox();
+      double position[3], scale[3];
+      box->GetPosition(position);
+      box->GetScale(scale);
+      htgClip->SetBounds(box->GetBounds());
+      htgClip->SetBounds(position[0], position[0] + scale[0], position[1], position[1] + scale[1],
+        position[2], position[2] + scale[2]);
+    }
+    else if (sphere)
+    {
+      htgClip->SetClipTypeToQuadric();
+      double center[3], radius = sphere->GetRadius();
+      sphere->GetCenter(center);
+      htgClip->SetQuadricCoefficients(1.0, 1.0, 1.0, 0.0, 0.0, 0.0, -2.0 * center[0],
+        -2.0 * center[1], -2.0 * center[2],
+        -radius * radius + center[0] * center[0] + center[1] * center[1] + center[2] * center[2]);
+    }
+    else if (cylinder)
+    {
+      htgClip->SetClipTypeToQuadric();
+      double* axis = cylinder->GetOrientedAxis();
+      double radius = cylinder->GetRadius();
+      double* center = cylinder->GetCenter();
+      htgClip->SetQuadricCoefficients(axis[1] * axis[1] + axis[2] * axis[2],
+        axis[0] * axis[0] + axis[2] * axis[2], axis[0] * axis[0] + axis[1] * axis[1],
+        -2.0 * axis[0] * axis[1], -2.0 * axis[1] * axis[2], -2.0 * axis[0] * axis[2],
+        -2.0 * center[0] * (axis[1] * axis[1] + axis[2] * axis[2]) +
+          2 * center[1] * axis[0] * axis[1] + 2 * center[2] * axis[0] * axis[2],
+        -2.0 * center[1] * (axis[0] * axis[0] + axis[2] * axis[2]) +
+          2 * center[0] * axis[0] * axis[1] + 2 * center[2] * axis[1] * axis[2],
+        -2.0 * center[2] * (axis[0] * axis[0] + axis[1] * axis[1]) +
+          2 * center[1] * axis[2] * axis[1] + 2 * center[0] * axis[0] * axis[2],
+        -radius * radius + center[0] * center[0] * (axis[1] * axis[1] + axis[2] * axis[2]) +
+          center[1] * center[1] * (axis[0] * axis[0] + axis[2] * axis[2]) +
+          center[2] * center[2] * (axis[0] * axis[0] + axis[1] * axis[1]) -
+          2.0 *
+            (axis[0] * axis[1] * center[0] * center[1] + axis[1] * axis[2] * center[1] * center[2] +
+              axis[0] * axis[2] * center[0] * center[2]));
+    }
+    else if (quadric)
+    {
+      htgClip->SetClipTypeToQuadric();
+      htgClip->SetQuadric(quadric);
+    }
+    else
+    {
+      vtkErrorMacro(<< "Clipping function not supported");
+      return 0;
+    }
+    htgClip->SetInsideOut(this->GetInsideOut() != 0);
+    htgClip->SetInputData(0, vtkHyperTreeGrid::SafeDownCast(inDataObj));
+    htgClip->Update();
+    outDataObj->ShallowCopy(htgClip->GetOutput(0));
+    return 1;
+  }
   return 0;
 }
 
@@ -196,7 +300,7 @@ int vtkPVClipDataSet::ClipUsingThreshold(
   vtkDataObject* inputDO = vtkDataObject::GetData(inputVector[0], 0);
   vtkDataObject* outputDO = vtkDataObject::GetData(outputVector, 0);
 
-  vtkSmartPointer<vtkThreshold> threshold(vtkSmartPointer<vtkThreshold>::New());
+  vtkSmartPointer<vtkPVThreshold> threshold(vtkSmartPointer<vtkPVThreshold>::New());
 
   vtkCompositeDataPipeline* executive = vtkCompositeDataPipeline::New();
   threshold->SetExecutive(executive);
@@ -204,7 +308,7 @@ int vtkPVClipDataSet::ClipUsingThreshold(
 
   vtkDataObject* inputClone = inputDO->NewInstance();
   inputClone->ShallowCopy(inputDO);
-  threshold->SetInputData(0, inputClone);
+  threshold->SetInputData(inputClone);
   inputClone->FastDelete();
   threshold->SetInputArrayToProcess(0, this->GetInputArrayInformation(0));
 

@@ -80,11 +80,24 @@ foreach (paraview_cmake_module_file IN LISTS paraview_cmake_module_files)
     "${paraview_cmake_module_file}")
 endforeach ()
 
+include(ParaViewInstallCMakePackageHelpers)
+if (NOT PARAVIEW_RELOCATABLE_INSTALL)
+  list(APPEND paraview_cmake_files_to_install
+    "${paraview_cmake_build_dir}/paraview-find-package-helpers.cmake")
+endif ()
+
 foreach (paraview_cmake_file IN LISTS paraview_cmake_files_to_install)
-  get_filename_component(subdir "${paraview_cmake_file}" DIRECTORY)
+  if (IS_ABSOLUTE "${paraview_cmake_file}")
+    file(RELATIVE_PATH paraview_cmake_subdir_root "${paraview_cmake_build_dir}" "${paraview_cmake_file}")
+    get_filename_component(paraview_cmake_subdir "${paraview_cmake_subdir_root}" DIRECTORY)
+    set(paraview_cmake_original_file "${paraview_cmake_file}")
+  else ()
+    get_filename_component(paraview_cmake_subdir "${paraview_cmake_file}" DIRECTORY)
+    set(paraview_cmake_original_file "${paraview_cmake_dir}/${paraview_cmake_file}")
+  endif ()
   install(
-    FILES       "${paraview_cmake_dir}/${paraview_cmake_file}"
-    DESTINATION "${paraview_cmake_destination}/${subdir}"
+    FILES       "${paraview_cmake_original_file}"
+    DESTINATION "${paraview_cmake_destination}/${paraview_cmake_subdir}"
     COMPONENT   "development")
 endforeach ()
 
@@ -98,3 +111,38 @@ vtk_module_export_find_packages(
   CMAKE_DESTINATION "${paraview_cmake_destination}"
   FILE_NAME         "ParaView-vtk-module-find-packages.cmake"
   MODULES           ${paraview_modules})
+
+if (PARAVIEW_BUILD_QT_GUI)
+  get_property(paraview_client_xml_files GLOBAL
+    PROPERTY paraview_client_xml_files)
+  get_property(paraview_client_xml_destination GLOBAL
+    PROPERTY paraview_client_xml_destination)
+
+  set(cmake_xml_file_name "ParaView-client-xml.cmake")
+  set(cmake_xml_build_file "${paraview_cmake_build_dir}/${cmake_xml_file_name}")
+  set(cmake_xml_install_file "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${cmake_xml_file_name}.install")
+
+  file(WRITE "${cmake_xml_build_file}" "")
+  file(WRITE "${cmake_xml_install_file}" "")
+  _vtk_module_write_import_prefix("${cmake_xml_install_file}" "${paraview_client_xml_destination}")
+  file(APPEND "${cmake_xml_build_file}"
+    "set(\"\${CMAKE_FIND_PACKAGE_NAME}_CLIENT_XML_FILES\")\n")
+  file(APPEND "${cmake_xml_install_file}"
+    "set(\"\${CMAKE_FIND_PACKAGE_NAME}_CLIENT_XML_FILES\")\n")
+
+  foreach (paraview_client_xml_file IN LISTS paraview_client_xml_files)
+    get_filename_component(basename "${paraview_client_xml_file}" NAME)
+    file(APPEND "${cmake_xml_build_file}"
+      "list(APPEND \"\${CMAKE_FIND_PACKAGE_NAME}_CLIENT_XML_FILES\"
+  \"${paraview_client_xml_file}\")\n")
+    file(APPEND "${cmake_xml_install_file}"
+      "list(APPEND \"\${CMAKE_FIND_PACKAGE_NAME}_CLIENT_XML_FILES\"
+  \"\${_vtk_module_import_prefix}/${paraview_client_xml_destination}/${basename}\")\n")
+  endforeach ()
+
+  install(
+    FILES       "${cmake_xml_install_file}"
+    DESTINATION "${paraview_cmake_destination}"
+    RENAME      "${cmake_xml_file_name}"
+    COMPONENT   "development")
+endif ()

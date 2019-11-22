@@ -52,7 +52,7 @@
  *                                    and vtkSI + DoubleVectorProperty class by
  *                                    default.
  *         name="Center"           => Name of the property:
- *                                    Example usage: vtkPropertyHelper(proxy, "Center").Set(0,1,2)
+ *                                    Example usage: vtkSMPropertyHelper(proxy, "Center").Set(0,1,2)
  *         command="SetCenter"     => Real method name that will be called on
  *                                    vtkObject when the property is updated.
  *         number_of_elements="3"  => Size of the vector.
@@ -271,8 +271,11 @@ public:
   /**
    * Given a group, returns a name not already used for proxies registered in
    * the given group. The prefix is used to come up with a new name.
+   * if alwaysAppend is true, then a suffix will always be appended, if not,
+   * the prefix may be used directly if possible.
    */
-  std::string GetUniqueProxyName(const char* groupname, const char* prefix);
+  std::string GetUniqueProxyName(
+    const char* groupname, const char* prefix, bool alwaysAppend = true);
 
   /**
    * If the proxy is in the given group, return its name, otherwise

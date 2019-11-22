@@ -42,6 +42,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QMenu>
 #include <QToolBar>
 
+#include <algorithm>
 #include <cassert>
 
 //-----------------------------------------------------------------------------
@@ -62,14 +63,21 @@ pqViewMenuManager::pqViewMenuManager(QMainWindow* mainWindow, QMenu* menu)
 
 namespace
 {
+QString trimShortcut(QString s)
+{
+  return s.remove('&');
+}
+
 bool toolbarLessThan(const QToolBar* tb1, const QToolBar* tb2)
 {
-  return tb1->toggleViewAction()->text() < tb2->toggleViewAction()->text();
+  return trimShortcut(tb1->toggleViewAction()->text()) <
+    trimShortcut(tb2->toggleViewAction()->text());
 }
 
 bool dockWidgetLessThan(const QDockWidget* tb1, const QDockWidget* tb2)
 {
-  return tb1->toggleViewAction()->text() < tb2->toggleViewAction()->text();
+  return trimShortcut(tb1->toggleViewAction()->text()) <
+    trimShortcut(tb2->toggleViewAction()->text());
 }
 }
 
@@ -124,7 +132,7 @@ void pqViewMenuManager::updateMenu()
 
   this->ToolbarsMenu->clear();
   QList<QToolBar*> all_toolbars = this->Window->findChildren<QToolBar*>();
-  qSort(all_toolbars.begin(), all_toolbars.end(), toolbarLessThan);
+  std::sort(all_toolbars.begin(), all_toolbars.end(), toolbarLessThan);
 
   foreach (QToolBar* toolbar, all_toolbars)
   {
@@ -148,7 +156,7 @@ void pqViewMenuManager::updateMenu()
   }
 
   QList<QDockWidget*> all_docks = this->Window->findChildren<QDockWidget*>();
-  qSort(all_docks.begin(), all_docks.end(), dockWidgetLessThan);
+  std::sort(all_docks.begin(), all_docks.end(), dockWidgetLessThan);
   foreach (QDockWidget* dock_widget, all_docks)
   {
     this->Menu->insertAction(

@@ -571,12 +571,6 @@
         </ArraySelectionDomain>
         <Documentation>Select the cell arrays to read load.</Documentation>
       </StringVectorProperty>
-      <Hints>
-        <ReaderFactory
-          filename_patterns="plt*"
-          file_description="AMReX plotfiles (grids)"
-          is_directory="1" />
-      </Hints>
     </Proxy>
     <!-- END AMReX AMR Core Reader definition -->
     <Proxy class="vtkAVSucdReader"
@@ -2653,6 +2647,22 @@
         containing part and material descriptions and a mapping to element
         blocks.</Documentation>
       </StringVectorProperty>
+
+      <IntVectorProperty name="UseLegacyBlockNamesWithElementTypes"
+        command="SetUseLegacyBlockNames"
+        number_of_elements="1"
+        default_values="0"
+        panel_visibility="advanced">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          In previous versions, the reader added the type of elements in the block to
+          the block name when no name was provided for the block. This has issues
+          with consistency when naming blocks across ranks for partitioned files.
+          Hence we no longer do that. For legacy pipelines, one can enable
+          the old behavior by setting this flag to true.
+        </Documentation>
+      </IntVectorProperty>
+
       <!-- End ExodusIIReaderCore -->
     </SourceProxy>
     <Proxy class="vtkTecplotReader"
@@ -3604,7 +3614,7 @@
     <!--  AMReX Reader -->
     <SourceProxy class="vtkFileSeriesReader"
                  file_name_method="SetFileName"
-                 label="AMReX Grid Reader"
+                 label="AMReX/BoxLib Grid Reader"
                  name="AMReXGridReader"
                  si_class="vtkSIMetaReaderProxy">
       <Documentation
@@ -3651,7 +3661,7 @@
       <Hints>
         <ReaderFactory
           filename_patterns="plt*"
-          file_description="AMReX plotfiles (grids)"
+          file_description="AMReX/BoxLib plotfiles (grids)"
           is_directory="1"
         />
       </Hints>
@@ -6017,6 +6027,75 @@
       </Hints>
       <!-- End TIFFSeriesReader -->
     </SourceProxy>
+
+    <SourceProxy class="vtkOMETIFFReader"
+                 label="OME TIFF Reader"
+                 name="OMETIFFReader">
+      <Documentation long_help="Reads an OME-TIFF file."
+        short_help="Reads an OME-TIFF file.">
+        Supports reading OME-TIFF files.
+      </Documentation>
+      <StringVectorProperty animateable="0"
+                            command="SetFileName"
+                            name="FileName"
+                            number_of_elements="1"
+                            panel_visibility="never">
+        <FileListDomain name="files" />
+        <Documentation>This property specifies the file name for the OME-TIFF reader.</Documentation>
+      </StringVectorProperty>
+      <IntVectorProperty name="UseCustomDataSpacing"
+                         command="SetSpacingSpecifiedFlag"
+                         number_of_elements="1"
+                         default_values="0">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          To manually specify a custom spacing using **CustomDataSpacing**, set this property to 1 (checked).
+        </Documentation>
+      </IntVectorProperty>
+      <DoubleVectorProperty name="CustomDataSpacing"
+                            command="SetDataSpacing"
+                            information_property="CustomDataSpacingInfo"
+                            number_of_elements="3"
+                            default_values="1 1 1">
+        <DoubleRangeDomain name="range" min="0 0 0" />
+        <Documentation>
+          Set the spacing to use for the image output by this reader. This is used only when
+          **UseCustomDataSpacing** is set to 1.
+        </Documentation>
+        <Hints>
+          <PropertyWidgetDecorator type="EnableWidgetDecorator">
+            <Property name="UseCustomDataSpacing" function="boolean" />
+          </PropertyWidgetDecorator>
+        </Hints>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty name="CustomDataSpacingInfo"
+                            command="GetDataSpacing"
+                            information_only="1">
+        <SimpleDoubleInformationHelper />
+      </DoubleVectorProperty>
+      <IntVectorProperty name="IgnoreColorMap"
+                         command="SetIgnoreColorMap"
+                         number_of_elements="1"
+                         default_values="1">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          When checked, data values in the TIFF file will not be mapped to colors using the
+          color map specified in the TIFF, if any. This is useful for files where the
+          color map may be incorrectly specified.
+        </Documentation>
+      </IntVectorProperty>
+      <DoubleVectorProperty information_only="1"
+                            name="TimestepValues"
+                            repeatable="1">
+        <TimeStepsInformationHelper />
+        <Documentation>Available timestep values.</Documentation>
+      </DoubleVectorProperty>
+      <Hints>
+        <ReaderFactory extensions="ome.tif ome.tiff"
+                       file_description="OME TIFF Files" />
+      </Hints>
+      <!-- End OMETIFFReader -->
+    </SourceProxy>
     <SourceProxy class="vtkRawImageFileSeriesReader"
                  file_name_method="SetFileName"
                  label="Image Reader"
@@ -6227,6 +6306,7 @@
             <Property name="XMLFileNameInfo" />
           </PropertyGroup>
           <Property name="GenerateFileIdArray" />
+          <Property name="UseLegacyBlockNamesWithElementTypes" />
         </ExposedProperties>
       </SubProxy>
       <StringVectorProperty command="GetCurrentFileName"
@@ -6365,6 +6445,7 @@
             <Property name="XMLFileNameInfo" />
           </PropertyGroup>
           <Property name="GenerateFileIdArray" />
+          <Property name="UseLegacyBlockNamesWithElementTypes" />
         </ExposedProperties>
       </SubProxy>
       <StringVectorProperty command="GetCurrentFileName"
@@ -8734,7 +8815,7 @@ series.
     <SourceProxy name="AMReXParticlesReader"
       class="vtkFileSeriesReader"
       file_name_method="SetPlotFileName"
-      label="AMReX Particles Reader"
+      label="AMReX/BoxLib Particles Reader"
       si_class="vtkSIMetaReaderProxy">
       <Documentation short_help="Reader for AMReX particle data">
         Reads particle data from AMReX plotfiles.
@@ -8770,7 +8851,7 @@ series.
       <Hints>
         <ReaderFactory
           filename_patterns="plt*"
-          file_description="AMReX plotfiles (particles)"
+          file_description="AMReX/BoxLib plotfiles (particles)"
           is_directory="1" />
       </Hints>
       <!-- end AMReXParticlesReader -->

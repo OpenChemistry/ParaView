@@ -24,6 +24,7 @@
 #include "vtkPVVTKExtensionsDefaultModule.h" //needed for exports
 #include "vtkWriter.h"
 
+class vtkMultiProcessController;
 class vtkStdString;
 class vtkTable;
 
@@ -33,6 +34,15 @@ public:
   static vtkCSVWriter* New();
   vtkTypeMacro(vtkCSVWriter, vtkWriter);
   void PrintSelf(ostream& os, vtkIndent indent) override;
+
+  //@{
+  /**
+   * Get/Set the controller to use. By default,
+   * `vtkMultiProcessController::GetGlobalController` will be used.
+   */
+  void SetController(vtkMultiProcessController*);
+  vtkGetObjectMacro(Controller, vtkMultiProcessController);
+  //@}
 
   //@{
   /**
@@ -111,6 +121,16 @@ public:
 
   //@{
   /**
+   * When set to true (default is false), if the input data set has time, then the
+   * time information will be saved under the column named "Time".
+   */
+  vtkSetMacro(AddTime, bool);
+  vtkGetMacro(AddTime, bool);
+  vtkBooleanMacro(AddTime, bool);
+  //@}
+
+  //@{
+  /**
    * Internal method: decorates the "string" with the "StringDelimiter" if
    * UseStringDelimiter is true.
    */
@@ -121,14 +141,7 @@ protected:
   vtkCSVWriter();
   ~vtkCSVWriter() override;
 
-  /**
-   * Open the file. If append is true then the file will be appended. Otherwise the file
-   * will be overwritten.
-   */
-  bool OpenFile(bool append);
-
   void WriteData() override;
-  virtual void WriteTable(vtkTable* table);
 
   // see algorithm for more info.
   // This writer takes in vtkTable, vtkDataSet or vtkCompositeDataSet.
@@ -146,12 +159,15 @@ protected:
   bool UseScientificNotation;
   int FieldAssociation;
   bool AddMetaData;
+  bool AddTime;
 
-  ofstream* Stream;
+  vtkMultiProcessController* Controller;
 
 private:
   vtkCSVWriter(const vtkCSVWriter&) = delete;
   void operator=(const vtkCSVWriter&) = delete;
+
+  class CSVFile;
 };
 
 #endif

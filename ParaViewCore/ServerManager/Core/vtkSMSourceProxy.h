@@ -150,7 +150,7 @@ public:
 
   /**
    * Set/Get the selection input. This is used to set the selection input to the
-   * extarction proxy for the output port identified by \c portIndex.
+   * extraction proxy for the output port identified by \c portIndex.
    * If no extraction proxies are present, this method has no effect.
    */
   void SetSelectionInput(unsigned int portIndex, vtkSMSourceProxy* input, unsigned int outputPort);
@@ -255,11 +255,6 @@ protected:
    */
   int ReadXMLAttributes(vtkSMSessionProxyManager* pm, vtkPVXMLElement* element) override;
 
-  /**
-   * Internal method which creates the output port proxies using the proxy specified.
-   */
-  void CreateOutputPortsInternal(vtkSMProxy* op);
-
   //@{
   /**
    * Method to set an output port at the given index. Provided for subclasses to
@@ -276,7 +271,13 @@ protected:
   /**
    * Overwritten from superclass to invoke
    */
-  void PostUpdateData() override;
+  void PostUpdateData(bool) override;
+
+  /**
+   * Overridden to pass the logname to the internal ExtractSelection proxies.
+   */
+  void SetLogNameInternal(
+    const char* name, bool propagate_to_subproxies, bool propagate_to_proxylistdomains) override;
 
   // flag used to avoid creation of extract selection proxies for this source
   // proxy.

@@ -302,6 +302,9 @@
         </Documentation>
       </IntVectorProperty>
 
+      <!--
+        Disabling for now. We need a more complex implementation if we need to truly support
+        cache limits correctly. For now, we'll disable cache-limits.
       <IntVectorProperty name="AnimationGeometryCacheLimit"
         command="SetAnimationGeometryCacheLimit"
         number_of_elements="1"
@@ -319,6 +322,7 @@
           </PropertyWidgetDecorator>
         </Hints>
       </IntVectorProperty>
+      -->
 
       <IntVectorProperty name="AnimationTimeNotation"
         number_of_elements="1"
@@ -509,7 +513,9 @@
 
       <PropertyGroup label="Animation">
         <Property name="CacheGeometryForAnimation" />
+        <!--
         <Property name="AnimationGeometryCacheLimit" />
+        -->
         <Property name="AnimationTimePrecision" />
         <Property name="AnimationTimeNotation" />
         <Property name="ShowAnimationShortcuts" />
@@ -560,7 +566,7 @@
       <DoubleVectorProperty name="PolygonOffsetParameters"
         command="SetPolygonOffsetParameters"
         number_of_elements="2"
-        default_values="0.8 6.0"
+        default_values="0.0 0.0"
         panel_visibility="advanced">
         <DoubleRangeDomain name="range" />
         <Documentation>
@@ -580,7 +586,7 @@
       <DoubleVectorProperty name="LineOffsetParameters"
         command="SetLineOffsetParameters"
         number_of_elements="2"
-        default_values="0.0 0.0"
+        default_values="0.0 -4"
         panel_visibility="advanced">
         <DoubleRangeDomain name="range" />
         <Documentation>
@@ -595,7 +601,7 @@
       <DoubleVectorProperty name="PointOffsetParameter"
         command="SetPointOffsetParameter"
         number_of_elements="1"
-        default_values="-6.0"
+        default_values="-8"
         panel_visibility="advanced">
         <DoubleRangeDomain name="range" />
         <Documentation>

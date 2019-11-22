@@ -46,7 +46,7 @@ A simple example::
 #
 #==============================================================================
 from __future__ import print_function
-import paraview, re, os, os.path, types, sys, atexit
+import paraview, re, os, os.path, types, sys
 
 # prefer `vtk` from `paraview` since it doesn't import all
 # vtk modules.
@@ -351,11 +351,17 @@ class Proxy(object):
         """Returns a scalar for properties with 1 elements, the property
         itself for vectors."""
         p = self.GetProperty(name)
-        if isinstance(p, VectorProperty):
-            if paraview.compatibility.GetVersion() <= 4.1 and name == "ColorArrayName":
-              # Return ColorArrayName as just the array name for backwards compatibility.
-              return p[1]
-            elif p.GetNumberOfElements() == 1 and not p.GetRepeatable():
+        if isinstance(p, VectorProperty) and paraview.compatibility.GetVersion() <= 4.1 and name == "ColorArrayName":
+            # Return ColorArrayName as just the array name for backwards compatibility.
+            return p[1]
+        if isinstance(p, EnumerationProperty) or \
+          isinstance(p, ArraySelectionProperty) or \
+          isinstance(p, StringListProperty) or \
+          isinstance(p, ArrayListProperty):
+            # with domain based property, return the property to provide access to Available method
+            return p
+        elif isinstance(p, VectorProperty):
+            if p.GetNumberOfElements() == 1 and not p.GetRepeatable():
                 if p.SMProperty.IsA("vtkSMStringVectorProperty") or not p.GetArgumentIsArray():
                     return p[0]
         elif isinstance(p, InputProperty):
@@ -659,6 +665,16 @@ class Property(object):
         self.SMProperty = smproperty
         self.Proxy = proxy
 
+    def __eq__(self, other):
+        "Returns true if the properties or properties values are the same."
+        return ((self is None and other is None) or
+                (self is not None and other is not None and self.__repr__() == other.__repr__()))
+
+    if sys.version_info < (3,):
+        def __ne__(self, other):
+            "Returns true if the properties or properties values are not the same."
+            return not self.__eq__(other)
+
     def __repr__(self):
         """Returns a string representation containing property name
         and value"""
@@ -795,6 +811,8 @@ class VectorProperty(Property):
     def SetData(self, values):
         """Allows setting of all values at once. Requires a single value or
         a iterable object."""
+        if self.SMProperty.GetInformationOnly() != 0:
+          raise RuntimeError("Cannot set an InformationOnly property!")
         # Python3: str now has attr "__iter__", test separately
         if (not hasattr(values, "__iter__")) or (type(values) == type("")):
             values = (values,)
@@ -868,7 +886,8 @@ class DoubleMapProperty(Property):
 
     def SetData(self, elements):
         """Sets all the elements at once."""
-
+        if self.SMProperty.GetInformationOnly() != 0:
+          raise RuntimeError("Cannot set an InformationOnly property!")
         # first clear existing data
         self.Clear()
 
@@ -977,6 +996,8 @@ class ArraySelectionProperty(VectorProperty):
     def SetData(self, values):
         """Allows setting of all values at once. Requires a single value,
         a tuple or list."""
+        if self.SMProperty.GetInformationOnly() != 0:
+          raise RuntimeError("Cannot set an InformationOnly property!")
         if not values:
             # if values is None or empty list, we are resetting the selection.
             self.SMProperty.SetElement(4, "")
@@ -1100,6 +1121,8 @@ class ArrayListProperty(VectorProperty):
     def SetData(self, values):
         """Allows setting of all values at once. Requires a single value,
         a tuple or list."""
+        if self.SMProperty.GetInformationOnly() != 0:
+          raise RuntimeError("Cannot set an InformationOnly property!")
         # Clean up first
         iup = self.SMProperty.GetImmediateUpdate()
         self.SMProperty.SetImmediateUpdate(False)
@@ -1297,6 +1320,8 @@ class ProxyProperty(Property):
     def SetData(self, values):
         """Allows setting of all values at once. Requires a single value,
         a tuple or list."""
+        if self.SMProperty.GetInformationOnly() != 0:
+          raise RuntimeError("Cannot set an InformationOnly property!")
         if isinstance(values, str):
             position = -1
             try:
@@ -2245,25 +2270,64 @@ def CreateRepresentation(aProxy, view, **extraArgs):
     view.Representations.append(proxy)
     return proxy
 
-class _ModuleLoader(object):
-    def find_module(self, fullname, path=None):
-        if vtkPVPythonModule.HasModule(fullname):
-            return self
-        else:
+if sys.version_info < (3, 3):
+    class ParaViewMetaPathFinder(object):
+        def find_module(self, fullname, path=None):
+            if vtkPVPythonModule.HasModule(fullname):
+                return self
             return None
-    def load_module(self, fullname):
-        import imp
-        moduleInfo = vtkPVPythonModule.GetModule(fullname)
-        if not moduleInfo:
-            raise ImportError
-        module = sys.modules.setdefault(fullname, imp.new_module(fullname))
-        module.__file__ = "<%s>" % moduleInfo.GetFullName()
-        module.__loader__ = self
-        if moduleInfo.GetIsPackage:
-            module.__path__ = moduleInfo.GetFullName()
-        code = compile(moduleInfo.GetSource(), module.__file__, 'exec')
-        exec (code in module.__dict__)
-        return module
+
+        def load_module(self, fullname):
+            try:
+                return sys.modules[fullname]
+            except KeyError:
+                pass
+
+            info = vtkPVPythonModule.GetModule(fullname)
+            if not info:
+                raise ImportError
+
+            import imp
+            module = imp.new_module(fullname)
+            module.__file__ = "<%s>" % fullname
+            module.__loader__ = self
+            if info.GetIsPackage():
+                module.__path__ = []
+                module.__package__ = fullname
+            else:
+                module.__package__ = fullname.rpartition('.')[0]
+
+            sys.modules[fullname] = module
+            try:
+                exec(info.GetSource(), module.__dict__)
+            except:
+                del sys.modules[fullname]
+                raise
+            return module
+else:
+    import importlib
+    class ParaViewMetaPathFinder(importlib.abc.MetaPathFinder):
+        def __init__(self):
+            self._loader = ParaViewLoader()
+
+        def find_spec(self, fullname, path, target=None):
+            info = vtkPVPythonModule.GetModule(fullname)
+            if info:
+                package = None
+                if info.GetIsPackage():
+                    package = fullname
+                return importlib.machinery.ModuleSpec(fullname, self._loader, is_package=package)
+            return None
+
+    class ParaViewLoader(importlib.abc.InspectLoader):
+        def _info(self, fullname):
+            return vtkPVPythonModule.GetModule(fullname)
+
+        def is_package(self, fullname):
+            return self._info(fullname).GetIsPackage()
+
+        def get_source(self, fullname):
+            return self._info(fullname).GetSource()
 
 def LoadXML(xmlstring):
     """DEPRECATED. Given a server manager XML as a string, parse and process it."""
@@ -2463,6 +2527,10 @@ def _getPyProxy(smproxy, outputPort=0):
     first checks if there is already such an object by looking in the
     _pyproxies group and returns it if found. Otherwise, it creates a
     new one. Proxies register themselves in _pyproxies upon creation."""
+    if isinstance(smproxy, Proxy):
+        # if already a pyproxy, do nothing.
+        return smproxy
+
     if not smproxy:
         return None
     try:
@@ -2650,11 +2718,13 @@ class PVModule(object):
 def _make_name_valid(name):
     return paraview.make_name_valid(name)
 
-def _createClass(groupName, proxyName, apxm=None):
+def _createClass(groupName, proxyName, apxm=None, prototype=None):
     """Defines a new class type for the proxy."""
-    global ActiveConnection
-    pxm = ProxyManager() if not apxm else apxm
-    proto = pxm.GetPrototypeProxy(groupName, proxyName)
+    if prototype is None:
+        pxm = ProxyManager() if not apxm else apxm
+        proto = pxm.GetPrototypeProxy(groupName, proxyName)
+    else:
+        proto = prototype
     if not proto:
        paraview.print_error("Error while loading %s %s"%(groupName, proxyName))
        return None
@@ -2672,8 +2742,8 @@ def _createClass(groupName, proxyName, apxm=None):
     for prop in iter:
         propName = iter.GetKey()
         if paraview.compatibility.GetVersion() >= 3.5:
-            if (prop.GetInformationOnly() and propName != "TimestepValues" ) \
-              or prop.GetIsInternal():
+            if (prop.GetInformationOnly() and propName != "TimestepValues" \
+              and prop.GetPanelVisibility() == "never") or prop.GetIsInternal():
                 continue
         names = [propName]
         if paraview.compatibility.GetVersion() >= 3.5:
@@ -3179,6 +3249,10 @@ if not vtkProcessModule.GetProcessModule():
       vtkInitializationHelper.Initialize(sys.executable,
           vtkProcessModule.PROCESS_CLIENT, pvoptions)
 
+    # since we initialized paraview, lets ensure that we finalize it too
+    import atexit
+    atexit.register(Finalize)
+
 # Initialize progress printing. Can be turned off by calling
 # ToggleProgressPrinting() again.
 progressObserverTag = None
@@ -3194,8 +3268,8 @@ _pyproxies = {}
 # _createModules()
 
 # Set up our custom importer (if possible)
-loader = _ModuleLoader()
-sys.meta_path.append(loader)
+finder = ParaViewMetaPathFinder()
+sys.meta_path.append(finder)
 
 def __exposeActiveModules__():
     """Update servermanager submodules to point to the current

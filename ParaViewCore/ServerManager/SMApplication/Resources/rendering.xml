@@ -32,6 +32,34 @@
                             information_property="CameraFocalPointInfo"
                             name="CameraFocalPoint"
                             number_of_elements="3"></DoubleVectorProperty>
+      <DoubleVectorProperty command="GetFocalDisk"
+                            default_values="1"
+                            information_only="1"
+                            name="CameraFocalDiskInfo"
+                            number_of_elements="1">
+        <SimpleDoubleInformationHelper />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetFocalDisk"
+                            default_values="0"
+                            ignore_synchronization="1"
+                            immediate_update="1"
+                            information_property="CameraFocalDiskInfo"
+                            name="CameraFocalDisk"
+                            number_of_elements="1"></DoubleVectorProperty>
+      <DoubleVectorProperty command="GetFocalDistance"
+                            default_values="0"
+                            information_only="1"
+                            name="CameraFocalDistanceInfo"
+                            number_of_elements="1">
+        <SimpleDoubleInformationHelper />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetFocalDistance"
+                            default_values="0"
+                            ignore_synchronization="1"
+                            immediate_update="1"
+                            information_property="CameraFocalDistanceInfo"
+                            name="CameraFocalDistance"
+                            number_of_elements="1"></DoubleVectorProperty>
       <DoubleVectorProperty command="GetViewUp"
                             default_values="0 1 0"
                             information_only="1"
@@ -239,7 +267,7 @@
     <Proxy class="vtkTexture"
            name="ImageTexture"
            si_class="vtkSIImageTextureProxy"
-           processes="client|renderserver">
+           processes="client|renderserver|dataserver">
       <Documentation>This is a proxy for a vtkTexture which also includes an
       image file reader. This reader can read an image of client/data server or
       render server and then transmit it to the client/render server where it
@@ -258,6 +286,23 @@
                          name="RestrictPowerOf2ImageSmaller"
                          number_of_elements="1">
         <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty animateable="0"
+                         command="SetColorMode"
+                         default_values="2"
+                         name="ColorMode"
+                         number_of_elements="1">
+        <EnumerationDomain name="enum">
+          <Entry text="Default"
+                 value="0" />
+          <Entry text="Map Scalars"
+                 value="1" />
+          <Entry text="Direct Scalars"
+                 value="2" />
+        </EnumerationDomain>
+        <Documentation>When color mode is Default, 8-bits textures is equivalent to Direct Scalars,
+        while equivalent to Map Scalars for 16-bits textures. In the case of Map Scalars, all the
+        values are mapped to a generic color map.</Documentation>
       </IntVectorProperty>
     </Proxy>
   </ProxyGroup>
@@ -605,12 +650,12 @@
                             default_values="30.0"
                             name="ConeAngle"
                             number_of_elements="1">
-        <DoubleRangeDomain max="180.0"
+        <DoubleRangeDomain max="90.0"
                            min="0.0"
                            name="range" />
         <Documentation>
         For a **Positional** light, limit the light to a cone around its direction, creating a "spot-light" effect.
-        Set to 180 to light all directions. In degrees.
+        Set to 90 to light all directions. In degrees.
         </Documentation>
         <Hints>
           <!-- display when light type is not Ambient, and when Positional -->
@@ -646,6 +691,13 @@
           <PropertyWidgetDecorator type="OSPRayHidingDecorator" />
         </Hints>
       </DoubleVectorProperty>
+      <PropertyGroup panel_widget="InteractiveLight">
+        <Property function="Positional" name="Positional" />
+        <Property function="WorldPosition" name="LightPosition" />
+        <Property function="FocalPoint" name="FocalPoint" />
+        <Property function="ConeAngle" name="ConeAngle" />
+        <Property function="LightColor" name="DiffuseColor" />
+      </PropertyGroup>
     </LightProxy>
     <!-- End of additional_lights -->
   </ProxyGroup>

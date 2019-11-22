@@ -513,9 +513,9 @@
         <Documentation>This property specifies the subdivision scheme
         (binary or ternary) of the hyper tree grid.</Documentation>
       </IntVectorProperty>
-      <IntVectorProperty command="SetMaximumLevel"
+      <IntVectorProperty command="SetMaxDepth"
                          default_values="1"
-                         name="MaximumLevel"
+                         name="MaxDepth"
                          number_of_elements="1">
         <IntRangeDomain min="1"
                         name="range" />
@@ -1425,6 +1425,87 @@
       <!-- End DiscSource -->
     </SourceProxy>
     <!-- ==================================================================== -->
+    <SourceProxy class="vtkEllipseArcSource"
+                 label="Ellipse"
+                 name="EllipseSource">
+      <Documentation short_help="Create an elliptical arc">
+        Source that creates an elliptical arc
+        defined by a normal, a center, a major radius vector (the direction in
+        which the ellipse is longest), and a ratio defined as the minor radius over
+        the major radius. A starting angle and segment angle control the starting
+        and ending points on the ellipse perimeter, enabling creation of only a
+        section of the ellipse. The number of segments in the polyline is controlled
+        by setting the object resolution.
+      </Documentation>
+      <DoubleVectorProperty command="SetCenter"
+                            default_values="0.0 0.0 0.0"
+                            name="Center"
+                            number_of_elements="3" >
+        <DoubleRangeDomain name="range" />
+        <Documentation>The center of the ellipse.</Documentation>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetNormal"
+                            default_values="0.0 0.0 1.0"
+                            name="Normal"
+                            number_of_elements="3" >
+        <DoubleRangeDomain name="range" />
+        <Documentation>The normal of the plane containing the ellipse.</Documentation>
+      </DoubleVectorProperty>
+      <IntVectorProperty command="SetResolution"
+                         default_values="100"
+                         name="Resolution"
+                         number_of_elements="1" >
+        <IntRangeDomain max="1024" min="8" name="range" />
+        <Documentation>Number of line segments in the polyline defining the ellipse edge.</Documentation>
+      </IntVectorProperty>
+
+      <DoubleVectorProperty command="SetMajorRadiusVector"
+                            default_values="1.0 0.0 0.0"
+                            name="MajorRadiusVector"
+                            number_of_elements="3" >
+        <DoubleRangeDomain name="range" />
+        <Documentation>The origin of polar angle and the major radius size.</Documentation>
+      </DoubleVectorProperty>
+
+      <DoubleVectorProperty command="SetRatio"
+                            default_values="1.0"
+                            name="Ratio"
+                            number_of_elements="1" >
+        <DoubleRangeDomain name="range" min="0.001" max="1.0" />
+        <Documentation>Ratio of the ellipse defined as minor radius / major radius. Valid
+        values are in the range [0.001, 1.0].</Documentation>
+      </DoubleVectorProperty>
+
+      <DoubleVectorProperty command="SetStartAngle"
+                            default_values="0.0"
+                            name="StartAngle"
+                            number_of_elements="1"
+                            panel_visibility="advanced">
+        <DoubleRangeDomain name="range" min="-360.0" max="360.0" />
+        <Documentation>The angle (in degrees) where the ellipse begins relative to the
+        **Major Radius Vector**.</Documentation>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetSegmentAngle"
+                            default_values="360.0"
+                            name="SectorAngle"
+                            number_of_elements="1"
+                            panel_visibility="advanced">
+        <DoubleRangeDomain name="range" min="0" max="360.0" />
+        <Documentation>The angular sector occupied by the arc, measured in degrees from
+        the **Start Angle**.</Documentation>
+      </DoubleVectorProperty>
+      <IntVectorProperty command="SetClose"
+                         default_values="1"
+                         name="Close"
+                         number_of_elements="1"
+                         panel_visibility="advanced">
+        <BooleanDomain name="bool" />
+        <Documentation>When on, closes the elliptical arc by adding a line segment between
+        the last point and the first point.</Documentation>
+      </IntVectorProperty>
+    </SourceProxy>
+
+    <!-- ==================================================================== -->
     <SourceProxy class="vtkSuperquadricSource"
                  label="Superquadric"
                  name="SuperquadricSource">
@@ -1737,6 +1818,24 @@
       <!-- End of TextSource -->
     </SourceProxy>
     <!-- ==================================================================== -->
+    <SourceProxy class="vtkPVLogoSource" name="LogoSource" label="Logo">
+      <ProxyProperty command="SetTexture"
+                     name="Texture"
+                     panel_widget="texture_selector"
+                     null_on_empty="1" >
+        <ProxyGroupDomain name="groups">
+          <Group name="textures" />
+        </ProxyGroupDomain>
+      </ProxyProperty>
+      <Hints>
+        <Visibility replace_input="0" />
+        <OutputPort index="0"
+                    name="Output-0"
+                    type="logo" />
+      </Hints>
+      <!-- End of LogoSource -->
+    </SourceProxy>
+    <!-- ==================================================================== -->
     <SourceProxy class="vtkQuerySelectionSource"
                  name="SelectionQuerySource">
       <IntVectorProperty command="SetFieldType"
@@ -1797,6 +1896,14 @@
         everything that should be extracted. When this is true the selection
         describes everything that should NOT be extracted.</Documentation>
       </IntVectorProperty>
+      <IntVectorProperty command="SetNumberOfLayers"
+                         default_values="0"
+                         name="NumberOfLayers"
+                         number_of_elements="1">
+        <Documentation>Specify the number of layers of connected elements
+          to include in the selection.</Documentation>
+        <IntRangeDomain name="range" min="0" />
+      </IntVectorProperty>
       <!-- end of SelectionQuerySource -->
     </SourceProxy>
     <!-- ==================================================================== -->
@@ -1843,6 +1950,14 @@
         everything that should be extracted. When this is true the selection
         describes everything that should NOT be extracted.</Documentation>
       </IntVectorProperty>
+      <IntVectorProperty command="SetNumberOfLayers"
+                         default_values="0"
+                         name="NumberOfLayers"
+                         number_of_elements="1">
+        <Documentation>Specify the number of layers of connected elements
+          to include in the selection.</Documentation>
+        <IntRangeDomain name="range" min="0" />
+      </IntVectorProperty>
     </Proxy>
     <!-- ==================================================================== -->
     <SourceProxy base_proxygroup="sources"
@@ -1853,10 +1968,9 @@
       selection used to select blocks from a composite dataset.</Documentation>
       <IdTypeVectorProperty clean_command="RemoveAllBlocks"
                             command="AddBlock"
-                            default_values="0"
                             label="Blocks"
                             name="Blocks"
-                            number_of_elements="1"
+                            number_of_elements="0"
                             number_of_elements_per_command="1"
                             repeat_command="1">
         <Documentation>The list of blocks that will be added to the selection
@@ -1899,10 +2013,9 @@
       based selection.</Documentation>
       <IdTypeVectorProperty clean_command="RemoveAllGlobalIDs"
                             command="AddGlobalID"
-                            default_values="0"
                             label="Global IDs"
                             name="IDs"
-                            number_of_elements="1"
+                            number_of_elements="0"
                             number_of_elements_per_command="1"
                             repeat_command="1">
         <Documentation>The list of IDs that will be added to the selection
@@ -1955,9 +2068,8 @@
       datasets.</Documentation>
       <IdTypeVectorProperty clean_command="RemoveAllIDs"
                             command="AddID"
-                            default_values="0 0"
                             name="IDs"
-                            number_of_elements="2"
+                            number_of_elements="0"
                             number_of_elements_per_command="2"
                             repeat_command="1">
         <Documentation>The list of IDs that will be added to the selection
@@ -1976,9 +2088,8 @@
       dataset).</Documentation>
       <IdTypeVectorProperty clean_command="RemoveAllCompositeIDs"
                             command="AddCompositeID"
-                            default_values="0 0 0"
                             name="IDs"
-                            number_of_elements="3"
+                            number_of_elements="0"
                             number_of_elements_per_command="3"
                             repeat_command="1">
         <Documentation>The list of IDs that will be added to the selection
@@ -1996,9 +2107,8 @@
       based selection for HierarchicalBox datasets.</Documentation>
       <IdTypeVectorProperty clean_command="RemoveAllHierarchicalIDs"
                             command="AddHierarhicalID"
-                            default_values="0 0 0"
                             name="IDs"
-                            number_of_elements="3"
+                            number_of_elements="0"
                             number_of_elements_per_command="3"
                             repeat_command="1">
         <Documentation>The list of IDs that will be added to the selection
@@ -2042,9 +2152,8 @@
       selection.</Documentation>
       <DoubleVectorProperty clean_command="RemoveAllLocations"
                             command="AddLocation"
-                            default_values="0 0 0"
                             name="Locations"
-                            number_of_elements="3"
+                            number_of_elements="0"
                             number_of_elements_per_command="3"
                             repeat_command="1">
         <Documentation>The list of locations that will be added to the
@@ -2189,6 +2298,15 @@
         <Documentation>Property used to reference the parametric function as
         data generator.</Documentation>
       </ProxyProperty>
+      <IntVectorProperty name="Resolution"
+        command="SetUResolution"
+        number_of_elements="1"
+        default_values="50">
+        <IntRangeDomain name="range" min="2" />
+        <Documentation>
+          Set the spline resolution.
+        </Documentation>
+      </IntVectorProperty>
     </SourceProxy>
     <!-- ==================================================================== -->
     <SourceProxy class="vtkTrivialProducer"

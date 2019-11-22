@@ -33,7 +33,6 @@ set(classes
   vtkAMROutlineRepresentation
   vtkAMRStreamingPriorityQueue
   vtkAMRStreamingVolumeRepresentation
-  vtkCacheSizeKeeper
   vtkCaveSynchronizedRenderers
   vtkChartRepresentation
   vtkChartSelectionRepresentation
@@ -48,6 +47,7 @@ set(classes
   vtkGlyph3DRepresentation
   vtkImageSliceRepresentation
   vtkImageVolumeRepresentation
+  vtkLogoSourceRepresentation
   vtkMoleculeRepresentation
   vtkMPIMoveData
   vtkOutlineRepresentation
@@ -56,14 +56,12 @@ set(classes
   vtkPolarAxesRepresentation
   vtkProgressBarSourceRepresentation
   vtkPVBoxChartRepresentation
-  vtkPVCacheKeeper
-  vtkPVCacheKeeperPipeline
-  vtkPVCacheSizeInformation
   vtkPVClientServerSynchronizedRenderers
   vtkPVCompositeOrthographicSliceRepresentation
   vtkPVCompositeRepresentation
   vtkPVContextInteractorStyle
   vtkPVContextView
+  vtkPVContextViewDataDeliveryManager
   vtkPVDataDeliveryManager
   vtkPVDataRepresentation
   vtkPVDataRepresentationPipeline
@@ -87,6 +85,7 @@ set(classes
   vtkPVRayCastPickingHelper
   vtkPVRenderingCapabilitiesInformation
   vtkPVRenderView
+  vtkPVRenderViewDataDeliveryManager
   vtkPVRenderViewSettings
   vtkPVRepresentedDataInformation
   vtkPVSelectionInformation
@@ -116,6 +115,7 @@ if (TARGET VTK::ParallelMPI AND TARGET ParaView::icet)
 endif ()
 
 set(headers
+  vtkPVDataDeliveryManagerInternals.h
   vtkStreamingPriorityQueue.h)
 
 set(private_headers

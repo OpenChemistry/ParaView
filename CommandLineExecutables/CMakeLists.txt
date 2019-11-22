@@ -31,7 +31,6 @@
 
 # TODO: Restore Cray ATP support via a new module.
 # TODO: Support static plugins.
-# TODO: Link pvserver and friends to ParaView::PythonInitializer for static builds?
 
 # Set up rpaths
 set(CMAKE_BUILD_RPATH_USE_ORIGIN 1)
@@ -46,6 +45,20 @@ if (UNIX AND NOT APPLE)
     "${_paraview_client_origin_rpath}")
 endif()
 
+# A plugin configuration file is required if either the GUI
+# application is not built (the configuration file is provided
+# there if so) or we're on macOS where the configuration file is
+# then stored under the bundle for the application. Instead,
+# provide our own configuration file instead.
+if (APPLE OR NOT PARAVIEW_BUILD_QT_GUI)
+  paraview_plugin_write_conf(
+    NAME "paraview"
+    PLUGINS_TARGETS ParaView::paraview_plugins
+    BUILD_DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    INSTALL_DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    COMPONENT "runtime")
+endif ()
+
 include("${CMAKE_CURRENT_SOURCE_DIR}/ParaViewCommandLineExecutables.cmake")
 
 set(paraview_tools)
@@ -58,9 +71,6 @@ endforeach ()
 if (PARAVIEW_ENABLE_PYTHON)
   foreach (exe IN ITEMS pvbatch pvpython)
     paraview_add_executable("${exe}" "${exe}.cxx")
-    target_link_libraries("${exe}"
-      PRIVATE
-        VTK::PythonInterpreter)
     list(APPEND paraview_tools
       "${exe}")
   endforeach ()
@@ -104,7 +114,7 @@ if (PARAVIEW_BUILD_MESA_LAUNCHER)
     TARGETS     "paraview-mesa"
     DESTINATION "${CMAKE_INSTALL_BINDIR}"
     COMPONENT   runtime
-    EXPORT      ParaView)
+    EXPORT      ParaViewTools)
 endif ()
 
 configure_file(
@@ -115,3 +125,14 @@ install(
   PROGRAMS    "${CMAKE_CURRENT_SOURCE_DIR}/paraview-config"
   DESTINATION "${CMAKE_INSTALL_BINDIR}"
   COMPONENT   development)
+
+export(
+  EXPORT      ParaViewTools
+  NAMESPACE   ParaView::
+  FILE        "${CMAKE_BINARY_DIR}/${paraview_cmake_destination}/ParaViewTools-targets.cmake")
+install(
+  EXPORT      ParaViewTools
+  NAMESPACE   ParaView::
+  FILE        "ParaViewTools-targets.cmake"
+  DESTINATION "${paraview_cmake_destination}"
+  COMPONENT   "development")

@@ -37,6 +37,7 @@
 class vtkAlgorithmOutput;
 class vtkCamera;
 class vtkCuller;
+class vtkEquirectangularToCubeMapTexture;
 class vtkExtentTranslator;
 class vtkFloatArray;
 class vtkFXAAOptions;
@@ -54,7 +55,6 @@ class vtkProp;
 class vtkPVAxesWidget;
 class vtkPVCameraCollection;
 class vtkPVCenterAxesActor;
-class vtkPVDataDeliveryManager;
 class vtkPVDataRepresentation;
 class vtkPVGridAxes3DActor;
 class vtkPVHardwareSelector;
@@ -65,6 +65,7 @@ class vtkRenderer;
 class vtkRenderViewBase;
 class vtkRenderWindow;
 class vtkRenderWindowInteractor;
+class vtkSkybox;
 class vtkTextRepresentation;
 class vtkTexture;
 class vtkTimerLog;
@@ -440,12 +441,8 @@ public:
    * If trueSize is non-zero, then that's the size used in making decisions
    * about LOD/remote rendering etc and not the actual size of the dataset.
    */
-  static void SetPiece(vtkInformation* info, vtkPVDataRepresentation* repr, vtkDataObject* data,
-    unsigned long trueSize = 0, int port = 0);
   static vtkAlgorithmOutput* GetPieceProducer(
     vtkInformation* info, vtkPVDataRepresentation* repr, int port = 0);
-  static void SetPieceLOD(
-    vtkInformation* info, vtkPVDataRepresentation* repr, vtkDataObject* data, int port = 0);
   static vtkAlgorithmOutput* GetPieceProducerLOD(
     vtkInformation* info, vtkPVDataRepresentation* repr, int port = 0);
   static void MarkAsRedistributable(
@@ -456,8 +453,8 @@ public:
     vtkInformation* info, vtkPVDataRepresentation* repr, int port = 0);
   static void SetRedistributionModeToDuplicateBoundaryCells(
     vtkInformation* info, vtkPVDataRepresentation* repr, int port = 0);
-  static void SetGeometryBounds(
-    vtkInformation* info, double bounds[6], vtkMatrix4x4* transform = NULL);
+  static void SetGeometryBounds(vtkInformation* info, vtkPVDataRepresentation* repr,
+    const double bounds[6], vtkMatrix4x4* transform = nullptr, int port = 0);
   static void SetStreamable(vtkInformation* info, vtkPVDataRepresentation* repr, bool streamable);
   static void SetNextStreamedPiece(
     vtkInformation* info, vtkPVDataRepresentation* repr, vtkDataObject* piece);
@@ -554,7 +551,7 @@ public:
    * should register the prop that they use for selection rendering. They can do
    * that in the vtkPVDataRepresentation::AddToView() implementation.
    */
-  void RegisterPropForHardwareSelection(vtkPVDataRepresentation* repr, vtkProp* prop);
+  int RegisterPropForHardwareSelection(vtkPVDataRepresentation* repr, vtkProp* prop);
   void UnRegisterPropForHardwareSelection(vtkPVDataRepresentation* repr, vtkProp* prop);
   //@}
 
@@ -622,6 +619,8 @@ public:
   virtual void SetBackgroundTexture(vtkTexture* val);
   virtual void SetGradientBackground(int val);
   virtual void SetTexturedBackground(int val);
+  virtual void SetSkyboxBackground(int val);
+  virtual void SetUseEnvironmentLighting(bool val);
 
   //*****************************************************************
   // Entry point for dynamic lights
@@ -712,19 +711,14 @@ public:
   /**
    * Returns the data distribution mode to use.
    */
-  int GetDataDistributionMode(bool use_remote_rendering);
-
-  /**
-   * Provides access to the geometry storage for this view.
-   */
-  vtkPVDataDeliveryManager* GetDeliveryManager();
+  int GetDataDistributionMode(bool low_res);
 
   /**
    * Called on all processes to request data-delivery for the list of
    * representations. Note this method has to be called on all processes or it
    * may lead to deadlock.
    */
-  void Deliver(int use_lod, unsigned int size, unsigned int* representation_ids);
+  void Deliver(int use_lod, unsigned int size, unsigned int* representation_ids) override;
 
   /**
    * Returns true when ordered compositing is needed on the current group of
@@ -746,25 +740,21 @@ public:
   /**
    * Enable/disable FXAA antialiasing.
    */
-  vtkSetMacro(UseFXAA, bool) vtkGetMacro(UseFXAA, bool)
-    //@}
+  vtkSetMacro(UseFXAA, bool);
+  vtkGetMacro(UseFXAA, bool);
+  //@}
 
-    //@{
-    /**
-     * FXAA tunable parameters. See vtkFXAAOptions for details.
-     */
-    void SetFXAARelativeContrastThreshold(double val);
+  //@{
+  /**
+   * FXAA tunable parameters. See vtkFXAAOptions for details.
+   */
+  void SetFXAARelativeContrastThreshold(double val);
   void SetFXAAHardContrastThreshold(double val);
   void SetFXAASubpixelBlendLimit(double val);
   void SetFXAASubpixelContrastThreshold(double val);
   void SetFXAAUseHighQualityEndpoints(bool val);
   void SetFXAAEndpointSearchIterations(int val);
   //@}
-
-  /**
-   * Provides access to the time when Update() was last called.
-   */
-  vtkMTimeType GetUpdateTimeStamp() { return this->UpdateTimeStamp; }
 
   /**
    * Copy internal fields that are used for rendering decision such as
@@ -800,6 +790,7 @@ public:
   //@{
   /**
    * Current rendering mode of vtkValuePass (float or invertible RGB).
+   * @deprecation Invertible is deprecated, so this currently does nothing and will be removed.
    */
   void SetValueRenderingModeCommand(int mode);
   int GetValueRenderingModeCommand();
@@ -959,22 +950,17 @@ public:
    */
   void SynchronizeMaximumIds(vtkIdType* maxPointId, vtkIdType* maxCellId);
 
+  /**
+   * Set skybox cubemap resolution in pixel.
+   * Each face (which is a square) of the skybox will have this resolution.
+   */
+  void SetSkyboxResolution(int resolution);
+
 protected:
   vtkPVRenderView();
   ~vtkPVRenderView() override;
 
-  //@{
-  /**
-   * Overridden to assign IDs to each representation. This assumes that
-   * representations will be added/removed in a consistent fashion across
-   * processes even in multi-client modes. The only exception is
-   * vtk3DWidgetRepresentation. However, since vtk3DWidgetRepresentation never
-   * does any data-delivery, we don't assign IDs for these, nor affect the ID
-   * uniquifier when a vtk3DWidgetRepresentation is added.
-   */
-  void AddRepresentationInternal(vtkDataRepresentation* rep) override;
-  void RemoveRepresentationInternal(vtkDataRepresentation* rep) override;
-  //@}
+  static vtkInformationDoubleVectorKey* GEOMETRY_BOUNDS();
 
   /**
    * Actual render method.
@@ -1073,6 +1059,11 @@ protected:
    */
   void PostSelect(vtkSelection* sel);
 
+  /**
+   * Update skybox actor
+   */
+  void UpdateSkybox();
+
   vtkLightKit* LightKit;
   vtkRenderViewBase* RenderView;
   vtkRenderer* NonCompositedRenderer;
@@ -1086,6 +1077,9 @@ protected:
   vtkPVHardwareSelector* Selector;
   vtkSelection* LastSelection;
   vtkSmartPointer<vtkPVGridAxes3DActor> GridAxes3DActor;
+  vtkNew<vtkSkybox> Skybox;
+  bool NeedSkybox = false;
+  vtkNew<vtkEquirectangularToCubeMapTexture> CubeMap;
 
   int StillRenderImageReductionFactor;
   int InteractiveRenderImageReductionFactor;
@@ -1138,11 +1132,6 @@ protected:
 
   vtkTypeUInt32 StillRenderProcesses;
   vtkTypeUInt32 InteractiveRenderProcesses;
-
-  /**
-   * Keeps track of the time when vtkPVRenderView::Update() was called.
-   */
-  vtkTimeStamp UpdateTimeStamp;
 
   /**
    * Keeps track of the time when the priority-queue for streaming was

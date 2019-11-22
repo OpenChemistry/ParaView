@@ -94,9 +94,13 @@ if (TARGET VTK::IOSegY)
     Resources/proxies_segy.xml)
 endif ()
 
-if (TARGET VTK::IOADIOS)
+if (TARGET VTK::IOADIOS2)
   list(APPEND xml_files
-    Resources/proxies_adios.xml)
+    Resources/proxies_adios2_core.xml)
+  if(PARAVIEW_USE_MPI)
+    list(APPEND xml_files
+      Resources/proxies_adios2_vtx.xml)
+  endif()
 endif ()
 
 if (TARGET VTK::IOMotionFX)
@@ -104,17 +108,26 @@ if (TARGET VTK::IOMotionFX)
     Resources/proxies_motionfx.xml)
 endif ()
 
-if (TARGET VTK::FiltersOpenTurns)
+if (TARGET VTK::FiltersOpenTURNS)
   list(APPEND xml_files
     Resources/proxies_openturns.xml)
 endif ()
 
-if (TARGET VTK::FiltersMomentInvariants)
+if (TARGET VTK::MomentInvariants)
   list(APPEND xml_files
     Resources/MomentInvariants.xml)
 endif ()
 
+if (TARGET VTK::ParallelMomentInvariants)
+  list(APPEND xml_files
+    Resources/ParallelMomentInvariants.xml)
+endif ()
+
+
 if (TARGET VTK::PythonInterpreter)
+  _vtk_module_set_module_property(ParaView::ServerManagerApplication APPEND
+    PROPERTY  "forward_link"
+    VALUE     VTK::PythonUsed)
   list(APPEND xml_files
     Resources/pythonfilter.xml
     Resources/pythonviews.xml)

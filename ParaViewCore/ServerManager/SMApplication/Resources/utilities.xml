@@ -120,6 +120,26 @@
                          number_of_elements="1">
         <BooleanDomain name="bool" />
       </IntVectorProperty>
+      <IntVectorProperty default_values="0"
+                         name="ShowDataHistogram"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation> Proxy only property used by the ColorOpacityWidget to know if the data histogram should be shown
+        </Documentation>
+      </IntVectorProperty>
+      <IntVectorProperty default_values="0"
+                         name="AutomaticDataHistogramComputation"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation> Proxy only property used by the ColorOpacityWidget to know if the data histogram should be automatically computed
+        </Documentation>
+      </IntVectorProperty>
+      <IntVectorProperty default_values="10"
+                         name="DataHistogramNumberOfBins"
+                         number_of_elements="1">
+        <Documentation> Proxy only property used by the ColorOpacityWidget to know the number of bin to use to compute the data histogram
+        </Documentation>
+      </IntVectorProperty>
       <IntVectorProperty command="SetColorSpace"
                          default_values="3"
                          name="ColorSpace"
@@ -337,6 +357,9 @@
         <Property name="RGBPoints" function="XRGBPoints" />
         <Property name="ScalarOpacityFunction" function="ScalarOpacityFunction" />
         <Property name="UseLogScale" function="UseLogScale" />
+        <Property name="ShowDataHistogram" function="ShowDataHistogram" />
+        <Property name="AutomaticDataHistogramComputation" function="AutomaticDataHistogramComputation" />
+        <Property name="DataHistogramNumberOfBins" function="DataHistogramNumberOfBins" />
       </PropertyGroup>
 
       <PropertyGroup label="Color Mapping Parameters">
@@ -690,6 +713,68 @@
         </ProxyList>
       </Hints>
     </Proxy>
+    <Proxy class="vtkPVPlane"
+           name="Axis Aligned Plane">
+      <InputProperty is_internal="1"
+                     name="Input"></InputProperty>
+      <DoubleVectorProperty command="SetOrigin"
+                            default_values="0.0 0.0 0.0"
+                            name="Origin"
+                            number_of_elements="3">
+        <BoundsDomain default_mode="mid"
+                      mode="normal"
+                      name="range">
+          <RequiredProperties>
+            <Property function="Input"
+                      name="Input" />
+          </RequiredProperties>
+        </BoundsDomain>
+        <Documentation>
+          Set the origin of the plane.
+        </Documentation>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetNormal"
+                            default_values="1.0 0.0 0.0"
+                            name="Normal"
+                            number_of_elements="3">
+        <DoubleRangeDomain name="range" />
+        <Documentation>
+          Set the normal of the plane.  For many filters this also sets the side
+          of the plane that is of interest.  The normal points towards the
+          "outside" of the plane.
+        </Documentation>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty animateable="1"
+                            command="SetOffset"
+                            default_values="0.0"
+                            name="Offset"
+                            number_of_elements="1">
+        <Documentation>
+          Set the value to offset the origin by. The origin is translated along the normal
+          direction by the number specified.
+        </Documentation>
+      </DoubleVectorProperty>
+      <IntVectorProperty command="SetAxisAligned"
+                         default_values="1"
+                         name="AlwaysSnapToNearestAxis"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <PropertyGroup label="Plane Parameters" panel_widget="InteractivePlane">
+        <Property function="Origin" name="Origin" />
+        <Property function="Normal" name="Normal" />
+        <Property function="Input" name="Input" />
+        <Property function="AlwaysSnapToNearestAxis" name="AlwaysSnapToNearestAxis" />
+      </PropertyGroup>
+
+      <Hints>
+        <ProxyList>
+          <Link name="Input"
+                with_property="Input" />
+        </ProxyList>
+      </Hints>
+      <!-- End of Axis Aligned Plane -->
+    </Proxy>
     <Proxy class="vtkPlanes"
            name="Planes">
       <ProxyProperty command="SetPoints"
@@ -704,6 +789,79 @@
           <Group name="data_arrays" />
         </ProxyGroupDomain>
       </ProxyProperty>
+    </Proxy>
+    <Proxy class="vtkPVBox" name="Axis Aligned Box">
+      <InputProperty is_internal="1" name="Input" />
+      <IntVectorProperty name="UseReferenceBounds"
+        command="SetUseReferenceBounds"
+        number_of_elements="1"
+        default_values="0">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <DoubleVectorProperty command="SetReferenceBounds"
+                            default_values="0 1 0 1 0 1"
+                            name="Bounds"
+                            number_of_elements="6">
+        <BoundsDomain mode="data_bounds" name="range">
+          <RequiredProperties>
+            <Property function="Input" name="Input" />
+          </RequiredProperties>
+        </BoundsDomain>
+        <Hints>
+          <NoDefault />
+        </Hints>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty animateable="1"
+                            command="SetPosition"
+                            default_values="0.0 0.0 0.0"
+                            name="Position"
+                            number_of_elements="3">
+        <BoundsDomain default_mode="min" mode="normal" name="range">
+          <RequiredProperties>
+            <Property function="Input" name="Input" />
+          </RequiredProperties>
+        </BoundsDomain>
+        <Documentation>
+          Set the position of the box.
+        </Documentation>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty animateable="1"
+                            command="SetRotation"
+                            default_values="0.0 0.0 0.0"
+                            name="Rotation"
+                            number_of_elements="3">
+        <DoubleRangeDomain name="range" />
+        <Documentation>
+          Set the orientation of the box.
+        </Documentation>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty animateable="1"
+                            command="SetScale"
+                            default_values="1.0 1.0 1.0"
+                            name="Length"
+                            number_of_elements="3">
+        <BoundsDomain default_mode="max" mode="component_magnitude" name="range">
+          <RequiredProperties>
+            <Property function="Input" name="Input" />
+          </RequiredProperties>
+        </BoundsDomain>
+        <Documentation>
+          Set the size of the box via a scale factor.
+        </Documentation>
+      </DoubleVectorProperty>
+      <PropertyGroup label="Box Parameters" panel_widget="InteractiveBox">
+        <Property function="Position" name="Position" />
+        <Property function="Scale" name="Length" />
+        <Property function="Input" name="Input" />
+        <Property function="UseReferenceBounds" name="UseReferenceBounds" />
+        <Property function="ReferenceBounds" name="Bounds" />
+      </PropertyGroup>
+      <Hints>
+        <ProxyList>
+          <Link name="Input" with_property="Input" />
+        </ProxyList>
+      </Hints>
+      <!-- End of Axis Aligned Box -->
     </Proxy>
     <Proxy class="vtkPVBox" name="Box">
       <InputProperty is_internal="1" name="Input" />
@@ -778,6 +936,18 @@
         </ProxyList>
       </Hints>
       <!-- End of Box -->
+    </Proxy>
+    <Proxy class="vtkQuadric" name="Quadric">
+      <InputProperty is_internal="1" name="Input" />
+      <DoubleVectorProperty name="QuadricCoefficients"
+                            command="SetCoefficients"
+                            number_of_elements="10"
+                            default_values="1 1 1 0 0 0 0 0 0 -1">
+        <Documentation>
+          Coefficients of the quadric function, defined as the 'a' values in:
+          F(x,y,z) = a0*x^2 + a1*y^2 + a2*z^2 + a3*x*y + a4*y*z + a5*x*z + a6*x + a7*y + a8*z + a9
+        </Documentation>
+      </DoubleVectorProperty>
     </Proxy>
     <Proxy class="vtkSphere" name="Sphere">
       <InputProperty is_internal="1" name="Input" />
@@ -1318,6 +1488,18 @@
            >
       <Documentation>FlagpoleLabel is a 3D representation for a text
      source.</Documentation>
+
+      <IntVectorProperty name="Visibility"
+                         command="SetVisibility"
+                         number_of_elements="1"
+                         default_values="0"
+                         panel_visibility="advanced">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Show/hide the flagpole lable.
+        </Documentation>
+      </IntVectorProperty>
+
       <DoubleVectorProperty name="BasePosition"
                             command="SetBasePosition"
                             number_of_elements="3"
@@ -1371,6 +1553,64 @@
         </ExposedProperties>
       </SubProxy>
       <!-- End of FlagpoleLabel -->
+    </Proxy>
+
+    <Proxy class="vtkBillboardTextActor3D"
+           name="BillboardTextActor3D"
+           processes="client|dataserver|renderserver"
+           >
+      <Documentation>BillboardTextActor3D is a 3D representation for a text
+     source.</Documentation>
+
+      <IntVectorProperty name="Visibility"
+                         command="SetVisibility"
+                         number_of_elements="1"
+                         default_values="0"
+                         panel_visibility="advanced">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Show/hide the billboard text actor.
+        </Documentation>
+      </IntVectorProperty>
+
+      <DoubleVectorProperty name="BillboardPosition"
+                            command="SetPosition"
+                            number_of_elements="3"
+                            default_values="0.0 0.0 0.0"
+                            >
+        <DoubleRangeDomain name="range" />
+        <Documentation>
+          The world coordinate position of the anchor point of the text billboard.
+        </Documentation>
+      </DoubleVectorProperty>
+
+      <IntVectorProperty name="DisplayOffset"
+                         command="SetDisplayOffset"
+                         number_of_elements="2"
+                         default_values="0 0"
+                         panel_visibility="advanced">
+        <Documentation>
+          Fixed offset from the anchor point in display coordinated to be used.
+        </Documentation>
+      </IntVectorProperty>
+
+      <SubProxy command="SetTextProperty">
+        <Proxy name="TextProperty"
+               proxygroup="properties"
+               proxyname="TextProperty"></Proxy>
+        <ExposedProperties>
+          <Property name="Color"/>
+          <Property name="Opacity"/>
+          <Property name="FontFamily"/>
+          <Property name="FontFile"/>
+          <Property name="Bold"/>
+          <Property name="Italic"/>
+          <Property name="Shadow"/>
+          <Property name="FontSize"/>
+          <Property name="Justification"/>
+        </ExposedProperties>
+      </SubProxy>
+      <!-- End of BillboardTextActor3D -->
     </Proxy>
 
     <!-- ================================================================== -->
@@ -3196,6 +3436,13 @@
                             number_of_elements="1">
         <Documentation>Name of the file to be written.</Documentation>
       </StringVectorProperty>
+      <IntVectorProperty command="SetInlineData"
+                         default_values="0"
+                         name="InlineData"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>Turn on inlining of buffer data.</Documentation>
+      </IntVectorProperty>
       <Hints>
         <ExporterFactory extensions="gltf" />
       </Hints>
@@ -3818,8 +4065,12 @@
       </IntVectorProperty>
 
       <StringVectorProperty name="RootDirectory"
-                         number_of_elements="1"
-                         default_values="">
+                            number_of_elements="1"
+                            default_values="">
+        <FileListDomain name="directory" />
+        <Hints>
+          <UseDirectoryName/>
+        </Hints>
         <Documentation>
           Defines a top level directory where Catalyst output files are placed under.
         </Documentation>
@@ -4252,51 +4503,6 @@
       <WriterProxy group="writers" name="CSVWriter" />
      </Hints>
      <!-- End of XMLHierarchicalBoxDataWriter -->
-    </SourceProxy>
-
-    <SourceProxy name="ADIOSWriter" class="vtkPVNullSource"
-      label="VTK ADIOS Writer">
-      <InputProperty name="Input">
-        <ProxyGroupDomain name="groups">
-          <Group name="sources" />
-          <Group name="filters" />
-        </ProxyGroupDomain>
-        <DataTypeDomain composite_data_supported="0"
-                        name="input_type">
-          <DataType value="vtkImageData" />
-          <DataType value="vtkPolyData" />
-          <DataType value="vtkUnstructuredGrid" />
-        </DataTypeDomain>
-
-        <Documentation>
-          The input.
-        </Documentation>
-      </InputProperty>
-
-      <StringVectorProperty name="FileName"
-                            number_of_elements="1"
-                            default_values="filename.vta">
-      </StringVectorProperty>
-      <IntVectorProperty name="WriteFrequency"
-        number_of_elements="1"
-        default_values="1">
-        <IntRangeDomain name="range" min="1" />
-      </IntVectorProperty>
-
-      <IntVectorProperty name="PaddingAmount"
-        number_of_elements="1"
-        default_values="0">
-        <IntRangeDomain name="range" min="0" />
-      </IntVectorProperty>
-
-      <Hints>
-        <!-- TODO: this doesn't work yet -->
-        <PipelineIcon name=":pqComponents/pqSave32.png" />
-
-        <!-- This will help us when exporting the script state -->
-        <WriterProxy group="writers" name="ADIOSWriter" />
-      </Hints>
-      <!-- End of ADIOSWriter -->
     </SourceProxy>
 
     <SourceProxy name="ExodusIIWriter" class="vtkPVNullSource"
@@ -4833,7 +5039,7 @@
         number_of_elements="1"
         default_values="0">
         <Documentation>
-          Deferred rendering cabability level of this database. None means that static images are created at each viewpoint (aka 'SpecA'). Composeable (aka 'SpecC') adds ability to hide/show individual objects. Recolorable adds colormap editability.
+          Deferred rendering cabability level for the database. None means that static images are created at each viewpoint (aka 'SpecA'). Composeable (aka 'SpecB') adds ability to hide/show individual objects. Recolorable (aka 'Spec C') adds colormap editability.
         </Documentation>
         <EnumerationDomain name="enum">
           <Entry text="None" value="0" />
@@ -4845,20 +5051,19 @@
         number_of_elements="1"
         default_values="0">
         <Documentation>
-          Specify camera capability level for this database. Static means the camera is fixed, phi-theta is an inward facing rectilinear sampling of the sphere, the pose cameras sparsely sample and maintain an orientation matrix.
+          Camera capability level for the database. Static means the camera is fixed, phi-theta is an inward facing rectilinear sampling over a sphere, inward pose is similar but maintains samples more sparsely.
         </Documentation>
         <EnumerationDomain name="enum">
           <Entry text="Static" value="0" />
           <Entry text="Phi-Theta" value="1" />
           <Entry text="Inward Pose" value="2" />
-          <Entry text="Outward Pose" value="3" />
         </EnumerationDomain>
       </IntVectorProperty>
       <StringVectorProperty name="TrackObject"
         number_of_elements="1"
         default_values="None">
         <Documentation>
-          Name of a pipeline object to orient the camera with. Only meaningful for Inward and Outward Pose Cameras.
+          Name of a pipeline object to orient the camera with. Only meaningful for Pose camera.
         </Documentation>
         <Hints>
           <PropertyWidgetDecorator type="CompositeDecorator">
@@ -4879,7 +5084,7 @@
         number_of_elements="1"
         default_values="12">
         <Documentation>
-          Specify number of longitudinal divisions. Only meaningful for Phi-Theta and Pose Cameras.
+          Specify number of longitudinal divisions. Only meaningful for Phi-Theta and Pose cameras.
         </Documentation>
         <IntRangeDomain name="range" min="1" max="64" />
       </IntVectorProperty>
@@ -4887,7 +5092,7 @@
         number_of_elements="1"
         default_values="7">
         <Documentation>
-          Specify number of latitudinal divisions. Only meaningful for Phi-Theta and Pose Cameras.
+          Specify number of latitudinal divisions. Only meaningful for Phi-Theta and Pose cameras.
         </Documentation>
         <IntRangeDomain name="range" min="1" max="32" />
       </IntVectorProperty>
@@ -4895,7 +5100,7 @@
         number_of_elements="1"
         default_values="1">
         <Documentation>
-          Specify number of roll divisions. Only meaningful for Inward and Outward Pose Cameras.
+          Specify number of roll divisions. Only meaningful for Pose camera.
         </Documentation>
         <IntRangeDomain name="range" min="1" max="64" />
         <Hints>

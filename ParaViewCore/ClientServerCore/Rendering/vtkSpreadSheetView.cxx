@@ -18,6 +18,7 @@
 #include "vtkCSVExporter.h"
 #include "vtkCharArray.h"
 #include "vtkClientServerMoveData.h"
+#include "vtkCommunicator.h"
 #include "vtkCompositeDataIterator.h"
 #include "vtkCompositeDataSet.h"
 #include "vtkDataSetAttributes.h"
@@ -173,8 +174,15 @@ class vtkSpreadSheetView::vtkInternals
         ? colInfo->Get(vtkSplitColumnComponents::ORIGINAL_COMPONENT_NUMBER())
         : -1;
 
-      auto tuple = std::make_tuple(std::string(col->GetName()),
-        original_component >= 0 ? original_name : std::string(), original_component);
+      std::string strName = "<None>";
+      const char* colName = col->GetName();
+      if (colName)
+      {
+        strName = std::string(colName);
+      }
+
+      auto tuple = std::make_tuple(
+        strName, original_component >= 0 ? original_name : std::string(), original_component);
       this->ColumnIndexMap[std::get<0>(tuple)] = this->ColumnMetaData.size();
       this->ColumnMetaData.push_back(std::move(tuple));
     }
@@ -644,7 +652,7 @@ int vtkSpreadSheetView::StreamToClient()
     this->DeliveryFilter->RemoveAllInputs();
   }
 
-  this->AllReduceMAX(num_rows, num_rows);
+  this->AllReduce(num_rows, num_rows, vtkCommunicator::SUM_OP);
 
   if (this->NumberOfRows != static_cast<vtkIdType>(num_rows))
   {

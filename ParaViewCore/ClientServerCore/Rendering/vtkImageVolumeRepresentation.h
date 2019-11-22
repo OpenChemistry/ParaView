@@ -39,7 +39,6 @@ class vtkOutlineSource;
 class vtkPExtentTranslator;
 class vtkPiecewiseFunction;
 class vtkPolyDataMapper;
-class vtkPVCacheKeeper;
 class vtkPVLODVolume;
 class vtkSmartVolumeMapper;
 class vtkVolumeProperty;
@@ -60,14 +59,6 @@ public:
    */
   int ProcessViewRequest(vtkInformationRequestKey* request_type, vtkInformation* inInfo,
     vtkInformation* outInfo) override;
-
-  /**
-   * This needs to be called on all instances of vtkGeometryRepresentation when
-   * the input is modified. This is essential since the geometry filter does not
-   * have any real-input on the client side which messes with the Update
-   * requests.
-   */
-  void MarkModified() override;
 
   /**
    * Get/Set the visibility for this representation. When the visibility of
@@ -109,6 +100,23 @@ public:
   // Forwarded to vtkSmartVolumeMapper.
   void SetRequestedRenderMode(int);
   void SetShowIsosurfaces(int);
+  void SetCropping(int);
+
+  //@{
+  /**
+   * Get/Set the cropping origin.
+   */
+  vtkSetVector3Macro(CroppingOrigin, double);
+  vtkGetVector3Macro(CroppingOrigin, double);
+  //@}
+
+  //@{
+  /**
+   * Get/Set the cropping scale.
+   */
+  vtkSetVector3Macro(CroppingScale, double);
+  vtkGetVector3Macro(CroppingScale, double);
+  //@}
 
   /**
    * Provides access to the actor used by this representation.
@@ -141,11 +149,6 @@ protected:
   bool RemoveFromView(vtkView* view) override;
 
   /**
-   * Overridden to check with the vtkPVCacheKeeper to see if the key is cached.
-   */
-  bool IsCached(double cache_key) override;
-
-  /**
    * Passes on parameters to the active volume mapper
    */
   virtual void UpdateMapperParameters();
@@ -156,14 +159,12 @@ protected:
   virtual vtkPVLODVolume* GetRenderedProp() { return this->Actor; };
 
   vtkImageData* Cache;
-  vtkPVCacheKeeper* CacheKeeper;
   vtkSmartVolumeMapper* VolumeMapper;
   vtkVolumeProperty* Property;
   vtkPVLODVolume* Actor;
 
   vtkOutlineSource* OutlineSource;
   vtkPolyDataMapper* OutlineMapper;
-  ;
 
   unsigned long DataSize;
   double DataBounds[6];
@@ -177,6 +178,9 @@ protected:
 
   bool MapScalars;
   bool MultiComponentsMapping;
+
+  double CroppingOrigin[3] = { 0, 0, 0 };
+  double CroppingScale[3] = { 1, 1, 1 };
 
 private:
   vtkImageVolumeRepresentation(const vtkImageVolumeRepresentation&) = delete;

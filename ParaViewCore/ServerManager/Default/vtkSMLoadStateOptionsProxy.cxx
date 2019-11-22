@@ -83,6 +83,12 @@ public:
       return;
     }
 
+    // Skip the filename domains from non-sources groups
+    if (strcmp(group.value(), "sources") != 0)
+    {
+      return;
+    }
+
     vtkSMProxy* prototype =
       vtkSMProxyManager::GetProxyManager()->GetActiveSessionProxyManager()->GetPrototypeProxy(
         group.value(), type.value());
@@ -145,15 +151,10 @@ public:
     for (piter->Begin(); !piter->IsAtEnd(); piter->Next())
     {
       vtkSMProperty* property = piter->GetProperty();
-      vtkSMDomainIterator* diter = property->NewDomainIterator();
-      for (diter->Begin(); !diter->IsAtEnd(); diter->Next())
+      if (property->FindDomain<vtkSMFileListDomain>() != nullptr)
       {
-        if (vtkSMFileListDomain::SafeDownCast(diter->GetDomain()))
-        {
-          fileNameProperties.insert(piter->GetKey());
-        }
+        fileNameProperties.insert(piter->GetKey());
       }
-      diter->Delete();
     }
     piter->Delete();
     return fileNameProperties;
@@ -304,6 +305,11 @@ bool vtkSMLoadStateOptionsProxy::LocateFilesInDirectory(
   std::vector<std::string>::iterator fIter;
   for (fIter = filepaths.begin(); fIter != filepaths.end(); ++fIter)
   {
+    if (fIter->empty())
+    {
+      // don't attempt to fix empty strings (see paraview/paraview#19137).
+      continue;
+    }
     // TODO: Inefficient - need vtkPVInfomation class to bundle file paths
     if (numOfPathMatches < this->PathMatchingThreshold)
     {
@@ -358,10 +364,9 @@ bool vtkSMLoadStateOptionsProxy::LocateFilesInDirectory(
 bool vtkSMLoadStateOptionsProxy::Load()
 {
   SM_SCOPED_TRACE(LoadState).arg("filename", this->StateFileName).arg("options", this);
-
-  this->SetDataFileOptions(vtkSMPropertyHelper(this, "LoadStateDataFileOptions").GetAsInt());
-  this->SetOnlyUseFilesInDataDirectory(
-    vtkSMPropertyHelper(this, "OnlyUseFilesInDataDirectory").GetAsInt() == 1);
+  this->DataFileOptions = vtkSMPropertyHelper(this, "LoadStateDataFileOptions").GetAsInt();
+  this->OnlyUseFilesInDataDirectory =
+    (vtkSMPropertyHelper(this, "OnlyUseFilesInDataDirectory").GetAsInt() == 1);
   switch (this->DataFileOptions)
   {
     case USE_FILES_FROM_STATE:
@@ -394,17 +399,12 @@ bool vtkSMLoadStateOptionsProxy::Load()
            idIter != this->Internals->PropertiesMap.end(); idIter++)
       {
         std::string primaryFilename = "";
-        bool propertiesModified = false;
         for (auto pIter = idIter->second.begin(); pIter != idIter->second.end(); pIter++)
         {
           vtkInternals::PropertyInfo& info = pIter->second;
           if (!info.Modified)
           {
             continue;
-          }
-          else
-          {
-            propertiesModified = true;
           }
 
           for (auto fIter = info.FilePaths.begin(); fIter != info.FilePaths.end(); ++fIter)
@@ -413,27 +413,24 @@ bool vtkSMLoadStateOptionsProxy::Load()
             info.XMLElement.find_child_by_attribute("Element", "index", idx.c_str())
               .attribute("value")
               .set_value(fIter->c_str());
-
             if (primaryFilename.empty() && fIter->compare(0, 3, "XML") != 0)
             {
               primaryFilename = fIter->c_str();
             }
           }
-        }
 
-        // Also fix up sources proxy collection
-        // Get sequence basename if needed
-        if (propertiesModified)
-        {
-          std::string filename = SystemTools::GetFilenameName(primaryFilename);
-          vtkNew<vtkFileSequenceParser> sequenceParser;
-          if (sequenceParser->ParseFileSequence(filename.c_str()))
+          // Also fix up sources proxy collection. Get file sequence basename if needed.
+          if (!primaryFilename.empty() && info.FilePaths.size() > 1)
           {
-            filename = sequenceParser->GetSequenceName();
+            std::string filename = SystemTools::GetFilenameName(primaryFilename);
+            vtkNew<vtkFileSequenceParser> sequenceParser;
+            if (sequenceParser->ParseFileSequence(filename.c_str()))
+            {
+              filename = sequenceParser->GetSequenceName();
+            }
+            this->Internals->CollectionsMap[idIter->first].attribute("name").set_value(
+              filename.c_str());
           }
-
-          this->Internals->CollectionsMap[idIter->first].attribute("name").set_value(
-            filename.c_str());
         }
       }
 

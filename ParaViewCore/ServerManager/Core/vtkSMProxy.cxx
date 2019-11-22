@@ -22,7 +22,9 @@
 #include "vtkLogger.h"
 #include "vtkNew.h"
 #include "vtkObjectFactory.h"
+#include "vtkPVInformation.h"
 #include "vtkPVInstantiator.h"
+#include "vtkPVLogger.h"
 #include "vtkPVOptions.h"
 #include "vtkPVXMLElement.h"
 #include "vtkProcessModule.h"
@@ -844,6 +846,10 @@ void vtkSMProxy::RebuildStateForProperties()
 bool vtkSMProxy::GatherInformation(vtkPVInformation* information)
 {
   assert(information);
+
+  vtkVLogScopeF(PARAVIEW_LOG_APPLICATION_VERBOSITY(), "%s: gather information %s",
+    this->GetLogNameOrDefault(), information->GetClassName());
+
   if (this->GetSession() && this->Location != 0)
   {
     // ensure that the proxy is created.
@@ -858,6 +864,10 @@ bool vtkSMProxy::GatherInformation(vtkPVInformation* information)
 bool vtkSMProxy::GatherInformation(vtkPVInformation* information, vtkTypeUInt32 location)
 {
   assert(information);
+
+  vtkVLogScopeF(PARAVIEW_LOG_APPLICATION_VERBOSITY(), "%s: gather information %s",
+    this->GetLogNameOrDefault(), information->GetClassName());
+
   vtkTypeUInt32 realLocation = (this->Location & location);
   if (this->GetSession() && realLocation != 0)
   {
@@ -1233,23 +1243,28 @@ vtkSMProperty* vtkSMProxy::GetProducerProperty(unsigned int idx)
 }
 
 //----------------------------------------------------------------------------
-void vtkSMProxy::PostUpdateData()
+void vtkSMProxy::PostUpdateData(bool using_cache)
 {
   unsigned int numProducers = this->GetNumberOfProducers();
   for (unsigned int i = 0; i < numProducers; i++)
   {
     if (this->GetProducerProxy(i)->NeedsUpdate)
     {
-      this->GetProducerProxy(i)->PostUpdateData();
+      this->GetProducerProxy(i)->PostUpdateData(using_cache);
     }
   }
   if (this->NeedsUpdate)
   {
+    vtkLogF(TRACE, "PostUpdateData (%s)", this->GetLogNameOrDefault());
     // this->NeedsUpdate must be set to false before firing this event otherwise
     // if the event handler results in other view updates, we end up
     // unnecessarily thinking that this proxy needs update.
     this->NeedsUpdate = false;
-    this->InvokeEvent(vtkCommand::UpdateDataEvent, 0);
+
+    if (!using_cache)
+    {
+      this->InvokeEvent(vtkCommand::UpdateDataEvent, 0);
+    }
   }
 }
 
@@ -1289,6 +1304,7 @@ void vtkSMProxy::MarkDirty(vtkSMProxy* modifiedProxy)
     return;
   }
 
+  vtkLogF(TRACE, "MarkDirty (%s)", this->GetLogNameOrDefault());
   this->MarkConsumersAsDirty(modifiedProxy);
   this->NeedsUpdate = true;
 }
@@ -1310,6 +1326,20 @@ void vtkSMProxy::MarkDirtyFromProducer(vtkSMProxy* modifiedProxy, vtkSMProxy* vt
   vtkSMProperty* vtkNotUsed(producerProperty))
 {
   this->MarkDirty(modifiedProxy);
+}
+
+//----------------------------------------------------------------------------
+void vtkSMProxy::MarkInputsAsDirty()
+{
+  for (unsigned int cc = 0, max = this->GetNumberOfProducers(); cc < max; ++cc)
+  {
+    if (vtkSMInputProperty::SafeDownCast(this->GetProducerProperty(cc)))
+    {
+      auto producer = this->GetProducerProxy(cc);
+      producer->NeedsUpdate = true;
+      producer->MarkInputsAsDirty();
+    }
+  }
 }
 
 //----------------------------------------------------------------------------
@@ -1445,7 +1475,8 @@ void vtkSMProxy::LinkProperty(vtkSMProperty* input, vtkSMProperty* output)
 {
   if (input == output || input == NULL || output == NULL)
   {
-    vtkErrorMacro("Invalid call to vtkSMProxy::LinkProperty. Check arguments.");
+    vtkErrorMacro(
+      "Invalid call to vtkSMProxy::LinkProperty. Check arguments." << this->GetXMLName());
     return;
   }
 

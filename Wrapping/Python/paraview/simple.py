@@ -44,6 +44,9 @@ import paraview._backwardscompatibilityhelper
 # Bring OutputPort in our namespace.
 from paraview.servermanager import OutputPort
 
+# Bring in selection
+from .selection import *
+
 import sys
 import warnings
 
@@ -443,14 +446,20 @@ def LoadState(filename, connection=None, **extraArgs):
     RemoveViewsAndLayouts()
 
     pxm = servermanager.ProxyManager()
-    proxy = pxm.NewProxy('options', 'LoadStateOptions')
+    smproxy = pxm.SMProxyManager.NewProxy('options', 'LoadStateOptions')
+    smproxy.UnRegister(None)
 
-    if ((proxy is not None) & proxy.PrepareToLoad(filename)):
-        if (proxy.HasDataFiles() and (extraArgs is not None)):
-            pyproxy = servermanager._getPyProxy(proxy)
+    if (smproxy is not None) and smproxy.PrepareToLoad(filename):
+        if smproxy.HasDataFiles() and (extraArgs is not None):
+            # always create a brand new class since the properties
+            # may change based on the state file being loaded.
+            customclass = servermanager._createClass(smproxy.GetXMLGroup(),
+                    smproxy.GetXMLName(), prototype=smproxy)
+            pyproxy = customclass(proxy=smproxy)
             SetProperties(pyproxy, **extraArgs)
-
-        proxy.Load()
+            del pyproxy
+            del customclass
+        smproxy.Load()
 
     # Try to set the new view active
     if len(GetRenderViews()) > 0:
@@ -799,10 +808,17 @@ def FindView(name):
 def GetActiveViewOrCreate(viewtype):
     """
     Returns the active view, if the active view is of the given type,
-    otherwise creates a new view of the requested type."""
+    otherwise creates a new view of the requested type.
+    Note, if a new view is created, it will be assigned to a layout
+    by calling `AssignViewToLayout`."""
     view = GetActiveView()
     if view is None or view.GetXMLName() != viewtype:
         view = CreateView(viewtype)
+        if view:
+            # if a new view is created, we assign it to a layout.
+            # Since this method gets used when tracing existing views, it makes
+            # sense to assign it to a layout during playback.
+            AssignViewToLayout(view)
     if not view:
         raise RuntimeError ("Failed to create/locate the specified view")
     return view
@@ -810,10 +826,17 @@ def GetActiveViewOrCreate(viewtype):
 def FindViewOrCreate(name, viewtype):
     """
     Returns the view, if a view with the given name exists and is of the
-    the given type, otherwise creates a new view of the requested type."""
+    the given type, otherwise creates a new view of the requested type.
+    Note, if a new view is created, it will be assigned to a layout
+    by calling `AssignViewToLayout`."""
     view = FindView(name)
     if view is None or view.GetXMLName() != viewtype:
         view = CreateView(viewtype)
+        if view:
+            # if a new view is created, we assign it to a layout.
+            # Since this method gets used when tracing existing views, it makes
+            # sense to assign it to a layout during playback.
+            AssignViewToLayout(view)
     if not view:
         raise RuntimeError ("Failed to create/locate the specified view")
     return view
@@ -2071,6 +2094,13 @@ def ResetProperty(propertyName, proxy=None, restoreFromSettings=True):
             settings.GetPropertySetting(propertyToReset)
 
         proxy.SMProxy.UpdateVTKObjects()
+
+def GetOpenGLInformation(location=servermanager.vtkSMSession.CLIENT):
+    """Recover OpenGL information, by default on the client"""
+    openGLInfo = servermanager.vtkPVServerImplementationRendering.vtkPVClientServerCoreRendering.vtkPVOpenGLInformation()
+    session = servermanager.vtkSMProxyManager.GetProxyManager().GetActiveSession()
+    session.GatherInformation(location, openGLInfo, 0)
+    return openGLInfo
 
 #==============================================================================
 # Usage and demo code set

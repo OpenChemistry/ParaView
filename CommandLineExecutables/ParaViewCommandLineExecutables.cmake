@@ -19,16 +19,17 @@ function (paraview_add_executable name)
     PRIVATE
       ParaView::ServerManagerApplication)
 
-  if (NOT BUILD_SHARED_LIBS)
-    target_link_libraries("${name}"
-      PRIVATE
-        paraview_plugins_static)
-  endif ()
+  target_link_libraries("${name}"
+    PRIVATE
+      ParaView::paraview_plugins)
 
   if (PARAVIEW_ENABLE_PYTHON)
+    target_compile_definitions("${name}"
+      PRIVATE
+        PARAVIEW_ENABLE_PYTHON)
     target_link_libraries("${name}"
       PRIVATE
-        ParaView::pvpythonmodules
+        VTK::PythonInterpreter
         ParaView::PythonInitializer)
   endif ()
 
@@ -42,5 +43,5 @@ function (paraview_add_executable name)
     TARGETS     "${name}"
     DESTINATION "${CMAKE_INSTALL_BINDIR}"
     COMPONENT   runtime
-    EXPORT      ParaView)
+    EXPORT      ParaViewTools)
 endfunction ()

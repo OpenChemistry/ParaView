@@ -113,6 +113,12 @@ can be found on [its website][mesa].
     - `ninja-build`
       - `ninja` is a speedy replacement for `make`, highly recommended.
 
+*Note*: If you are using an Ubuntu-provided compiler, there is a known issue
+with the optional Python linking. This case is hard to auto-detect, so if
+undefined symbol errors related to Python symbols arise, setting
+`vtk_undefined_symbols_allowed=OFF` may resolve the errors. If it does not,
+please file a new issue.
+
 ### Windows
 
   * [Visual Studio Community Edition][visual-studio]
@@ -226,11 +232,13 @@ More advanced options:
   * `PARAVIEW_ENABLE_LAS` (default `OFF`): Enable support for reading LAS
     files.
   * `PARAVIEW_ENABLE_OPENTURNS` (default `OFF`): Enable support for reading
-    OpenTurns files.
+    OpenTURNS files.
   * `PARAVIEW_ENABLE_PDAL` (default `OFF`): Enable support for reading PDAL
     files.
   * `PARAVIEW_ENABLE_MOTIONFX` (default `OFF`): Enable support for reading
     MotionFX files.
+  * `PARAVIEW_ENABLE_MOMENTINVARIANTS` (default `OFF`): Enable
+    MomentInvariants filters.
   * `PARAVIEW_ENABLE_XDMF2` (default `OFF`): Enable support for reading Xdmf2
     files.
   * `PARAVIEW_ENABLE_XDMF3` (default `OFF`): Enable support for reading Xdmf3
@@ -265,6 +273,13 @@ More advanced options:
   * `PARAVIEW_PLUGINS_DEFAULT` (default `ON`): The state for ParaView's set of
     enabled-by-default plugins. Note that this variable only really has an
     effect on initial configures or newly added plugins.
+  * `PARAVIEW_INSTALL_DEVELOPMENT_FILES` (default `ON`): If set, ParaView will
+    install its headers, CMake API, etc. into its install tree for use.
+  * `PARAVIEW_RELOCATABLE_INSTALL` (default `ON`): If set, the install tree
+    will be relocatable to another path. If unset, the install tree may be tied
+    to the build machine with absolute paths, but finding dependencies in
+    non-standard locations may require work without passing extra information
+    when consuming ParaView.
 
 <!--
 These variables should be documented once they're effective again.
@@ -277,6 +292,14 @@ These variables should be documented once they're effective again.
     ParaView's example Catalyst adaptors will be added as tests to the ParaView
     test suite.
 -->
+
+## Building documentation
+
+The following targets are used to build documentation for ParaView:
+
+  * `ParaViewDoxygenDoc` - build the doxygen documentation from ParaView's C++ source files.
+  * `ParaViewPythonDoc` - build the documentation from ParaView's Python source files.
+  * `ParaViewDoc-TGZ` - build a gzipped tarball of ParaView documentation.
 
 [cmake]: https://cmake.org
 [cmake-download]: https://cmake.org/download

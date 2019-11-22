@@ -31,6 +31,7 @@
 set(classes
   vtkPVComparativeAnimationCue
   vtkPVComparativeView
+  vtkPVEncodeSelectionForServer
   vtkPVRepresentedArrayListSettings
   vtkSMBoxRepresentationProxy
   vtkSMCameraLink
@@ -43,7 +44,7 @@ set(classes
   vtkSMComparativeAnimationCueUndoElement
   vtkSMComparativeViewProxy
   vtkSMContextViewProxy
-  vtkSMDataDeliveryManager
+  vtkSMDataDeliveryManagerProxy
   vtkSMImplicitPlaneRepresentationProxy
   vtkSMLightProxy
   vtkSMMaterialDomain
@@ -57,6 +58,7 @@ set(classes
   vtkSMPlotMatrixViewProxy
   vtkSMRangedTransferFunctionDomain
   vtkSMRenderViewProxy
+  vtkSMRendererDomain
   vtkSMRepresentationProxy
   vtkSMRepresentationTypeDomain
   vtkSMRepresentedArrayListDomain
@@ -95,7 +97,7 @@ add_custom_command(
           vtkSMTransferFunctionPresets JSON JSON
           "${CMAKE_CURRENT_SOURCE_DIR}/ColorMaps.json"
   COMMENT "Processing builtin color maps")
-set(headers
+set(private_headers
   "${CMAKE_CURRENT_BINARY_DIR}/vtkSMTransferFunctionPresetsBuiltin.h")
 
 vtk_object_factory_declare(
@@ -109,5 +111,4 @@ vtk_object_factory_configure(
 vtk_module_add_module(ParaView::ServerManagerRendering
   CLASSES ${classes}
   SOURCES ${vtk_object_factory_source}
-  HEADERS ${headers}
-  PRIVATE_HEADERS ${vtk_object_factory_header})
+  PRIVATE_HEADERS ${vtk_object_factory_header} ${private_headers})

@@ -21,6 +21,8 @@
 #include "vtkSISourceProxy.h"
 #include "vtkSMMessage.h"
 
+#include <vtksys/SystemTools.hxx>
+
 #include <assert.h>
 #include <string>
 #include <vector>
@@ -100,7 +102,7 @@ bool vtkSIStringVectorProperty::Pull(vtkSMMessage* message)
     return true;
   }
 
-  int numArgs = res.GetNumberOfArguments(0);
+  const int numArgs = res.GetNumberOfArguments(0);
   if (numArgs < 1)
   {
     return true;
@@ -112,26 +114,35 @@ bool vtkSIStringVectorProperty::Pull(vtkSMMessage* message)
   Variant* var = prop->mutable_value();
   var->set_type(Variant_Type_STRING);
 
-  const char* arg = NULL;
-  int retVal = res.GetArgument(0, 0, &arg);
-  if (!arg)
+  for (int argIdx = 0; argIdx < numArgs; ++argIdx)
   {
-    var->add_txt(std::string());
-  }
-  else
-  {
-    if (this->NeedReencoding)
+    const char* arg = NULL;
+    int retVal = res.GetArgument(0, argIdx, &arg);
+    if (retVal == 0)
     {
-      // certain type of string needs to be converted to utf8
-      // to be sent back to client
-      var->add_txt(vtkPVFileInformationHelper::LocalToUtf8Win32(arg).c_str());
+      // failed to parse as string.
+      return false;
+    }
+
+    if (!arg)
+    {
+      var->add_txt(std::string());
     }
     else
     {
-      var->add_txt(arg);
+      if (this->NeedReencoding)
+      {
+        // certain type of string needs to be converted to utf8
+        // to be sent back to client
+        var->add_txt(vtkPVFileInformationHelper::LocalToUtf8Win32(arg).c_str());
+      }
+      else
+      {
+        var->add_txt(arg);
+      }
     }
   }
-  return (retVal != 0);
+  return true;
 }
 
 //---------------------------------------------------------------------------
@@ -152,8 +163,33 @@ bool vtkSIStringVectorProperty::ReadXMLAttributes(vtkSIProxy* proxy, vtkPVXMLEle
   }
   this->ElementTypes->resize(number_of_elements_per_command, STRING);
 
-  element->GetVectorAttribute(
-    "element_types", number_of_elements_per_command, &(*this->ElementTypes)[0]);
+  const std::map<std::string, int> elementTypesStrMap = { { std::string("int"), INT },
+    { std::string("double"), DOUBLE }, { std::string("str"), STRING } };
+
+  // This fails if attributes are strings
+  // In this case, we treat them by their name
+  if (!element->GetVectorAttribute(
+        "element_types", number_of_elements_per_command, &(*this->ElementTypes)[0]) &&
+    element->GetAttribute("element_types") != nullptr)
+  {
+    std::string element_types = element->GetAttribute("element_types");
+    std::vector<std::string> parts = vtksys::SystemTools::SplitString(element_types, ' ');
+    if (parts.size() == this->ElementTypes->size())
+    {
+      for (std::size_t i = 0; i < parts.size(); ++i)
+      {
+        auto element_iter = elementTypesStrMap.find(parts[i]);
+        if (element_iter == elementTypesStrMap.end())
+        {
+          vtkGenericWarningMacro("Element type " << parts[i] << " does not exists");
+        }
+        else
+        {
+          (*this->ElementTypes)[i] = element_iter->second;
+        }
+      }
+    }
+  }
   vtkVectorOfStrings values;
   bool hasDefaultValues = false;
   if (number_of_elements > 0)

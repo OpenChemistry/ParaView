@@ -18,12 +18,13 @@
 #include "vtkAbstractArray.h"
 #include "vtkAbstractWidget.h"
 #include "vtkAlgorithmOutput.h"
+#include "vtkBillboardTextActor3D.h"
 #include "vtkDataSetAttributes.h"
+#include "vtkDoubleArray.h"
 #include "vtkFlagpoleLabel.h"
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include "vtkObjectFactory.h"
-#include "vtkPVCacheKeeper.h"
 #include "vtkPVRenderView.h"
 #include "vtkPointSource.h"
 #include "vtkPolyData.h"
@@ -51,16 +52,15 @@ vtkStandardNewMacro(vtkTextSourceRepresentation);
 vtkCxxSetObjectMacro(
   vtkTextSourceRepresentation, TextWidgetRepresentation, vtk3DWidgetRepresentation);
 vtkCxxSetObjectMacro(vtkTextSourceRepresentation, FlagpoleLabel, vtkFlagpoleLabel);
+vtkCxxSetObjectMacro(vtkTextSourceRepresentation, BillboardTextActor, vtkBillboardTextActor3D);
 
 //----------------------------------------------------------------------------
 vtkTextSourceRepresentation::vtkTextSourceRepresentation()
 {
   this->TextPropMode = 0;
   this->TextWidgetRepresentation = nullptr;
-  // this->FlagpoleLabel = vtkFlagpoleLabel::New();
   this->FlagpoleLabel = nullptr;
-
-  this->CacheKeeper = vtkPVCacheKeeper::New();
+  this->BillboardTextActor = nullptr;
 
   vtkPointSource* source = vtkPointSource::New();
   source->SetNumberOfPoints(1);
@@ -68,8 +68,6 @@ vtkTextSourceRepresentation::vtkTextSourceRepresentation()
   this->DummyPolyData = vtkPolyData::New();
   this->DummyPolyData->ShallowCopy(source->GetOutputDataObject(0));
   source->Delete();
-
-  this->CacheKeeper->SetInputData(this->DummyPolyData);
 }
 
 //----------------------------------------------------------------------------
@@ -77,8 +75,8 @@ vtkTextSourceRepresentation::~vtkTextSourceRepresentation()
 {
   this->SetFlagpoleLabel(nullptr);
   this->SetTextWidgetRepresentation(nullptr);
+  this->SetBillboardTextActor(nullptr);
   this->DummyPolyData->Delete();
-  this->CacheKeeper->Delete();
 }
 
 //----------------------------------------------------------------------------
@@ -94,6 +92,11 @@ void vtkTextSourceRepresentation::SetVisibility(bool val)
   if (this->FlagpoleLabel && this->TextPropMode == 1)
   {
     this->FlagpoleLabel->SetVisibility(val);
+  }
+
+  if (this->BillboardTextActor && this->TextPropMode == 2)
+  {
+    this->BillboardTextActor->SetVisibility(val);
   }
 }
 
@@ -117,17 +120,21 @@ int vtkTextSourceRepresentation::FillInputPortInformation(int, vtkInformation* i
 //----------------------------------------------------------------------------
 bool vtkTextSourceRepresentation::AddToView(vtkView* view)
 {
-  if (this->TextWidgetRepresentation /*&& this->TextPropMode == 0*/)
+  if (this->TextWidgetRepresentation)
   {
     view->AddRepresentation(this->TextWidgetRepresentation);
   }
-  if (this->FlagpoleLabel /*&& this->TextPropMode == 1*/)
+  vtkPVRenderView* pvview = vtkPVRenderView::SafeDownCast(view);
+  if (pvview)
   {
-    vtkPVRenderView* pvview = vtkPVRenderView::SafeDownCast(view);
-    if (pvview)
+    vtkRenderer* activeRenderer = pvview->GetRenderer();
+    if (this->FlagpoleLabel)
     {
-      vtkRenderer* activeRenderer = pvview->GetRenderer();
       activeRenderer->AddActor(this->FlagpoleLabel);
+    }
+    if (this->BillboardTextActor)
+    {
+      activeRenderer->AddActor(this->BillboardTextActor);
     }
   }
   return this->Superclass::AddToView(view);
@@ -140,43 +147,26 @@ bool vtkTextSourceRepresentation::RemoveFromView(vtkView* view)
   {
     view->RemoveRepresentation(this->TextWidgetRepresentation);
   }
-  if (this->FlagpoleLabel)
+  vtkPVRenderView* pvview = vtkPVRenderView::SafeDownCast(view);
+  if (pvview)
   {
-    vtkPVRenderView* pvview = vtkPVRenderView::SafeDownCast(view);
-    if (pvview)
+    vtkRenderer* activeRenderer = pvview->GetRenderer();
+    if (this->FlagpoleLabel)
     {
-      vtkRenderer* activeRenderer = pvview->GetRenderer();
       activeRenderer->RemoveActor(this->FlagpoleLabel);
+    }
+    if (this->BillboardTextActor)
+    {
+      activeRenderer->RemoveActor(this->BillboardTextActor);
     }
   }
   return this->Superclass::RemoveFromView(view);
 }
 
 //----------------------------------------------------------------------------
-void vtkTextSourceRepresentation::MarkModified()
-{
-  if (!this->GetUseCache())
-  {
-    // Cleanup caches when not using cache.
-    this->CacheKeeper->RemoveAllCaches();
-  }
-  this->Superclass::MarkModified();
-}
-
-//----------------------------------------------------------------------------
-bool vtkTextSourceRepresentation::IsCached(double cache_key)
-{
-  return this->CacheKeeper->IsCached(cache_key);
-}
-
-//----------------------------------------------------------------------------
 int vtkTextSourceRepresentation::RequestData(
   vtkInformation* request, vtkInformationVector** inputVector, vtkInformationVector* outputVector)
 {
-  // Pass caching information to the cache keeper.
-  this->CacheKeeper->SetCachingEnabled(this->GetUseCache());
-  this->CacheKeeper->SetCacheTime(this->GetCacheKey());
-
   if (inputVector[0]->GetNumberOfInformationObjects() == 1)
   {
     vtkTable* input = vtkTable::GetData(inputVector[0], 0);
@@ -185,14 +175,11 @@ int vtkTextSourceRepresentation::RequestData(
       this->DummyPolyData->GetFieldData()->ShallowCopy(input->GetRowData());
     }
   }
+  else
+  {
+    this->DummyPolyData->Initialize();
+  }
   this->DummyPolyData->Modified();
-  this->CacheKeeper->Update();
-
-  // It is tempting to try to do the data delivery in RequestData() itself.
-  // However, whenever a representation updates, ParaView GUI may have some
-  // GatherInformation() requests that happen. That messes up with any
-  // data-delivery code placed here. So we leave the data delivery to the
-  // REQUEST_PREPARE_FOR_RENDER() pass.
   return this->Superclass::RequestData(request, inputVector, outputVector);
 }
 
@@ -208,7 +195,7 @@ int vtkTextSourceRepresentation::ProcessViewRequest(
 
   if (request_type == vtkPVView::REQUEST_UPDATE())
   {
-    vtkPVRenderView::SetPiece(inInfo, this, this->CacheKeeper->GetOutputDataObject(0));
+    vtkPVRenderView::SetPiece(inInfo, this, this->DummyPolyData);
     vtkPVRenderView::SetDeliverToClientAndRenderingProcesses(inInfo, this,
       /*deliver_to_client=*/true, /*gather_before_delivery=*/false);
   }
@@ -221,13 +208,18 @@ int vtkTextSourceRepresentation::ProcessViewRequest(
 
     std::string text =
       vtkExtractString(producerPort->GetProducer()->GetOutputDataObject(producerPort->GetIndex()));
-    vtkTextRepresentation* repr = vtkTextRepresentation::SafeDownCast(this->TextWidgetRepresentation
-        ? this->TextWidgetRepresentation->GetRepresentation()
-        : nullptr);
+    vtkTextRepresentation* repr = this->TextWidgetRepresentation
+      ? vtkTextRepresentation::SafeDownCast(this->TextWidgetRepresentation->GetRepresentation())
+      : nullptr;
     if (repr)
     {
       repr->SetText(text.c_str());
       repr->SetVisibility(text.empty() ? 0 : this->TextPropMode == 0);
+    }
+    if (this->BillboardTextActor)
+    {
+      this->BillboardTextActor->SetInput(text.c_str());
+      this->BillboardTextActor->SetVisibility(text.empty() ? 0 : this->TextPropMode == 2);
     }
     if (this->FlagpoleLabel)
     {

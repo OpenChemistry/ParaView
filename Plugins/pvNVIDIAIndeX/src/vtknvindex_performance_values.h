@@ -48,7 +48,8 @@ public:
   ~vtknvindex_performance_values();
 
   // Print performance values to a file.
-  void print_perf_values(mi::base::Handle<nv::index::IFrame_results> frame_results);
+  void print_perf_values(
+    mi::base::Handle<nv::index::IFrame_results> frame_results, mi::Uint32 time_step = 0);
 
 private:
   vtknvindex_performance_values(const vtknvindex_performance_values&) = delete;

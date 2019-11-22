@@ -47,7 +47,7 @@ $<$<BOOL:${_vtk_client_server_genex_include_directories}>:\n-I\'$<JOIN:${_vtk_cl
     VARIABLE  _vtk_client_server_hierarchy_file)
 
   get_property(_vtk_client_server_is_imported
-    TARGET    "${module}"
+    TARGET    "${_vtk_client_server_target_name}"
     PROPERTY  "IMPORTED")
   if (_vtk_client_server_is_imported OR CMAKE_GENERATOR MATCHES "Ninja")
     set(_vtk_client_server_command_depend "${_vtk_client_server_hierarchy_file}")
@@ -57,7 +57,8 @@ $<$<BOOL:${_vtk_client_server_genex_include_directories}>:\n-I\'$<JOIN:${_vtk_cl
     else ()
       message(FATAL_ERROR
         "The ${module} hierarchy file is attached to a non-imported target "
-        "and a hierarchy target is missing.")
+        "and a hierarchy target (${_vtk_client_server_target_name}-hierarchy) "
+        "is missing.")
     endif ()
   endif ()
 
@@ -88,7 +89,7 @@ $<$<BOOL:${_vtk_client_server_genex_include_directories}>:\n-I\'$<JOIN:${_vtk_cl
               CXX "${_vtk_client_server_header}"
       COMMENT "Generating client_server wrapper sources for ${_vtk_client_server_basename}"
       DEPENDS
-        ParaView::WrapClientServer
+        "$<TARGET_FILE:ParaView::WrapClientServer>"
         "${_vtk_client_server_header}"
         "${_vtk_client_server_args_file}"
         "${_vtk_client_server_command_depend}")
@@ -147,8 +148,6 @@ function (_vtk_module_wrap_client_server_library name)
     return ()
   endif ()
 
-  # TODO: Support unified bindings?
-
   set(_vtk_client_server_declarations)
   set(_vtk_client_server_calls)
   foreach (_vtk_client_server_class IN LISTS _vtk_client_server_library_classes)
@@ -189,7 +188,6 @@ ${_vtk_client_server_calls}}\n")
   set(_vtk_build_LIBRARY_NAME_SUFFIX "${_vtk_client_server_LIBRARY_NAME_SUFFIX}")
   set(_vtk_build_ARCHIVE_DESTINATION "${_vtk_client_server_DESTINATION}")
   _vtk_module_apply_properties("${name}")
-  _vtk_module_install("${name}")
 
   vtk_module_autoinit(
     MODULES ${ARGN}
@@ -243,7 +241,7 @@ vtk_module_wrap_client_server(
   * `DESTINATION`: (Defaults to `${CMAKE_INSTALL_LIBDIR}`) Where to install the
     generated libraries.
   * `INSTALL_EXPORT`: If provided, installs will add the installed
-    libraries to the provided export set.
+    libraries and generated interface target to the provided export set.
   * `COMPONENT`: (Defaults to `development`) All install rules created by this
     function will use this installation component.
 #]==]
@@ -364,6 +362,18 @@ ${_vtk_client_server_calls}}
     target_link_libraries("${_vtk_client_server_TARGET}"
       INTERFACE
         ${_vtk_client_server_all_modules})
+
+    set(_vtk_client_server_export)
+    if (_vtk_client_server_INSTALL_EXPORT)
+      set(_vtk_client_server_export
+        EXPORT "${_vtk_client_server_INSTALL_EXPORT}")
+    endif ()
+
+    install(
+      TARGETS             "${_vtk_client_server_TARGET}"
+      ${_vtk_client_server_export}
+      COMPONENT           "${_vtk_client_server_COMPONENT}"
+      ARCHIVE DESTINATION "${_vtk_client_server_DESTINATION}")
   endif ()
 endfunction ()
 

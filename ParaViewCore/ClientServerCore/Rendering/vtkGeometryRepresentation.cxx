@@ -32,10 +32,10 @@
 #include "vtkMultiProcessController.h"
 #include "vtkNew.h"
 #include "vtkObjectFactory.h"
-#include "vtkPVCacheKeeper.h"
 #include "vtkPVConfig.h"
 #include "vtkPVGeometryFilter.h"
 #include "vtkPVLODActor.h"
+#include "vtkPVLogger.h"
 #include "vtkPVRenderView.h"
 #include "vtkPVTrivialProducer.h"
 #include "vtkPVUpdateSuppressor.h"
@@ -43,11 +43,13 @@
 #include "vtkProcessModule.h"
 #include "vtkProperty.h"
 #include "vtkRenderer.h"
+#include "vtkScalarsToColors.h"
 #include "vtkSelection.h"
 #include "vtkSelectionConverter.h"
 #include "vtkSelectionNode.h"
 #include "vtkShaderProperty.h"
 #include "vtkStreamingDemandDrivenPipeline.h"
+#include "vtkTexture.h"
 #include "vtkTransform.h"
 #include "vtkUnstructuredGrid.h"
 
@@ -59,6 +61,7 @@
 #include <vtksys/SystemTools.hxx>
 
 #include <memory>
+#include <numeric>
 #include <tuple>
 #include <vector>
 
@@ -124,13 +127,9 @@ void vtkGeometryRepresentation::HandleGeometryRepresentationProgress(
       {
         this->UpdateProgress(0.8 + progress * 0.05);
       }
-      else if (algorithm == this->CacheKeeper)
-      {
-        this->UpdateProgress(0.85 + progress * 0.05);
-      }
       else if (algorithm == this->Decimator)
       {
-        this->UpdateProgress(0.90 + progress * 0.05);
+        this->UpdateProgress(0.85 + progress * 0.10);
       }
       else if (algorithm == this->LODOutlineFilter)
       {
@@ -147,15 +146,12 @@ void vtkGeometryRepresentation::HandleGeometryRepresentationProgress(
 vtkGeometryRepresentation::vtkGeometryRepresentation()
 {
   this->GeometryFilter = vtkPVGeometryFilter::New();
-  this->CacheKeeper = vtkPVCacheKeeper::New();
   this->MultiBlockMaker = vtkGeometryRepresentationMultiBlockMaker::New();
   this->Decimator = vtkGeometryRepresentation_detail::DecimationFilterType::New();
   this->LODOutlineFilter = vtkPVGeometryFilter::New();
 
   // connect progress bar
   this->GeometryFilter->AddObserver(vtkCommand::ProgressEvent, this,
-    &vtkGeometryRepresentation::HandleGeometryRepresentationProgress);
-  this->CacheKeeper->AddObserver(vtkCommand::ProgressEvent, this,
     &vtkGeometryRepresentation::HandleGeometryRepresentationProgress);
   this->MultiBlockMaker->AddObserver(vtkCommand::ProgressEvent, this,
     &vtkGeometryRepresentation::HandleGeometryRepresentationProgress);
@@ -186,6 +182,9 @@ vtkGeometryRepresentation::vtkGeometryRepresentation()
   compositeAttributes->Delete();
 
   this->RequestGhostCellsIfNeeded = true;
+  this->RepeatTextures = true;
+  this->InterpolateTextures = false;
+  this->UseMipmapTextures = false;
   this->Ambient = 0.0;
   this->Diffuse = 1.0;
   this->Specular = 0.0;
@@ -208,7 +207,6 @@ vtkGeometryRepresentation::vtkGeometryRepresentation()
 //----------------------------------------------------------------------------
 vtkGeometryRepresentation::~vtkGeometryRepresentation()
 {
-  this->CacheKeeper->Delete();
   this->GeometryFilter->Delete();
   this->MultiBlockMaker->Delete();
   this->Decimator->Delete();
@@ -237,9 +235,6 @@ void vtkGeometryRepresentation::SetupDefaults()
   }
 
   this->MultiBlockMaker->SetInputConnection(this->GeometryFilter->GetOutputPort());
-  this->CacheKeeper->SetInputConnection(this->MultiBlockMaker->GetOutputPort());
-  this->Decimator->SetInputConnection(this->CacheKeeper->GetOutputPort());
-  this->LODOutlineFilter->SetInputConnection(this->CacheKeeper->GetOutputPort());
 
   this->Actor->SetMapper(this->Mapper);
   this->Actor->SetLODMapper(this->LODMapper);
@@ -303,27 +298,19 @@ int vtkGeometryRepresentation::ProcessViewRequest(
   {
     // provide the "geometry" to the view so the view can delivery it to the
     // rendering nodes as and when needed.
-    // When this process doesn't have any valid input, the cache-keeper is setup
-    // to provide a place-holder dataset of the right type. This is essential
-    // since the vtkPVRenderView uses the type specified to decide on the
-    // delivery mechanism, among other things.
-    vtkPVRenderView::SetPiece(inInfo, this, this->CacheKeeper->GetOutputDataObject(0));
+    vtkPVView::SetPiece(inInfo, this, this->MultiBlockMaker->GetOutputDataObject(0));
 
     // Since we are rendering polydata, it can be redistributed when ordered
     // compositing is needed. So let the view know that it can feel free to
     // redistribute data as and when needed.
     vtkPVRenderView::MarkAsRedistributable(inInfo, this);
 
-    this->ComputeVisibleDataBounds();
-
     // Tell the view if this representation needs ordered compositing. We need
     // ordered compositing when rendering translucent geometry.
-    if (this->Actor->HasTranslucentPolygonalGeometry())
+    if (this->NeedsOrderedCompositing())
     {
-      // We need to extend this condition to consider translucent LUTs once we
-      // start supporting them,
-
       outInfo->Set(vtkPVRenderView::NEED_ORDERED_COMPOSITING(), 1);
+
       // Pass partitioning information to the render view.
       if (this->UseDataPartitions == true)
       {
@@ -335,34 +322,30 @@ int vtkGeometryRepresentation::ProcessViewRequest(
     // information for resetting camera and clip planes. Since this
     // representation allows users to transform the geometry, we need to ensure
     // that the bounds we report include the transformation as well.
+    this->ComputeVisibleDataBounds();
+
     vtkNew<vtkMatrix4x4> matrix;
     this->Actor->GetMatrix(matrix.GetPointer());
-    vtkPVRenderView::SetGeometryBounds(inInfo, this->VisibleDataBounds, matrix.GetPointer());
+    vtkPVRenderView::SetGeometryBounds(inInfo, this, this->VisibleDataBounds, matrix.GetPointer());
   }
   else if (request_type == vtkPVView::REQUEST_UPDATE_LOD())
   {
     // Called to generate and provide the LOD data to the view.
     // If SuppressLOD is true, we tell the view we have no LOD data to provide,
     // otherwise we provide the decimated data.
-    if (!this->SuppressLOD)
+    auto data = vtkPVView::GetPiece(inInfo, this);
+    if (data != nullptr && !this->SuppressLOD)
     {
       if (inInfo->Has(vtkPVRenderView::USE_OUTLINE_FOR_LOD()))
       {
-        // HACK to ensure that when Decimator is next employed, it delivers a
-        // new geometry.
-        this->Decimator->Modified();
-
+        this->LODOutlineFilter->SetInputDataObject(data);
         this->LODOutlineFilter->Update();
         // Pass along the LOD geometry to the view so that it can deliver it to
         // the rendering node as and when needed.
-        vtkPVRenderView::SetPieceLOD(inInfo, this, this->LODOutlineFilter->GetOutputDataObject(0));
+        vtkPVView::SetPieceLOD(inInfo, this, this->LODOutlineFilter->GetOutputDataObject(0));
       }
       else
       {
-        // HACK to ensure that when Decimator is next employed, it delivers a
-        // new geometry.
-        this->LODOutlineFilter->Modified();
-
         if (inInfo->Has(vtkPVRenderView::LOD_RESOLUTION()))
         {
           // We handle this number differently depending on decimator
@@ -371,20 +354,22 @@ int vtkGeometryRepresentation::ProcessViewRequest(
           this->Decimator->SetLODFactor(factor);
         }
 
+        this->Decimator->SetInputDataObject(data);
         this->Decimator->Update();
 
         // Pass along the LOD geometry to the view so that it can deliver it to
         // the rendering node as and when needed.
-        vtkPVRenderView::SetPieceLOD(inInfo, this, this->Decimator->GetOutputDataObject(0));
+        vtkPVView::SetPieceLOD(inInfo, this, this->Decimator->GetOutputDataObject(0));
       }
     }
   }
   else if (request_type == vtkPVView::REQUEST_RENDER())
   {
-    vtkAlgorithmOutput* producerPort = vtkPVRenderView::GetPieceProducer(inInfo, this);
-    vtkAlgorithmOutput* producerPortLOD = vtkPVRenderView::GetPieceProducerLOD(inInfo, this);
-    this->Mapper->SetInputConnection(0, producerPort);
-    this->LODMapper->SetInputConnection(0, producerPortLOD);
+    auto data = vtkPVView::GetDeliveredPiece(inInfo, this);
+    // vtkLogF(INFO, "%p: %s", (void*)data, this->GetLogName().c_str());
+    auto dataLOD = vtkPVView::GetDeliveredPieceLOD(inInfo, this);
+    this->Mapper->SetInputDataObject(data);
+    this->LODMapper->SetInputDataObject(dataLOD);
 
     // This is called just before the vtk-level render. In this pass, we simply
     // pick the correct rendering mode and rendering parameters.
@@ -392,8 +377,7 @@ int vtkGeometryRepresentation::ProcessViewRequest(
     this->Actor->SetEnableLOD(lod ? 1 : 0);
     this->UpdateColoringParameters();
 
-    auto data = producerPort->GetProducer()->GetOutputDataObject(0);
-    if (this->BlockAttributeTime < data->GetMTime() || this->BlockAttrChanged)
+    if (data && (this->BlockAttributeTime < data->GetMTime() || this->BlockAttrChanged))
     {
       this->UpdateBlockAttributes(this->Mapper);
       this->BlockAttributeTime.Modified();
@@ -445,15 +429,9 @@ int vtkGeometryRepresentation::RequestUpdateExtent(
 int vtkGeometryRepresentation::RequestData(
   vtkInformation* request, vtkInformationVector** inputVector, vtkInformationVector* outputVector)
 {
-
-  // Pass caching information to the cache keeper.
-  this->CacheKeeper->SetCachingEnabled(this->GetUseCache());
-  this->CacheKeeper->SetCacheTime(this->GetCacheKey());
-  // cout << this << ": Using Cache (" << this->GetCacheKey() << ") : is_cached = " <<
-  //  this->IsCached(this->GetCacheKey()) << " && use_cache = " <<  this->GetUseCache() << endl;
-
   if (inputVector[0]->GetNumberOfInformationObjects() == 1)
   {
+    // vtkLogF(INFO, "%s->RequestData", this->GetLogName().c_str());
     vtkInformation* inInfo = inputVector[0]->GetInformationObject(0);
     if (inInfo->Has(vtkStreamingDemandDrivenPipeline::WHOLE_EXTENT()))
     {
@@ -471,13 +449,9 @@ int vtkGeometryRepresentation::RequestData(
     vtkNew<vtkMultiBlockDataSet> placeholder;
     this->GeometryFilter->SetInputDataObject(0, placeholder.GetPointer());
   }
-  this->CacheKeeper->Update();
 
-  // HACK: To overcome issue with PolyDataMapper (OpenGL2). It doesn't recreate
-  // VBO/IBOs when using data from cache. I suspect it's because the blocks in
-  // the MB dataset have older MTime.
-  this->Mapper->Modified();
-
+  this->MultiBlockMaker->Modified();
+  this->MultiBlockMaker->Update();
   return this->Superclass::RequestData(request, inputVector, outputVector);
 }
 
@@ -509,31 +483,14 @@ bool vtkGeometryRepresentation::GetBounds(
 }
 
 //----------------------------------------------------------------------------
-bool vtkGeometryRepresentation::IsCached(double cache_key)
-{
-  return this->CacheKeeper->IsCached(cache_key);
-}
-
-//----------------------------------------------------------------------------
 vtkDataObject* vtkGeometryRepresentation::GetRenderedDataObject(int port)
 {
   (void)port;
   if (this->GeometryFilter->GetNumberOfInputConnections(0) > 0)
   {
-    return this->CacheKeeper->GetOutputDataObject(0);
+    return this->MultiBlockMaker->GetOutputDataObject(0);
   }
   return NULL;
-}
-
-//----------------------------------------------------------------------------
-void vtkGeometryRepresentation::MarkModified()
-{
-  if (!this->GetUseCache())
-  {
-    // Cleanup caches when not using cache.
-    this->CacheKeeper->RemoveAllCaches();
-  }
-  this->Superclass::MarkModified();
 }
 
 //----------------------------------------------------------------------------
@@ -699,6 +656,75 @@ void vtkGeometryRepresentation::SetVisibility(bool val)
 }
 
 //----------------------------------------------------------------------------
+bool vtkGeometryRepresentation::NeedsOrderedCompositing()
+{
+  // One would think simply calling `vtkActor::HasTranslucentPolygonalGeometry`
+  // should do the trick, however that method relies on the mapper's input
+  // having up-to-date data. vtkGeometryRepresentation needs to determine
+  // whether the representation needs ordered compositing in `REQUEST_UPDATE`
+  // pass i.e. before the mapper's input is updated. Hence we explicitly
+  // determine if the mapper may choose to render translucent geometry.
+  if (this->Actor->GetForceOpaque())
+  {
+    return false;
+  }
+
+  if (this->Actor->GetForceTranslucent())
+  {
+    return true;
+  }
+
+  if (auto prop = this->Actor->GetProperty())
+  {
+    auto opacity = prop->GetOpacity();
+    if (opacity > 0.0 && opacity < 1.0)
+    {
+      return true;
+    }
+  }
+
+  if (auto texture = this->Actor->GetTexture())
+  {
+    if (texture->IsTranslucent())
+    {
+      return true;
+    }
+  }
+
+  // Check is BlockOpacities has any value not 0 or 1.
+  if (std::accumulate(this->BlockOpacities.begin(), this->BlockOpacities.end(), false,
+        [](bool result, const std::pair<unsigned int, double>& apair) {
+          return result || (apair.second > 0.0 && apair.second < 1.0);
+        }))
+  {
+    // a translucent block may be present.
+    return true;
+  }
+
+  auto colorarrayname = this->GetColorArrayName();
+  if (colorarrayname && colorarrayname[0])
+  {
+    if (this->Mapper->GetColorMode() == VTK_COLOR_MODE_DIRECT_SCALARS)
+    {
+      // when mapping scalars directly, assume the scalars have an alpha
+      // component since we cannot check if that is indeed the case consistently
+      // on all ranks without a bit of work.
+      return true;
+    }
+
+    if (auto lut = this->Mapper->GetLookupTable())
+    {
+      if (lut->IsOpaque() == 0)
+      {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+//----------------------------------------------------------------------------
 void vtkGeometryRepresentation::PrintSelf(ostream& os, vtkIndent indent)
 {
   this->Superclass::PrintSelf(os, indent);
@@ -783,6 +809,88 @@ void vtkGeometryRepresentation::SetRenderLinesAsTubes(bool val)
 }
 
 //----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetRoughness(double val)
+{
+  this->Property->SetRoughness(val);
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetMetallic(double val)
+{
+  this->Property->SetMetallic(val);
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetBaseColorTexture(vtkTexture* tex)
+{
+  if (tex)
+  {
+    tex->UseSRGBColorSpaceOn();
+    tex->SetInterpolate(this->InterpolateTextures);
+    tex->SetRepeat(this->RepeatTextures);
+    tex->SetMipmap(this->UseMipmapTextures);
+  }
+  this->Property->SetBaseColorTexture(tex);
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetMaterialTexture(vtkTexture* tex)
+{
+  if (tex)
+  {
+    tex->UseSRGBColorSpaceOff();
+    tex->SetInterpolate(this->InterpolateTextures);
+    tex->SetRepeat(this->RepeatTextures);
+    tex->SetMipmap(this->UseMipmapTextures);
+  }
+  this->Property->SetORMTexture(tex);
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetNormalTexture(vtkTexture* tex)
+{
+  if (tex)
+  {
+    tex->UseSRGBColorSpaceOff();
+    tex->SetInterpolate(this->InterpolateTextures);
+    tex->SetRepeat(this->RepeatTextures);
+    tex->SetMipmap(this->UseMipmapTextures);
+  }
+  this->Property->SetNormalTexture(tex);
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetEmissiveTexture(vtkTexture* tex)
+{
+  if (tex)
+  {
+    tex->UseSRGBColorSpaceOn();
+    tex->SetInterpolate(this->InterpolateTextures);
+    tex->SetRepeat(this->RepeatTextures);
+    tex->SetMipmap(this->UseMipmapTextures);
+  }
+  this->Property->SetEmissiveTexture(tex);
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetNormalScale(double val)
+{
+  this->Property->SetNormalScale(val);
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetOcclusionStrength(double val)
+{
+  this->Property->SetOcclusionStrength(val);
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetEmissiveFactor(double rval, double gval, double bval)
+{
+  this->Property->SetEmissiveFactor(rval, gval, bval);
+}
+
+//----------------------------------------------------------------------------
 void vtkGeometryRepresentation::SetPointSize(double val)
 {
   this->Property->SetPointSize(val);
@@ -863,9 +971,71 @@ void vtkGeometryRepresentation::SetUserTransform(const double matrix[16])
 }
 
 //----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetFlipTextures(bool flip)
+{
+  vtkInformation* info = this->Actor->GetPropertyKeys();
+  info->Remove(vtkProp::GeneralTextureTransform());
+  if (flip)
+  {
+    double mat[] = { 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1 };
+    info->Set(vtkProp::GeneralTextureTransform(), mat, 16);
+  }
+  this->Actor->Modified();
+}
+
+//----------------------------------------------------------------------------
 void vtkGeometryRepresentation::SetTexture(vtkTexture* val)
 {
   this->Actor->SetTexture(val);
+  if (val)
+  {
+    val->SetRepeat(this->RepeatTextures);
+    val->SetInterpolate(this->InterpolateTextures);
+    val->SetMipmap(this->UseMipmapTextures);
+  }
+}
+
+//----------------------------------------------------------------------------
+void vtkGeometryRepresentation::SetRepeatTextures(bool rep)
+{
+  if (this->Actor->GetTexture())
+  {
+    this->Actor->GetTexture()->SetRepeat(rep);
+  }
+  std::map<std::string, vtkTexture*>& tex = this->Actor->GetProperty()->GetAllTextures();
+  for (auto t : tex)
+  {
+    t.second->SetRepeat(rep);
+  }
+  this->RepeatTextures = rep;
+}
+
+void vtkGeometryRepresentation::SetInterpolateTextures(bool rep)
+{
+  if (this->Actor->GetTexture())
+  {
+    this->Actor->GetTexture()->SetInterpolate(rep);
+  }
+  std::map<std::string, vtkTexture*>& tex = this->Actor->GetProperty()->GetAllTextures();
+  for (auto t : tex)
+  {
+    t.second->SetInterpolate(rep);
+  }
+  this->InterpolateTextures = rep;
+}
+
+void vtkGeometryRepresentation::SetUseMipmapTextures(bool rep)
+{
+  if (this->Actor->GetTexture())
+  {
+    this->Actor->GetTexture()->SetMipmap(rep);
+  }
+  std::map<std::string, vtkTexture*>& tex = this->Actor->GetProperty()->GetAllTextures();
+  for (auto t : tex)
+  {
+    t.second->SetMipmap(rep);
+  }
+  this->UseMipmapTextures = rep;
 }
 
 //----------------------------------------------------------------------------
@@ -1134,7 +1304,7 @@ void vtkGeometryRepresentation::ComputeVisibleDataBounds()
   if (this->VisibleDataBoundsTime < this->GetPipelineDataTime() ||
     (this->BlockAttrChanged && this->VisibleDataBoundsTime < this->BlockAttributeTime))
   {
-    vtkDataObject* dataObject = this->CacheKeeper->GetOutputDataObject(0);
+    vtkDataObject* dataObject = this->MultiBlockMaker->GetOutputDataObject(0);
     vtkNew<vtkCompositeDataDisplayAttributes> cdAttributes;
     // If the input data is a composite dataset, use the currently set values for block
     // visibility rather than the cached ones from the last render.  This must be computed

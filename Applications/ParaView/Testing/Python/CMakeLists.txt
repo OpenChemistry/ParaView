@@ -8,7 +8,9 @@ set(${_vtk_build_test}_TEST_LABELS paraview)
 
 ExternalData_Expand_Arguments(ParaViewData _
   # data files
+  "DATA{${paraview_test_data_directory_input}/Data/blow.vtk}"
   "DATA{${paraview_test_data_directory_input}/Data/can.ex2}"
+  "DATA{${paraview_test_data_directory_input}/Data/iron_protein.vtk}"
   "DATA{${paraview_test_data_directory_input}/Data/multicomb_0.vts}"
 
   # baselines
@@ -72,7 +74,9 @@ paraview_add_test_python(
 paraview_add_test_python(
   NO_VALID NO_RT
   ExportCSV.py
+  LoadStateWithOptions.py
   Plot3DReader.py
+  SaveDataWithArraySelection.py
 )
 
 # These tests could run safely in serial and parallel.
@@ -80,6 +84,7 @@ set(PVBATCH_TESTS
   BatchAxesGrid.py
   PLYWriter.py
   VolumeCellSelection.py
+  SaveDataWithArraySelection.py,NO_VALID
 )
 if(NOT APPLE)
   # temporarily disable on mac due to bugs in

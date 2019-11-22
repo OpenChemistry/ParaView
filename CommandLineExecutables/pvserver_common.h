@@ -14,22 +14,21 @@ PURPOSE.  See the above copyright notice for more information.
 =========================================================================*/
 #include "vtkPVConfig.h"
 
+#include "vtkInitializationHelper.h"
+#include "vtkMultiProcessController.h"
+#include "vtkNetworkAccessManager.h"
+#include "vtkPVPluginTracker.h"
+#include "vtkPVServerOptions.h"
+#include "vtkPVSessionServer.h"
+#include "vtkProcessModule.h"
+
 #ifdef PARAVIEW_ENABLE_PYTHON
 extern "C" {
 void vtkPVInitializePythonModules();
 }
 #endif
 
-#include "vtkInitializationHelper.h"
-#include "vtkMultiProcessController.h"
-#include "vtkNetworkAccessManager.h"
-#include "vtkPVServerOptions.h"
-#include "vtkPVSessionServer.h"
-#include "vtkProcessModule.h"
-
-#ifndef BUILD_SHARED_LIBS
-#include "paraview_plugins_static.h"
-#endif
+#include "ParaView_paraview_plugins.h"
 
 static bool RealMain(int argc, char* argv[], vtkProcessModule::ProcessTypes type)
 {
@@ -54,10 +53,10 @@ static bool RealMain(int argc, char* argv[], vtkProcessModule::ProcessTypes type
   vtkPVInitializePythonModules();
 #endif
 
-#ifndef BUILD_SHARED_LIBS
   // load static plugins
-  paraview_plugins_static_init();
-#endif
+  ParaView_paraview_plugins_initialize();
+
+  vtkPVPluginTracker::GetInstance()->LoadPluginConfigurationXMLs("paraview");
 
   vtkProcessModule* pm = vtkProcessModule::GetProcessModule();
   vtkMultiProcessController* controller = pm->GetGlobalController();

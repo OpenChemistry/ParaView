@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqScalarValueListPropertyWidget.h"
 #include "ui_pqScalarValueListPropertyWidget.h"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 
@@ -137,29 +138,28 @@ public:
   bool setData(const QModelIndex& idx, const QVariant& aValue, int role = Qt::EditRole) override
   {
     Q_UNUSED(role);
-    if (!aValue.toString().isEmpty())
+    int offset = this->computeOffset(idx);
+    if (offset >= this->Values.size())
     {
-      int offset = this->computeOffset(idx);
-      if (offset >= this->Values.size())
-      {
-        // we don't need to fire this->beginInsertRows
-        // since this typically happens for setting a non-existent
-        // column value.
-        this->Values.resize(offset + 1);
-      }
-      if (this->Values[offset] != aValue)
-      {
-        if (this->AllowIntegralValuesOnly)
-        {
-          this->Values[offset] = aValue.toInt();
-        }
-        else
-        {
-          this->Values[offset] = aValue;
-        }
-        emit this->dataChanged(idx, idx);
-      }
+      // we don't need to fire this->beginInsertRows
+      // since this typically happens for setting a non-existent
+      // column value.
+      this->Values.resize(offset + 1);
     }
+    if (this->Values[offset] != aValue)
+    {
+      if (this->AllowIntegralValuesOnly)
+      {
+        this->Values[offset] = aValue.toInt();
+      }
+      else
+      {
+        this->Values[offset] = aValue;
+      }
+      emit this->dataChanged(idx, idx);
+      return true;
+    }
+
     return false;
   }
 
@@ -265,7 +265,7 @@ public:
         rows.push_back((*iter).row());
       }
     }
-    qSort(rows.begin(), rows.end());
+    std::sort(rows.begin(), rows.end());
     result.resize(1);
     result[0].push_back(rows[0]);
     for (int i = 1; i < rows.size(); ++i)

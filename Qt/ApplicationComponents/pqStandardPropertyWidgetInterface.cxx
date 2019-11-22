@@ -62,6 +62,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqInputDataTypeDecorator.h"
 #include "pqInputSelectorWidget.h"
 #include "pqIntMaskPropertyWidget.h"
+#include "pqLightPropertyWidget.h"
 #include "pqLinePropertyWidget.h"
 #include "pqListPropertyWidget.h"
 #include "pqMoleculePropertyWidget.h"
@@ -83,10 +84,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqYoungsMaterialPropertyWidget.h"
 #include "vtkSMProperty.h"
 #include "vtkSMPropertyGroup.h"
-
-#if VTK_MODULE_ENABLE_ParaView_pqPython
-#include "pqCinemaConfiguration.h"
-#endif
 
 #include <QtDebug>
 
@@ -135,7 +132,7 @@ pqPropertyWidget* pqStandardPropertyWidgetInterface::createWidgetForProperty(
   }
   else if (name == "texture_selector")
   {
-    return new pqTextureSelectorPropertyWidget(smProxy, parentWidget);
+    return new pqTextureSelectorPropertyWidget(smProxy, smProperty, parentWidget);
   }
   else if (name == "shader_replacements_selector")
   {
@@ -293,13 +290,9 @@ pqPropertyWidget* pqStandardPropertyWidgetInterface::createWidgetForPropertyGrou
   {
     return new pqCylinderPropertyWidget(proxy, group, parentWidget);
   }
-  else if (panelWidget == "cinema_export_selector")
+  else if (panelWidget == "InteractiveLight")
   {
-#if VTK_MODULE_ENABLE_ParaView_pqPython
-    return new pqCinemaConfiguration(proxy, group, parentWidget);
-#else
-    return NULL;
-#endif
+    return new pqLightPropertyWidget(proxy, group, parentWidget);
   }
   // *** NOTE: When adding new types, please update the header documentation ***
 

@@ -101,6 +101,7 @@ set(classes
   pqLockViewSizeCustomDialog
   pqMemoryInspectorPanel
   pqMultiBlockInspectorWidget
+  pqMultiQueryClauseWidget
   pqMultiViewWidget
   pqOrbitCreatorDialog
   pqOutputPortComboBox
@@ -176,6 +177,14 @@ set(classes
   pqViewManager
   pqWidgetRangeDomain)
 
+set(built_shared 0)
+if (BUILD_SHARED_LIBS)
+  set(built_shared 1)
+endif ()
+set_property(SOURCE pqComponentsInit.cxx APPEND
+  PROPERTY
+    COMPILE_DEFINITIONS "BUILD_SHARED_LIBS=${built_shared}")
+
 set(headers
   pqPluginTreeWidget.h)
 
@@ -240,37 +249,6 @@ set(ui_files
   Resources/UI/pqTimerLogDisplay.ui
   Resources/UI/pqViewFrame.ui)
 
-set(sources)
-set(private_headers
-  pqSGExportStateWizardInternals.h)
-
-if (TARGET pqPython)
-  # code for generating specialized Python scripts
-  # from the GUI using trace information
-  list(APPEND classes
-    pqCatalystExportStateWizard
-    pqCinemaConfiguration
-    pqCinemaTrack
-    pqImageOutputInfo
-    pqSGExportStateWizard
-    pqSGPluginManager
-    pqSGWritersMenuManager)
-  list(APPEND sources
-    pqCinemaTrackSelection.cxx
-    pqExportViewSelection.cxx)
-  list(APPEND private_headers
-    pqCinemaTrackSelection.h
-    pqExportViewSelection.h)
-
-  list(APPEND ui_files
-    Resources/UI/pqCinemaConfiguration.ui
-    Resources/UI/pqCinemaTrack.ui
-    Resources/UI/pqCinemaTrackSelection.ui
-    Resources/UI/pqExportStateWizard.ui
-    Resources/UI/pqExportViewSelection.ui
-    Resources/UI/pqImageOutputInfo.ui)
-endif ()
-
 set(resource_files
   Resources/pqComponents.qrc)
 
@@ -290,19 +268,9 @@ set(CMAKE_AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/UI")
 vtk_module_add_module(ParaView::pqComponents
   CLASSES ${classes}
   HEADERS ${headers}
-  SOURCES ${sources}
-          ${ui_files}
-          ${resource_files}
-  PRIVATE_HEADERS ${private_headers})
+  SOURCES ${ui_files}
+          ${resource_files})
 vtk_module_link(ParaView::pqComponents
   PRIVATE
     Qt5::Network
     Qt5::Widgets)
-
-if (PARAVIEW_ENABLE_PYTHON)
-  # The pqSGExportStateWizard has subclasses that directly access the UI file,
-  # and currently we don't have a clean way to break this hard dependency, so
-  # for now we manually install this ui file.
-  vtk_module_install_headers(
-    FILES "${CMAKE_CURRENT_BINARY_DIR}/pqComponents_autogen/include/ui_pqExportStateWizard.h")
-endif ()

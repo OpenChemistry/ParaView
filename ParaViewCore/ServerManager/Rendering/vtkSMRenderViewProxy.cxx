@@ -33,6 +33,7 @@
 #include "vtkPVArrayInformation.h"
 #include "vtkPVCompositeDataInformation.h"
 #include "vtkPVDataInformation.h"
+#include "vtkPVEncodeSelectionForServer.h"
 #include "vtkPVLastSelectionInformation.h"
 #include "vtkPVOptions.h"
 #include "vtkPVRenderView.h"
@@ -45,7 +46,7 @@
 #include "vtkRenderWindowInteractor.h"
 #include "vtkRenderer.h"
 #include "vtkSMCollaborationManager.h"
-#include "vtkSMDataDeliveryManager.h"
+#include "vtkSMDataDeliveryManagerProxy.h"
 #include "vtkSMEnumerationDomain.h"
 #include "vtkSMInputProperty.h"
 #include "vtkSMMaterialLibraryProxy.h"
@@ -77,7 +78,6 @@ vtkSMRenderViewProxy::vtkSMRenderViewProxy()
 {
   this->IsSelectionCached = false;
   this->NewMasterObserverId = 0;
-  this->DeliveryManager = NULL;
   this->NeedsUpdateLOD = true;
   this->InteractorHelper->SetViewProxy(this);
 }
@@ -92,12 +92,6 @@ vtkSMRenderViewProxy::~vtkSMRenderViewProxy()
   {
     this->Session->GetCollaborationManager()->RemoveObserver(this->NewMasterObserverId);
     this->NewMasterObserverId = 0;
-  }
-
-  if (this->DeliveryManager)
-  {
-    this->DeliveryManager->Delete();
-    this->DeliveryManager = NULL;
   }
 }
 
@@ -224,7 +218,7 @@ bool vtkSMRenderViewProxy::StreamingUpdate(bool render_if_needed)
   this->ExecuteStream(stream);
 
   // Now fetch any pieces that the server streamed back to the client.
-  bool something_delivered = this->DeliveryManager->DeliverStreamedPieces();
+  bool something_delivered = this->GetDeliveryManager()->DeliverStreamedPieces();
   bool OSPRayNotDone = view->GetOSPRayContinueStreaming();
   if (render_if_needed && (something_delivered || OSPRayNotDone))
   {
@@ -242,14 +236,13 @@ vtkTypeUInt32 vtkSMRenderViewProxy::PreRender(bool interactive)
 
   vtkPVRenderView* rv = vtkPVRenderView::SafeDownCast(this->GetClientSideObject());
   assert(rv != NULL);
-
   if (interactive && rv->GetUseLODForInteractiveRender())
   {
     // for interactive renders, we need to determine if we are going to use LOD.
     // If so, we may need to update the LOD geometries.
     this->UpdateLOD();
   }
-  this->DeliveryManager->Deliver(interactive);
+
   return interactive ? rv->GetInteractiveRenderProcesses() : rv->GetStillRenderProcesses();
 }
 
@@ -441,10 +434,6 @@ void vtkSMRenderViewProxy::CreateVTKObjects()
     this->NewMasterObserverId = this->Session->GetCollaborationManager()->AddObserver(
       vtkSMCollaborationManager::UpdateMasterUser, this, &vtkSMRenderViewProxy::NewMasterCallback);
   }
-
-  // Setup data-delivery manager.
-  this->DeliveryManager = vtkSMDataDeliveryManager::New();
-  this->DeliveryManager->SetViewProxy(this);
 }
 
 //----------------------------------------------------------------------------
@@ -455,6 +444,38 @@ const char* vtkSMRenderViewProxy::GetRepresentationType(vtkSMSourceProxy* produc
   if (const char* reprName = this->Superclass::GetRepresentationType(producer, outputPort))
   {
     return reprName;
+  }
+
+  if (vtkPVXMLElement* hints = producer->GetHints())
+  {
+    // If the source has an hint as follows, then it's a text producer and must
+    // be display-able.
+    //  <Hints>
+    //    <OutputPort name="..." index="..." type="text" />
+    //  </Hints>
+    for (unsigned int cc = 0, max = hints->GetNumberOfNestedElements(); cc < max; cc++)
+    {
+      int index;
+      vtkPVXMLElement* child = hints->GetNestedElement(cc);
+      const char* childName = child->GetName();
+      const char* childType = child->GetAttribute("type");
+      if (childName && strcmp(childName, "OutputPort") == 0 &&
+        child->GetScalarAttribute("index", &index) && index == outputPort && childType)
+      {
+        if (strcmp(childType, "text") == 0)
+        {
+          return "TextSourceRepresentation";
+        }
+        else if (strcmp(childType, "progress") == 0)
+        {
+          return "ProgressBarSourceRepresentation";
+        }
+        else if (strcmp(childType, "logo") == 0)
+        {
+          return "LogoSourceRepresentation";
+        }
+      }
+    }
   }
 
   vtkSMSessionProxyManager* pxm = this->GetSessionProxyManager();
@@ -498,35 +519,6 @@ const char* vtkSMRenderViewProxy::GetRepresentationType(vtkSMSourceProxy* produc
       }
     }
   }
-
-  if (vtkPVXMLElement* hints = producer->GetHints())
-  {
-    // If the source has an hint as follows, then it's a text producer and must
-    // be display-able.
-    //  <Hints>
-    //    <OutputPort name="..." index="..." type="text" />
-    //  </Hints>
-    for (unsigned int cc = 0, max = hints->GetNumberOfNestedElements(); cc < max; cc++)
-    {
-      int index;
-      vtkPVXMLElement* child = hints->GetNestedElement(cc);
-      const char* childName = child->GetName();
-      if (childName && strcmp(childName, "OutputPort") == 0 &&
-        child->GetScalarAttribute("index", &index) && index == outputPort &&
-        child->GetAttribute("type"))
-      {
-        if (strcmp(child->GetAttribute("type"), "text") == 0)
-        {
-          return "TextSourceRepresentation";
-        }
-        else if (strcmp(child->GetAttribute("type"), "progress") == 0)
-        {
-          return "ProgressBarSourceRepresentation";
-        }
-      }
-    }
-  }
-
   return NULL;
 }
 
@@ -712,8 +704,8 @@ vtkSMRepresentationProxy* vtkSMRenderViewProxy::PickBlock(int x, int y, unsigned
       vtkSelectionNode::BLOCKS, selectionSource, reprInput, inputHelper.GetOutputPort());
 
     // set block index
-    flatIndex = vtkSMPropertyHelper(blockSelection, "Blocks").GetAsInt();
-
+    vtkSMPropertyHelper helper(blockSelection, "Blocks");
+    flatIndex = (helper.GetNumberOfElements() > 0) ? helper.GetAsInt() : 0;
     blockSelection->Delete();
   }
 
@@ -825,7 +817,8 @@ bool vtkSMRenderViewProxy::ConvertDisplayToPointOnSurface(
 
 //----------------------------------------------------------------------------
 bool vtkSMRenderViewProxy::SelectInternal(const vtkClientServerStream& csstream,
-  vtkCollection* selectedRepresentations, vtkCollection* selectionSources, bool multiple_selections)
+  vtkCollection* selectedRepresentations, vtkCollection* selectionSources, bool multiple_selections,
+  int modifier, bool selectBlocks)
 {
   if (!this->IsSelectionAvailable())
   {
@@ -840,99 +833,49 @@ bool vtkSMRenderViewProxy::SelectInternal(const vtkClientServerStream& csstream,
   // render window. Calling PreRender ensures that the view is ready to render.
   vtkTypeUInt32 render_location = this->PreRender(/*interactive=*/false);
   this->ExecuteStream(csstream, false, render_location);
-  bool retVal =
-    this->FetchLastSelection(multiple_selections, selectedRepresentations, selectionSources);
+  bool retVal = this->FetchLastSelection(
+    multiple_selections, selectedRepresentations, selectionSources, modifier, selectBlocks);
   this->PostRender(false);
   return retVal;
 }
 
 //----------------------------------------------------------------------------
 bool vtkSMRenderViewProxy::SelectSurfaceCells(const int region[4],
-  vtkCollection* selectedRepresentations, vtkCollection* selectionSources, bool multiple_selections)
+  vtkCollection* selectedRepresentations, vtkCollection* selectionSources, bool multiple_selections,
+  int modifier, bool select_blocks)
 {
   vtkClientServerStream stream;
   stream << vtkClientServerStream::Invoke << VTKOBJECT(this) << "SelectCells" << region[0]
          << region[1] << region[2] << region[3] << vtkClientServerStream::End;
-  return this->SelectInternal(
-    stream, selectedRepresentations, selectionSources, multiple_selections);
+  return this->SelectInternal(stream, selectedRepresentations, selectionSources,
+    multiple_selections, modifier, select_blocks);
 }
 
 //----------------------------------------------------------------------------
 bool vtkSMRenderViewProxy::SelectSurfacePoints(const int region[4],
-  vtkCollection* selectedRepresentations, vtkCollection* selectionSources, bool multiple_selections)
+  vtkCollection* selectedRepresentations, vtkCollection* selectionSources, bool multiple_selections,
+  int modifier, bool select_blocks)
 {
   vtkClientServerStream stream;
   stream << vtkClientServerStream::Invoke << VTKOBJECT(this) << "SelectPoints" << region[0]
          << region[1] << region[2] << region[3] << vtkClientServerStream::End;
-  return this->SelectInternal(
-    stream, selectedRepresentations, selectionSources, multiple_selections);
-}
-
-namespace
-{
-//-----------------------------------------------------------------------------
-static void vtkShrinkSelection(vtkSelection* sel)
-{
-  std::map<void*, int> pixelCounts;
-  unsigned int numNodes = sel->GetNumberOfNodes();
-  void* chosen = NULL;
-  int maxPixels = -1;
-  for (unsigned int cc = 0; cc < numNodes; cc++)
-  {
-    vtkSelectionNode* node = sel->GetNode(cc);
-    vtkInformation* properties = node->GetProperties();
-    if (properties->Has(vtkSelectionNode::PIXEL_COUNT()) &&
-      properties->Has(vtkSelectionNode::SOURCE()))
-    {
-      int numPixels = properties->Get(vtkSelectionNode::PIXEL_COUNT());
-      void* source = properties->Get(vtkSelectionNode::SOURCE());
-      pixelCounts[source] += numPixels;
-      if (pixelCounts[source] > maxPixels)
-      {
-        maxPixels = numPixels;
-        chosen = source;
-      }
-    }
-  }
-
-  std::vector<vtkSmartPointer<vtkSelectionNode> > chosenNodes;
-  if (chosen != NULL)
-  {
-    for (unsigned int cc = 0; cc < numNodes; cc++)
-    {
-      vtkSelectionNode* node = sel->GetNode(cc);
-      vtkInformation* properties = node->GetProperties();
-      if (properties->Has(vtkSelectionNode::SOURCE()) &&
-        properties->Get(vtkSelectionNode::SOURCE()) == chosen)
-      {
-        chosenNodes.push_back(node);
-      }
-    }
-  }
-  sel->RemoveAllNodes();
-  for (unsigned int cc = 0; cc < chosenNodes.size(); cc++)
-  {
-    sel->AddNode(chosenNodes[cc]);
-  }
-}
+  return this->SelectInternal(stream, selectedRepresentations, selectionSources,
+    multiple_selections, modifier, select_blocks);
 }
 
 //----------------------------------------------------------------------------
-bool vtkSMRenderViewProxy::FetchLastSelection(
-  bool multiple_selections, vtkCollection* selectedRepresentations, vtkCollection* selectionSources)
+bool vtkSMRenderViewProxy::FetchLastSelection(bool multiple_selections,
+  vtkCollection* selectedRepresentations, vtkCollection* selectionSources, int modifier,
+  bool selectBlocks)
 {
   if (selectionSources && selectedRepresentations)
   {
     vtkPVRenderView* rv = vtkPVRenderView::SafeDownCast(this->GetClientSideObject());
-    vtkSelection* selection = rv->GetLastSelection();
-    if (!multiple_selections)
-    {
-      // only pass through selection over a single representation.
-      vtkShrinkSelection(selection);
-    }
-    vtkSMSelectionHelper::NewSelectionSourcesFromSelection(
-      selection, this, selectionSources, selectedRepresentations);
-    return (selectionSources->GetNumberOfItems() > 0);
+    vtkSelection* rawSelection = rv->GetLastSelection();
+
+    vtkNew<vtkPVEncodeSelectionForServer> helper;
+    return helper->ProcessSelection(rawSelection, this, multiple_selections,
+      selectedRepresentations, selectionSources, modifier, selectBlocks);
   }
   return false;
 }
@@ -1158,7 +1101,7 @@ bool vtkSMRenderViewProxy::SelectPolygonPoints(vtkIntArray* polygonPts,
   vtkCollection* selectedRepresentations, vtkCollection* selectionSources, bool multiple_selections)
 {
   return this->SelectPolygonInternal(polygonPts, selectedRepresentations, selectionSources,
-    multiple_selections, "SelectPolygonPoints");
+    multiple_selections, vtkSelectionNode::POINT);
 }
 
 //----------------------------------------------------------------------------
@@ -1166,14 +1109,16 @@ bool vtkSMRenderViewProxy::SelectPolygonCells(vtkIntArray* polygonPts,
   vtkCollection* selectedRepresentations, vtkCollection* selectionSources, bool multiple_selections)
 {
   return this->SelectPolygonInternal(polygonPts, selectedRepresentations, selectionSources,
-    multiple_selections, "SelectPolygonCells");
+    multiple_selections, vtkSelectionNode::CELL);
 }
 
 //----------------------------------------------------------------------------
 bool vtkSMRenderViewProxy::SelectPolygonInternal(vtkIntArray* polygonPts,
   vtkCollection* selectedRepresentations, vtkCollection* selectionSources, bool multiple_selections,
-  const char* method)
+  int fieldAssociation)
 {
+  const char* method =
+    fieldAssociation == vtkSelectionNode::POINT ? "SelectPolygonPoints" : "SelectPolygonCells";
   vtkClientServerStream stream;
   stream << vtkClientServerStream::Invoke << VTKOBJECT(this) << method
          << vtkClientServerStream::InsertArray(polygonPts->GetPointer(0),

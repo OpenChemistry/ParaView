@@ -10,6 +10,14 @@ import sys
 import copy
 import numpy as np
 
+def py23iteritems(d):
+    myit = None
+    try:
+        myit = d.iteritems()
+    except AttributeError:
+        myit = d.items()
+    return myit
+
 
 class FileStore(store.Store):
     """Implementation of a store based on named files and directories."""
@@ -37,7 +45,7 @@ class FileStore(store.Store):
     def load(self):
         """loads an existing filestore"""
         super(FileStore, self).load()
-        with open(self.__dbfilename, mode="rb") as file:
+        with open(self.__dbfilename, mode="r") as file:
             info_json = json.load(file)
             if 'arguments' in info_json:
                 self._set_parameter_list(info_json['arguments'])
@@ -78,7 +86,7 @@ class FileStore(store.Store):
         dirname = os.path.dirname(self.__dbfilename)
         if not os.path.exists(dirname):
             os.makedirs(dirname)
-        with open(self.__dbfilename, mode="wb") as file:
+        with open(self.__dbfilename, mode="w") as file:
             json.dump(info_json, file, sort_keys=True, indent=4)
 
     @property
@@ -160,7 +168,7 @@ class FileStore(store.Store):
         else:
             sep = ""
             for k in ordered_keys:
-                index = self.get_parameter(k)['values'].index(desc[k])
+                index = list(self.get_parameter(k)['values']).index(desc[k])
                 base = base + sep + k + "=" + str(index)
                 sep = "/"
 
@@ -189,8 +197,6 @@ class FileStore(store.Store):
         super(FileStore, self).insert(document)
 
         fname = self._get_filename(document.descriptor, readingFile=False)
-        if not os.path.exists(fname):
-            self.__new_files.append((document.descriptor,fname))
 
         dirname = os.path.dirname(fname)
         if not os.path.exists(dirname):
@@ -204,7 +210,9 @@ class FileStore(store.Store):
                 pass
 
         if document.data is not None:
-            for parname, parvalue in document.descriptor.iteritems():
+            adjustedfname = None
+
+            for parname, parvalue in py23iteritems(document.descriptor):
                 params = self.get_parameter(parname)
                 if 'role' in params:
                     if params['role'] == 'field':
@@ -215,11 +223,11 @@ class FileStore(store.Store):
 
             doctype = self.determine_type(document.descriptor)
             if doctype == 'RGB' or doctype == 'LUMINANCE':
-                self.raster_wrangler.rgbwriter(document.data, fname)
+                adjustedfname = self.raster_wrangler.rgbwriter(document.data, fname)
             elif doctype == 'VALUE':
                 # find the range for the value that this raster shows
                 vrange = [0, 1]
-                for parname, parvalue in document.descriptor.iteritems():
+                for parname, parvalue in py23iteritems(document.descriptor):
                     param = self.get_parameter(parname)
                     if 'valueRanges' in param:
                         # we now have a color parameter, look for the range
@@ -227,13 +235,16 @@ class FileStore(store.Store):
                         vr = param['valueRanges']
                         if parvalue in vr:
                             vrange = vr[parvalue]
-                self.raster_wrangler.valuewriter(document.data, fname, vrange)
+                adjustedfname = self.raster_wrangler.valuewriter(document.data, fname, vrange)
             elif doctype == 'Z':
-                self.raster_wrangler.zwriter(document.data, fname)
+                adjustedfname = self.raster_wrangler.zwriter(document.data, fname)
             elif doctype == 'MAGNITUDE':
                 pass
             else:
-                self.raster_wrangler.genericwriter(document.data, fname)
+                adjustedfname = self.raster_wrangler.genericwriter(document.data, fname)
+            if adjustedfname is not None:
+                self.__new_files.append((document.descriptor,adjustedfname))
+
 
     def _load_data(self, descriptor):
         doctype = self.determine_type(descriptor)

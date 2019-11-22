@@ -17,11 +17,14 @@
 #include "vtkAlgorithm.h"
 #include "vtkDataObject.h"
 #include "vtkExtractGeometry.h"
+#include "vtkHyperTreeGrid.h"
 #include "vtkImplicitFunction.h"
 #include "vtkInformation.h"
+#include "vtkInformationVector.h"
 #include "vtkNew.h"
 #include "vtkObjectFactory.h"
 #include "vtkPVClipDataSet.h"
+#include "vtkPVPlane.h"
 #include "vtkSmartPointer.h"
 
 class vtkPVMetaClipDataSet::vtkInternals
@@ -37,8 +40,10 @@ public:
     this->ExtractCells->SetExtractBoundaryCells(1);
   }
 };
+
 //----------------------------------------------------------------------------
 vtkStandardNewMacro(vtkPVMetaClipDataSet);
+
 //----------------------------------------------------------------------------
 vtkPVMetaClipDataSet::vtkPVMetaClipDataSet()
   : ExactBoxClip(false)
@@ -47,6 +52,9 @@ vtkPVMetaClipDataSet::vtkPVMetaClipDataSet()
   this->SetOutputType(VTK_UNSTRUCTURED_GRID);
 
   this->Internal = new vtkInternals();
+
+  this->ImplicitFunctions[METACLIP_DATASET] = nullptr;
+  this->ImplicitFunctions[METACLIP_HYPERTREEGRID] = nullptr;
 
   this->RegisterFilter(this->Internal->Clip.GetPointer());
   this->RegisterFilter(this->Internal->ExtractCells.GetPointer());
@@ -58,7 +66,7 @@ vtkPVMetaClipDataSet::vtkPVMetaClipDataSet()
 vtkPVMetaClipDataSet::~vtkPVMetaClipDataSet()
 {
   delete this->Internal;
-  this->Internal = NULL;
+  this->Internal = nullptr;
 }
 
 //----------------------------------------------------------------------------
@@ -77,6 +85,20 @@ void vtkPVMetaClipDataSet::SetImplicitFunction(vtkImplicitFunction* func)
 }
 
 //----------------------------------------------------------------------------
+void vtkPVMetaClipDataSet::SetDataSetClipFunction(vtkImplicitFunction* func)
+{
+  this->ImplicitFunctions[METACLIP_DATASET] = func;
+  this->Modified();
+}
+
+//----------------------------------------------------------------------------
+void vtkPVMetaClipDataSet::SetHyperTreeGridClipFunction(vtkImplicitFunction* func)
+{
+  this->ImplicitFunctions[METACLIP_HYPERTREEGRID] = func;
+  this->Modified();
+}
+
+//----------------------------------------------------------------------------
 void vtkPVMetaClipDataSet::SetValue(double value)
 {
   this->Internal->Clip->SetValue(value);
@@ -91,7 +113,10 @@ void vtkPVMetaClipDataSet::SetUseValueAsOffset(int value)
 //----------------------------------------------------------------------------
 void vtkPVMetaClipDataSet::PreserveInputCells(int keepCellAsIs)
 {
-  this->SetActiveFilter(keepCellAsIs);
+  if (this->Internal->Clip->GetClipFunction() == this->ImplicitFunctions[METACLIP_DATASET])
+  {
+    this->SetActiveFilter(keepCellAsIs);
+  }
 }
 //----------------------------------------------------------------------------
 void vtkPVMetaClipDataSet::SetInputArrayToProcess(
@@ -126,7 +151,6 @@ void vtkPVMetaClipDataSet::SetInputArrayToProcess(
 }
 
 //----------------------------------------------------------------------------
-
 void vtkPVMetaClipDataSet::SetInsideOut(int insideOut)
 {
   this->Internal->Clip->SetInsideOut(insideOut);
@@ -151,7 +175,8 @@ bool vtkPVMetaClipDataSet::SwitchFilterForCrinkle()
 int vtkPVMetaClipDataSet::ProcessRequest(
   vtkInformation* request, vtkInformationVector** inputVector, vtkInformationVector* outputVector)
 {
-  bool needSwitch = this->SwitchFilterForCrinkle();
+  vtkHyperTreeGrid* htg = vtkHyperTreeGrid::GetData(inputVector[0], 0);
+  bool needSwitch = htg ? false : this->SwitchFilterForCrinkle();
   this->Internal->Clip->SetExactBoxClip(this->ExactBoxClip);
   int res = this->Superclass::ProcessRequest(request, inputVector, outputVector);
   if (needSwitch)
@@ -173,4 +198,31 @@ int vtkPVMetaClipDataSet::ProcessRequest(
     this->PreserveInputCells(1);
   }
   return res;
+}
+
+//----------------------------------------------------------------------------
+int vtkPVMetaClipDataSet::RequestDataObject(
+  vtkInformation* request, vtkInformationVector** inputVector, vtkInformationVector* outputVector)
+{
+  if (!inputVector && !inputVector[0])
+  {
+    return 0;
+  }
+
+  if (vtkHyperTreeGrid::SafeDownCast(
+        inputVector[0]->GetInformationObject(0)->Get(vtkDataObject::DATA_OBJECT())))
+  {
+    this->SetOutputType(VTK_HYPER_TREE_GRID);
+    this->Internal->Clip->SetClipFunction(this->ImplicitFunctions[METACLIP_HYPERTREEGRID]);
+    this->Internal->ExtractCells->SetImplicitFunction(
+      this->ImplicitFunctions[METACLIP_HYPERTREEGRID]);
+  }
+  else
+  {
+    this->SetOutputType(VTK_UNSTRUCTURED_GRID);
+    this->Internal->Clip->SetClipFunction(this->ImplicitFunctions[METACLIP_DATASET]);
+    this->Internal->ExtractCells->SetImplicitFunction(this->ImplicitFunctions[METACLIP_DATASET]);
+  }
+
+  return this->Superclass::RequestDataObject(request, inputVector, outputVector);
 }

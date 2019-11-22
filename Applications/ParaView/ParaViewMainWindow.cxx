@@ -29,12 +29,11 @@ NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ========================================================================*/
-#include "vtkPVConfig.h"
 #ifdef PARAVIEW_ENABLE_PYTHON
-extern "C" {
-void vtkPVInitializePythonModules();
-}
+#include "pvpythonmodules.h"
 #endif
+
+#include "vtkPVConfig.h"
 
 #include "ParaViewMainWindow.h"
 #include "ui_ParaViewMainWindow.h"
@@ -53,14 +52,9 @@ void vtkPVInitializePythonModules();
 #include "pqWelcomeDialog.h"
 #include "vtkCommand.h"
 #include "vtkPVGeneralSettings.h"
-#include "vtkPVPlugin.h"
 #include "vtkProcessModule.h"
 #include "vtkSMSettings.h"
 #include "vtksys/SystemTools.hxx"
-
-#ifndef BUILD_SHARED_LIBS
-#include "pvStaticPluginsInit.h"
-#endif
 
 #ifdef PARAVIEW_USE_QTHELP
 #include "pqHelpReaction.h"
@@ -116,7 +110,7 @@ ParaViewMainWindow::ParaViewMainWindow()
   }
 
 #ifdef PARAVIEW_ENABLE_PYTHON
-  vtkPVInitializePythonModules();
+  pvpythonmodules_load();
 #endif
 
 #ifdef PARAVIEW_ENABLE_EMBEDDED_DOCUMENTATION
@@ -382,7 +376,7 @@ void ParaViewMainWindow::updateFontSize()
   }
 
 // Console font size
-#if defined(PARAVIEW_ENABLE_PYTHON)
+#ifdef PARAVIEW_ENABLE_PYTHON
   pqPythonShell* shell = qobject_cast<pqPythonShell*>(this->Internals->pythonShellDock->widget());
   shell->setFontSize(fontSize);
 #endif

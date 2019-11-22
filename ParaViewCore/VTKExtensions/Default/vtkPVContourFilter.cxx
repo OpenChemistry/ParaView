@@ -20,19 +20,26 @@
 #include "vtkArrayDispatch.h"
 #include "vtkAssume.h"
 #include "vtkCompositeDataIterator.h"
+#include "vtkContour3DLinearGrid.h"
 #include "vtkDataArray.h"
 #include "vtkDataArrayAccessor.h"
 #include "vtkDataObject.h"
 #include "vtkDemandDrivenPipeline.h"
+#include "vtkEventForwarderCommand.h"
 #include "vtkHierarchicalBoxDataSet.h"
+#include "vtkHyperTreeGrid.h"
+#include "vtkHyperTreeGridContour.h"
 #include "vtkInformation.h"
 #include "vtkInformationStringVectorKey.h"
 #include "vtkInformationVector.h"
+#include "vtkLogger.h"
 #include "vtkMultiBlockDataSet.h"
+#include "vtkNew.h"
 #include "vtkObjectFactory.h"
 #include "vtkPointData.h"
 #include "vtkSMPTools.h"
 #include "vtkSmartPointer.h"
+#include "vtkUnstructuredGrid.h"
 
 #include <cmath>
 #include <set>
@@ -141,6 +148,68 @@ int vtkPVContourFilter::RequestData(
       }
       return 1;
     }
+  }
+
+  // Check if input is hyper tree grid
+  if (vtkHyperTreeGrid::SafeDownCast(inDataObj))
+  {
+    vtkInformation* inArrayInfo = this->GetInputArrayInformation(0);
+    if (!inArrayInfo)
+    {
+      vtkErrorMacro("Problem getting name of array to process.");
+      return 0;
+    }
+
+    // WARNING
+    // Compute Normals and Generate Triangles do not apply to Hyper Tree Grids
+
+    vtkNew<vtkHyperTreeGridContour> contourFilter;
+    contourFilter->SetInputData(0, inDataObj);
+    contourFilter->SetInputArrayToProcess(0, inArrayInfo);
+    for (vtkIdType i = 0; i < this->GetNumberOfContours(); ++i)
+    {
+      contourFilter->SetValue(i, this->GetValue(i));
+    }
+
+    contourFilter->Update();
+    vtkPolyData::SafeDownCast(outDataObj)->ShallowCopy(contourFilter->GetOutput(0));
+
+    return 1;
+  }
+
+  vtkDataArray* array = this->GetInputArrayToProcess(0, inputVector);
+  if (!array)
+  {
+    vtkLog(INFO, "Contour array is null.");
+    return 1;
+  }
+
+  // See if we can delegate to the faster vtkContour3DLinearGrid for this dataset and settings
+  // Note: vtkContour3DLinearGrid does not support the ComputeScalars option.
+  bool useLinear3DContour = this->ComputeScalars == 0 &&
+    vtkContour3DLinearGrid::CanFullyProcessDataObject(inDataObj, array->GetName());
+
+  if (useLinear3DContour)
+  {
+    vtkNew<vtkContour3DLinearGrid> linear3DContour;
+    linear3DContour->SetNumberOfContours(this->GetNumberOfContours());
+    for (int i = 0; i < this->GetNumberOfContours(); ++i)
+    {
+      linear3DContour->SetValue(i, this->GetValue(i));
+    }
+    linear3DContour->SetMergePoints(this->GetLocator() != nullptr);
+    linear3DContour->SetInterpolateAttributes(true);
+    linear3DContour->SetComputeNormals(this->GetComputeNormals());
+    linear3DContour->SetOutputPointsPrecision(this->GetOutputPointsPrecision());
+    linear3DContour->SetUseScalarTree(this->GetUseScalarTree());
+    linear3DContour->SetScalarTree(this->GetScalarTree());
+    linear3DContour->SetInputArrayToProcess(0, this->GetInputArrayInformation(0));
+    vtkNew<vtkEventForwarderCommand> progressForwarder;
+    progressForwarder->SetTarget(this);
+    linear3DContour->AddObserver(vtkCommand::ProgressEvent, progressForwarder);
+    auto retval = linear3DContour->ProcessRequest(request, inputVector, outputVector);
+
+    return retval;
   }
 
   return this->ContourUsingSuperclass(request, inputVector, outputVector);
@@ -260,6 +329,7 @@ int vtkPVContourFilter::FillInputPortInformation(int port, vtkInformation* info)
   // According to the documentation this is the way to append additional
   // input data set type since VTK 5.2.
   info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkHierarchicalBoxDataSet");
+  info->Append(vtkAlgorithm::INPUT_REQUIRED_DATA_TYPE(), "vtkHyperTreeGrid");
   return 1;
 }
 
@@ -304,6 +374,7 @@ struct Cleaner
   }
 };
 }
+
 void vtkPVContourFilter::CleanOutputScalars(vtkDataArray* outScalars)
 {
   if (outScalars)

@@ -1,7 +1,15 @@
 <ServerManagerConfiguration>
   <!-- ******************************************************************** -->
+  <ProxyGroup name="delivery_managers">
+    <DataDeliveryManagerProxy name="RenderViewDeliveryManager" class="vtkPVRenderViewDataDeliveryManager">
+    </DataDeliveryManagerProxy>
+    <DataDeliveryManagerProxy name="ContextViewDeliveryManager" class="vtkPVContextViewDataDeliveryManager">
+    </DataDeliveryManagerProxy>
+  </ProxyGroup>
+
   <ProxyGroup name="internal_views">
     <!-- ================================================================== -->
+
     <Proxy class="vtkPVView"
            name="ViewBase"
            processes="client|renderserver|dataserver">
@@ -92,6 +100,13 @@
            name="XYChartViewTitle"
            processes="client|renderserver|dataserver">
       <Documentation>This is the base proxy for XY chart views.</Documentation>
+
+      <SubProxy command="SetDeliveryManager">
+        <Proxy name="DeliveryManager"
+          proxygroup="delivery_managers"
+          proxyname="ContextViewDeliveryManager"/>
+      </SubProxy>
+
       <StringVectorProperty command="SetTitle"
                             name="ChartTitle"
                             number_of_elements="1"
@@ -216,6 +231,13 @@
                  value="8" />
         </EnumerationDomain>
       </IntVectorProperty>
+      <IntVectorProperty command="SetLegendSymbolWidth"
+                         default_values="25"
+                         name="LegendSymbolWidth"
+                         number_of_elements="1"
+                         panel_visibility="advanced">
+        <Documentation>Set the legend symbol width.</Documentation>
+      </IntVectorProperty>
       <IntVectorProperty command="SetSortByXAxis"
                          default_values="0"
                          name="SortByXAxis"
@@ -328,7 +350,8 @@
         <Property name="ShowLegend"/>
         <Property name="LegendLocation"/>
         <Property name="LegendPosition"/>
-        <Property name="HideTimeMarker" />
+        <Property name="HideTimeMarker"/>
+        <Property name="LegendSymbolWidth"/>
       </PropertyGroup>
       <PropertyGroup label="Tooltip"
                      panel_visibility="advanced">
@@ -503,24 +526,28 @@
           the corresponding AxisUseCustomLabels flag is set to 1.
         </Documentation>
       </IntVectorProperty>
-      <DoubleVectorProperty command="SetLeftAxisLabels"
-                            name="LeftAxisLabels"
+
+      <StringVectorProperty name="LeftAxisLabels"
+                            command="SetLeftAxisLabels"
                             panel_visibility="advanced"
                             animateable="1"
                             number_of_elements="0"
-                            number_of_elements_per_command="1"
+                            number_of_elements_per_command="2"
                             repeat_command="1"
                             use_index="1"
                             set_number_command="SetLeftAxisLabelsNumber">
-        <!-- used to trigger the display pqScalarValueListPropertyWidget -->
-        <ArrayRangeDomain name="scalar_range"/>
         <Hints>
           <PropertyWidgetDecorator type="ShowWidgetDecorator">
             <Property name="LeftAxisUseCustomLabels"
                       function="boolean" />
           </PropertyWidgetDecorator>
         </Hints>
-      </DoubleVectorProperty>
+        <Documentation>
+          Specify list of ticks and the associated labels to display. If the label is empty,
+          the value of the tick will be used for display.
+        </Documentation>
+      </StringVectorProperty>
+
       <StringVectorProperty command="SetLeftAxisLabelFontFamily"
                             default_values="Arial"
                             name="LeftAxisLabelFontFamily"
@@ -786,12 +813,12 @@
           the corresponding AxisUseCustomLabels flag is set to 1.
         </Documentation>
       </IntVectorProperty>
-      <DoubleVectorProperty command="SetBottomAxisLabels"
+      <StringVectorProperty command="SetBottomAxisLabels"
                             name="BottomAxisLabels"
                             panel_visibility="advanced"
                             animateable="1"
                             number_of_elements="0"
-                            number_of_elements_per_command="1"
+                            number_of_elements_per_command="2"
                             repeat_command="1"
                             use_index="1"
                             set_number_command="SetBottomAxisLabelsNumber">
@@ -803,7 +830,11 @@
                       function="boolean" />
           </PropertyWidgetDecorator>
         </Hints>
-      </DoubleVectorProperty>
+        <Documentation>
+          Specify list of ticks and the associated labels to display. If the label is empty,
+          the value of the tick will be used for display.
+        </Documentation>
+      </StringVectorProperty>
       <StringVectorProperty command="SetBottomAxisLabelFontFamily"
                             default_values="Arial"
                             name="BottomAxisLabelFontFamily"
@@ -902,7 +933,6 @@
       </PropertyGroup>
       <!-- end bottom axis -->
     </ContextViewProxy>
-
     <!-- ================================================================== -->
     <ContextViewProxy base_proxygroup="internal_views"
                       base_proxyname="XYChartViewBase"
@@ -1085,12 +1115,12 @@
           the corresponding AxisUseCustomLabels flag is set to 1.
         </Documentation>
       </IntVectorProperty>
-      <DoubleVectorProperty command="SetRightAxisLabels"
+      <StringVectorProperty command="SetRightAxisLabels"
                             name="RightAxisLabels"
                             panel_visibility="advanced"
                             animateable="1"
                             number_of_elements="0"
-                            number_of_elements_per_command="1"
+                            number_of_elements_per_command="2"
                             repeat_command="1"
                             use_index="1"
                             set_number_command="SetRightAxisLabelsNumber">
@@ -1102,7 +1132,11 @@
                       function="boolean" />
           </PropertyWidgetDecorator>
         </Hints>
-      </DoubleVectorProperty>
+        <Documentation>
+          Specify list of ticks and the associated labels to display. If the label is empty,
+          the value of the tick will be used for display.
+        </Documentation>
+      </StringVectorProperty>
       <StringVectorProperty command="SetRightAxisLabelFontFamily"
                             default_values="Arial"
                             name="RightAxisLabelFontFamily"
@@ -1373,12 +1407,12 @@
           the corresponding AxisUseCustomLabels flag is set to 1.
         </Documentation>
       </IntVectorProperty>
-      <DoubleVectorProperty command="SetTopAxisLabels"
+      <StringVectorProperty command="SetTopAxisLabels"
                             name="TopAxisLabels"
                             panel_visibility="advanced"
                             animateable="1"
                             number_of_elements="0"
-                            number_of_elements_per_command="1"
+                            number_of_elements_per_command="2"
                             repeat_command="1"
                             use_index="1"
                             set_number_command="SetTopAxisLabelsNumber">
@@ -1390,7 +1424,11 @@
                       function="boolean" />
           </PropertyWidgetDecorator>
         </Hints>
-      </DoubleVectorProperty>
+        <Documentation>
+          Specify list of ticks and the associated labels to display. If the label is empty,
+          the value of the tick will be used for display.
+        </Documentation>
+      </StringVectorProperty>
       <StringVectorProperty command="SetTopAxisLabelFontFamily"
                             default_values="Arial"
                             name="TopAxisLabelFontFamily"
@@ -2377,6 +2415,10 @@
           <Property name="CameraViewUpInfo" panel_visibility="never"/>
           <Property name="CameraViewUp" panel_visibility="never"/>
           <Property name="CameraViewAngle" panel_visibility="never"/>
+          <Property name="CameraFocalDiskInfo" panel_visibility="never"/>
+          <Property name="CameraFocalDisk" panel_visibility="never"/>
+          <Property name="CameraFocalDistanceInfo" panel_visibility="never"/>
+          <Property name="CameraFocalDistance" panel_visibility="never"/>
           <Property name="CameraParallelScale" panel_visibility="never"/>
           <Property name="CameraParallelScaleInfo" panel_visibility="never"/>
           <Property name="EyeAngle" panel_visibility="never"/>
@@ -2431,6 +2473,32 @@
                          name="UseTexturedBackground"
                          number_of_elements="1">
         <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty command="SetSkyboxBackground"
+                         default_values="0"
+                         name="UseSkyboxBackground"
+                         number_of_elements="1">
+        <Documentation>
+          Enable skybox texture.
+        </Documentation>
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty command="SetUseEnvironmentLighting"
+                         default_values="0"
+                         name="UseEnvironmentLighting"
+                         number_of_elements="1">
+        <Documentation>
+          Enable skybox light contribution. This feature is only compatible with PBR interpolation.
+        </Documentation>
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty command="SetSkyboxResolution"
+                         default_values="1000"
+                         name="SkyboxResolution"
+                         number_of_elements="1">
+        <Documentation>
+          Set the resolution of the skybox.
+        </Documentation>
       </IntVectorProperty>
       <ProxyProperty command="SetBackgroundTexture"
                      name="BackgroundTexture" panel_widget="texture_selector">
@@ -2612,11 +2680,8 @@
           label="Back End"
           default_values="scivis"
           number_of_elements="1">
-        <StringListDomain name="list">
-          <String value="OSPRay raycaster" />
-          <String value="OSPRay pathtracer" />
-          <String value="OptiX pathtracer" />
-        </StringListDomain>
+        <RendererDomain name="list">
+        </RendererDomain>
         <Documentation>Set the OSPRay renderer to use.</Documentation>
         <Hints>
           <PropertyWidgetDecorator type="OSPRayHidingDecorator" />
@@ -2692,13 +2757,23 @@
           animateable="0"
           number_of_elements="1">
         <BooleanDomain name="bool" />
-        <Documentation>Controls whether to denoise images (if available).</Documentation>
+        <Documentation>Controls whether to denoise images. This option will have no effect without a denoiser library and until progressive passes or samples per pixel exceeds four.</Documentation>
         <Hints>
           <PropertyWidgetDecorator type="OSPRayHidingDecorator" />
           <PropertyWidgetDecorator type="GenericDecorator"
                                    mode="visibility"
                                    property="EnableOSPRay"
                                    values="1" />
+          <PropertyWidgetDecorator type="CompositeDecorator">
+            <Expression type="or">
+              <PropertyWidgetDecorator type="EnableWidgetDecorator">
+                <Property name="MaxFrames" function="greaterthan" value="3"/>
+              </PropertyWidgetDecorator>
+              <PropertyWidgetDecorator type="EnableWidgetDecorator">
+                <Property name="SamplesPerPixel" function="greaterthan" value="3" />
+              </PropertyWidgetDecorator>
+            </Expression>
+          </PropertyWidgetDecorator>
         </Hints>
       </IntVectorProperty>
       <DoubleVectorProperty
@@ -2741,7 +2816,7 @@
       <DoubleVectorProperty
           name="BackgroundNorth"
           command="SetBackgroundNorth"
-          default_values="1.0 0.0 0.0"
+          default_values="0.0 1.0 0.0"
           animateable="0"
           number_of_elements="3">
         <Documentation>Sets north pole for gradient and image background in OSPRay path tracer.</Documentation>
@@ -2756,7 +2831,7 @@
       <DoubleVectorProperty
           name="BackgroundEast"
           command="SetBackgroundEast"
-          default_values="0.0 1.0 0.0"
+          default_values="1.0 0.0 0.0"
           animateable="0"
           number_of_elements="3">
         <Documentation>Sets east direction for image background in OSPRay path tracer.</Documentation>
@@ -2819,6 +2894,9 @@
         <Property name="Background2"/>
         <Property name="UseGradientBackground"/>
         <Property name="UseTexturedBackground"/>
+        <Property name="UseSkyboxBackground"/>
+        <Property name="UseEnvironmentLighting"/>
+        <Property name="SkyboxResolution"/>
         <Property name="BackgroundTexture"/>
       </PropertyGroup>
       <PropertyGroup label="Stereo">
@@ -2855,8 +2933,14 @@
         <Property name="MaxFrames"/>
         <Property name="Denoise"/>
         <Property name="LightScale"/>
-	<Property name="OSPRayTemporalCacheSize"/>
+        <Property name="OSPRayTemporalCacheSize"/>
       </PropertyGroup>
+
+      <SubProxy command="SetDeliveryManager">
+        <Proxy name="DeliveryManager"
+          proxygroup="delivery_managers"
+          proxyname="RenderViewDeliveryManager"/>
+      </SubProxy>
     </RenderViewProxy>
 
     <!-- ================================================================== -->
@@ -2976,6 +3060,12 @@
                          name="ShowLegend"
                          number_of_elements="1">
         <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty command="SetLegendSymbolWidth"
+                         default_values="25"
+                         name="LegendSymbolWidth"
+                         number_of_elements="1"
+                         panel_visibility="never">
       </IntVectorProperty>
     </ContextViewProxy>
     <!-- ================================================================== -->
@@ -3772,6 +3862,20 @@
                       panel_visibility="advanced" />
             <Property name="Ambient" panel_visibility="advanced"/>
             <Property name="Diffuse" panel_visibility="advanced"/>
+            <Property name="Roughness" panel_visibility="advanced"/>
+            <Property name="Metallic" panel_visibility="advanced"/>
+            <Property name="Texture" panel_visibility="advanced"/>
+            <Property name="RepeatTextures" panel_visibility="advanced"/>
+            <Property name="InterpolateTextures" panel_visibility="advanced"/>
+            <Property name="UseMipmapTextures" panel_visibility="advanced"/>
+            <Property name="BaseColorTexture" panel_visibility="advanced"/>
+            <Property name="NormalTexture" panel_visibility="advanced"/>
+            <Property name="NormalScale" panel_visibility="advanced"/>
+            <Property name="MaterialTexture" panel_visibility="advanced"/>
+            <Property name="OcclusionStrength" panel_visibility="advanced"/>
+            <Property name="EmissiveTexture" panel_visibility="advanced"/>
+            <Property name="EmissiveFactor" panel_visibility="advanced"/>
+            <Property name="FlipTextures" panel_visibility="advanced"/>
           </PropertyGroup>
 
           <PropertyGroup label="Edge Styling">
@@ -3812,8 +3916,6 @@
                       panel_visibility="never" />
             <Property name="SuppressLOD"
                       panel_visibility="never" />
-            <Property name="Texture"
-                      panel_visibility="advanced" />
             <Property name="UserTransform"
                       panel_visibility="never" />
             <Property name="Triangulate"
@@ -3934,7 +4036,6 @@
             <Property name="CustomTriangleScale" />
             <Property name="CustomShader" />
             <Property name="Emissive" />
-            <Property name="Color" />
             <Property name="ScaleByArray" />
             <Property name="SetScaleArray" />
             <Property name="ScaleArrayComponent" />
@@ -3965,7 +4066,7 @@
           <ProxyEditorPropertyWidget property="GridAxesVisibility" />
         </Hints>
       </ProxyProperty>
-      <SubProxy>
+      <SubProxy command="SetSelectionRepresentation">
         <Proxy name="SelectionRepresentation"
                proxygroup="representations"
                proxyname="SelectionRepresentation" />
@@ -4115,7 +4216,7 @@
             <Property name="ScalarOpacityUnitDistance"
                       panel_visibility="advanced" />
             <Property name="ExtractedBlockIndex"
-                      panel_visibility="never" />
+                      panel_visibility="advanced" />
             <Property name="SelectMapper"
                       panel_visibility="advanced"
                       panel_visibility_default_for_representation="volume" />
@@ -4262,6 +4363,7 @@
                       panel_visibility="never" />
             <Property name="ShowIsosurfaces" />
             <Property name="IsosurfaceValues" />
+            <Property name="UseCropping" />
             <Hints>
               <PropertyWidgetDecorator type="CompositeDecorator">
                 <Expression type="or">
@@ -4277,7 +4379,35 @@
               </PropertyWidgetDecorator>
             </Hints>
           </PropertyGroup>
+          <PropertyGroup label="Cropping Parameters" panel_widget="InteractiveBox">
+            <Property function="Position" name="CroppingOrigin" />
+            <Property function="Scale" name="CroppingScale" />
+            <Property function="Input" name="DummyInput" />
+            <Hints>
+              <PropertyWidgetDecorator type="CompositeDecorator">
+                <Expression type="and">
+                  <Expression type="or">
+                    <PropertyWidgetDecorator type="GenericDecorator"
+                                             mode="visibility"
+                                             property="Representation"
+                                             value="Volume" />
+                    <PropertyWidgetDecorator type="GenericDecorator"
+                                             mode="visibility"
+                                             property="Representation"
+                                             value="NVIDIA IndeX" />
+                  </Expression>
+                  <PropertyWidgetDecorator type="GenericDecorator"
+                                           mode="visibility"
+                                           property="UseCropping"
+                                           value="1" />
+                </Expression>
+              </PropertyWidgetDecorator>
+            </Hints>
+          </PropertyGroup>
         </ExposedProperties>
+        <LinkProperties>
+          <Property name="DummyInput" with_property="Input" />
+        </LinkProperties>
       </SubProxy>
       <SubProxy>
         <Proxy name="SliceRepresentation"
@@ -4644,6 +4774,36 @@
           <!-- enable this widget when ShowIsosurfaces==1 -->
         </Hints>
       </DoubleVectorProperty>
+      <IntVectorProperty command="SetCropping"
+                         default_values="0"
+                         name="UseCropping"
+                         number_of_elements="1">
+        <BooleanDomain name="bool"/>
+        <Documentation>This property specifies if the cropping is enabled.</Documentation>
+      </IntVectorProperty>
+      <DoubleVectorProperty animateable="1"
+                            command="SetCroppingOrigin"
+                            name="CroppingOrigin"
+                            number_of_elements="3"
+                            argument_is_array="1"
+                            default_values="0 0 0">
+        <Documentation>This property specifies the cropping origin.</Documentation>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty animateable="1"
+                            command="SetCroppingScale"
+                            name="CroppingScale"
+                            number_of_elements="3"
+                            argument_is_array="1"
+                            default_values="1 1 1">
+        <Documentation>This property specifies the cropping scale.</Documentation>
+      </DoubleVectorProperty>
+      <InputProperty is_internal="1" name="DummyInput" />
+      <Hints>
+        <ProxyList>
+          <Link name="DummyInput"
+                with_property="Input" />
+        </ProxyList>
+      </Hints>
 
       <!-- end of UniformGridVolumeRepresentation -->
     </RepresentationProxy>
@@ -4996,18 +5156,6 @@
           The opacity to use when rendering the model.
         </Documentation>
       </DoubleVectorProperty>
-      <DoubleVectorProperty command="SetColor"
-                            default_values="1.0 1.0 1.0"
-                            name="Color"
-                            number_of_elements="3"
-                            panel_visibility="never">
-        <DoubleRangeDomain max="1 1 1"
-                           min="0 0 0"
-                           name="range" />
-        <Hints>
-          <GlobalPropertyLink type="ColorPalette" property="ForegroundColor" />
-        </Hints>
-      </DoubleVectorProperty>
       <DoubleVectorProperty command="SetEdgeColor"
                             default_values="0 0 0.5"
                             name="EdgeColor"
@@ -5173,8 +5321,8 @@
                          default_values="0"
                          name="ExtractedBlockIndex"
                          number_of_elements="1">
-        <Documentation>In case of multiblock datasets, choose the flat index of
-        the dataset to volume render. The flat index must point to an
+        <Documentation>In case of multiblock datasets, choose the index of
+        the dataset to volume render. The index must point to an
         unstructured grid dataset. If the input is not a multiblock dataset
         then this index is ignored.</Documentation>
         <CompositeTreeDomain mode="leaves"
@@ -7855,7 +8003,7 @@
       </StringVectorProperty>
       <StringVectorProperty command="SetLineThickness"
                             clean_command="ClearLineThicknesses"
-                            element_types="2 0"
+                            element_types="str int"
                             name="SeriesLineThickness"
                             number_of_elements_per_command="2"
                             repeat_command="1">
@@ -7889,6 +8037,24 @@
           </RequiredProperties>
         </ChartSeriesSelectionDomain>
       </StringVectorProperty>
+      <StringVectorProperty command="SetMarkerSize"
+                            clean_command="ClearMarkerSizes"
+                            element_types="str double"
+                            name="SeriesMarkerSize"
+                            number_of_elements_per_command="2"
+                            repeat_command="1">
+        <Documentation>Set the series marker size.</Documentation>
+        <ChartSeriesSelectionDomain name="array_list"
+                                    hide_partial_arrays="0"
+                                    default_mode="value"
+                                    default_value="4">
+          <RequiredProperties>
+            <Property function="Input" name="Input" />
+            <Property function="FieldDataSelection" name="AttributeType" />
+            <Property function="CompositeIndexSelection" name="CompositeDataSetIndex" />
+          </RequiredProperties>
+        </ChartSeriesSelectionDomain>
+      </StringVectorProperty>
 
       <PropertyGroup label="Series Parameters"
                      panel_widget="SeriesEditor"
@@ -7903,6 +8069,8 @@
                   function="SeriesLineStyle" />
         <Property name="SeriesLabel"
                   function="SeriesLabel" />
+        <Property name="SeriesMarkerSize"
+                  function="SeriesMarkerSize" />
         <Property name="SeriesMarkerStyle"
                   function="SeriesMarkerStyle" />
         <Property name="SeriesPlotCorner"
@@ -7941,7 +8109,7 @@
       </StringVectorProperty>
       <StringVectorProperty command="SetLineThickness"
                             clean_command="ClearLineThicknesses"
-                            element_types="2 0"
+                            element_types="str double"
                             name="SeriesLineThickness"
                             number_of_elements_per_command="2"
                             repeat_command="1">
@@ -7973,6 +8141,23 @@
           </RequiredProperties>
         </ChartSeriesSelectionDomain>
       </StringVectorProperty>
+      <StringVectorProperty command="SetMarkerSize"
+                            clean_command="ClearMarkerSizes"
+                            element_types="str double"
+                            name="SeriesMarkerSize"
+                            number_of_elements_per_command="2"
+                            repeat_command="1">
+        <Documentation>Set the series marker size.</Documentation>
+        <ChartSeriesSelectionDomain name="array_list"
+                                    default_mode="value"
+                                    default_value="4">
+          <RequiredProperties>
+            <Property function="Input" name="Input" />
+            <Property function="FieldDataSelection" name="AttributeType" />
+            <Property function="CompositeIndexSelection" name="CompositeDataSetIndex" />
+          </RequiredProperties>
+        </ChartSeriesSelectionDomain>
+      </StringVectorProperty>
 
       <PropertyGroup label="Series Parameters"
                      panel_widget="SeriesEditor"
@@ -7989,6 +8174,8 @@
                   function="SeriesLabel" />
         <Property name="SeriesMarkerStyle"
                   function="SeriesMarkerStyle" />
+        <Property name="SeriesMarkerSize"
+                  function="SeriesMarkerSize" />
         <Property name="SeriesPlotCorner"
                   function="SeriesPlotCorner"/>
       </PropertyGroup>
@@ -8187,9 +8374,10 @@
         <EnumerationDomain name="enum">
           <Entry text="2D Text Widget" value="0" />
           <Entry text="Flagpole Actor" value="1" />
+          <Entry text="Billboard 3D Text" value="2" />
         </EnumerationDomain>
         <Documentation>
-Select how you want the text to be represented in the view.
+          Select how you want the text to be represented in the view.
         </Documentation>
       </IntVectorProperty>
 
@@ -8269,9 +8457,9 @@ Select how you want the text to be represented in the view.
             <Property name="Position2Info" />
             <Hints>
               <PropertyWidgetDecorator type="GenericDecorator"
-                                      mode="visibility"
-                                      property="TextPropMode"
-                                      value="0" />
+                                       mode="visibility"
+                                       property="TextPropMode"
+                                       value="0" />
             </Hints>
           </PropertyGroup>
           <Property name="TextScaleMode" panel_visibility="never"/>
@@ -8301,9 +8489,46 @@ Select how you want the text to be represented in the view.
             <Property name="FlagSize" />
             <Hints>
               <PropertyWidgetDecorator type="GenericDecorator"
-                                      mode="visibility"
-                                      property="TextPropMode"
-                                      value="1" />
+                                       mode="visibility"
+                                       property="TextPropMode"
+                                       value="1" />
+            </Hints>
+          </PropertyGroup>
+        </ExposedProperties>
+      </SubProxy>
+
+      <SubProxy command="SetBillboardTextActor">
+        <Proxy name="BillboardTextActor3D"
+               proxygroup="annotations"
+               proxyname="BillboardTextActor3D"></Proxy>
+         <ShareProperties subproxy="TextWidgetRepresentation">
+           <Exception name="Orientation" />
+           <Exception name="WindowLocation" />
+           <Exception name="Position" />
+           <Exception name="Position2" />
+           <Exception name="PositionInfo" />
+           <Exception name="Position2Info" />
+           <Exception name="TextScaleMode" />
+           <Exception name="Resizable" />
+         </ShareProperties>
+        <ExposedProperties>
+          <!-- properties for Text -->
+          <PropertyGroup label="Billboard Position" panel_widget="InteractiveHandle">
+            <Property function="WorldPosition" name="BillboardPosition" />
+            <Hints>
+              <PropertyWidgetDecorator type="GenericDecorator"
+                                       mode="visibility"
+                                       property="TextPropMode"
+                                       value="2" />
+            </Hints>
+          </PropertyGroup>
+          <PropertyGroup label="Billboard Properties">
+            <Property name="DisplayOffset" />
+            <Hints>
+              <PropertyWidgetDecorator type="GenericDecorator"
+                                       mode="visibility"
+                                       property="TextPropMode"
+                                       value="2" />
             </Hints>
           </PropertyGroup>
         </ExposedProperties>
@@ -8521,6 +8746,56 @@ Select how you want the text to be represented in the view.
         </ExposedProperties>
       </SubProxy>
       <!-- End of ProgressBarSourceRepresentation -->
+    </RepresentationProxy>
+    <!-- =================================================================== -->
+    <RepresentationProxy class="vtkLogoSourceRepresentation"
+                         name="LogoSourceRepresentation"
+                         processes="client|dataserver|renderserver"
+                         si_class="vtkSIProxy">
+      <Documentation>Representation proxy used to show a Logo.</Documentation>
+      <InputProperty command="SetInputConnection"
+                     name="Input">
+        <DataTypeDomain name="input_type">
+          <DataType value="vtkImageData" />
+        </DataTypeDomain>
+        <Documentation>ImageData input for the representation.</Documentation>
+      </InputProperty>
+      <IntVectorProperty command="SetVisibility"
+                         default_values="1"
+                         name="Visibility"
+                         number_of_elements="1"
+                         panel_visibility="never">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty command="SetInteractivity"
+                         default_values="1"
+                         name="Interactivity"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Set whether user should be able to interactively place the Logo in the view.
+        </Documentation>
+      </IntVectorProperty>
+      <DoubleVectorProperty command="SetOpacity"
+                            default_values="1.0"
+                            name="Opacity"
+                            number_of_elements="1">
+        <DoubleRangeDomain max="1"
+                           min="0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <SubProxy command="SetLogoWidgetRepresentation">
+        <Proxy name="LogoWidgetRepresentation"
+               proxygroup="representations"
+               proxyname="LogoWidgetRepresentation"></Proxy>
+        <ExposedProperties>
+          <Property name="Position" />
+          <Property name="Position2" panel_visibility="never"/>
+          <Property name="PositionInfo" />
+          <Property name="Position2Info" />
+        </ExposedProperties>
+      </SubProxy>
+      <!-- End of LogoSourceRepresentation -->
     </RepresentationProxy>
     <!-- =================================================================== -->
     <Proxy class="vtkPVFrustumActor"
@@ -9740,6 +10015,10 @@ Select how you want the text to be represented in the view.
           <Property name="CameraViewUpInfo" panel_visibility="never"/>
           <Property name="CameraViewUp" panel_visibility="never"/>
           <Property name="CameraViewAngle" panel_visibility="never"/>
+          <Property name="CameraFocalDiskInfo" panel_visibility="never"/>
+          <Property name="CameraFocalDisk" panel_visibility="never"/>
+          <Property name="CameraFocalDistanceInfo" panel_visibility="never"/>
+          <Property name="CameraFocalDistance" panel_visibility="never"/>
           <Property name="CameraParallelScale" panel_visibility="never"/>
           <Property name="CameraParallelScaleInfo" panel_visibility="never"/>
           <Property name="CameraParallelProjection"
@@ -9751,6 +10030,9 @@ Select how you want the text to be represented in the view.
             <Property name="Background2"/>
             <Property name="UseGradientBackground"/>
             <Property name="UseTexturedBackground"/>
+            <Property name="UseSkyboxBackground"/>
+            <Property name="UseEnvironmentLighting"/>
+            <Property name="SkyboxResolution"/>
             <Property name="BackgroundTexture"/>
           </PropertyGroup>
 
@@ -9806,6 +10088,7 @@ Select how you want the text to be represented in the view.
             <Property name="ShowLegend"/>
             <Property name="LegendLocation"/>
             <Property name="LegendPosition"/>
+            <Property name="LegendSymbolWidth"/>
           </PropertyGroup>
           <PropertyGroup label="Legend Properties"
                          panel_widget="FontEditor"
@@ -10025,6 +10308,7 @@ Select how you want the text to be represented in the view.
             <Property name="ShowLegend"/>
             <Property name="LegendLocation"/>
             <Property name="LegendPosition"/>
+            <Property name="LegendSymbolWidth"/>
           </PropertyGroup>
           <PropertyGroup label="Legend Properties"
                          panel_widget="FontEditor"
@@ -10198,6 +10482,155 @@ Select how you want the text to be represented in the view.
         <Documentation>Set the input to the representation.</Documentation>
       </InputProperty>
 
+      <DoubleVectorProperty command="SetPosition"
+                            default_values="0 0 0"
+                            name="Position"
+                            number_of_elements="3">
+        <DoubleRangeDomain name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetScale"
+                            default_values="1 1 1"
+                            name="Scale"
+                            number_of_elements="3">
+        <DoubleRangeDomain name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetOrientation"
+                            default_values="0 0 0"
+                            name="Orientation"
+                            number_of_elements="3">
+        <DoubleRangeDomain name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetOrigin"
+                            default_values="0 0 0"
+                            name="Origin"
+                            number_of_elements="3">
+        <DoubleRangeDomain name="range" />
+      </DoubleVectorProperty>
+      <IntVectorProperty command="SetPickable"
+                         default_values="1"
+                         name="Pickable"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <DoubleVectorProperty argument_is_array="1"
+                            command="SetUserTransform"
+                            default_values="1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1"
+                            name="UserTransform"
+                            number_of_elements="16">
+        <Documentation>
+          In addition to the instance variables such as position and
+          orientation, you can add an additional transformation for your own
+          use. This transformation is concatenated with the actor's internal
+          transformation, which you implicitly create through the use of
+          Position, Origin, Orientation. The value is 4x4 matrix for the linear
+          transform to use.
+        </Documentation>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetAmbient"
+                            default_values="0.0"
+                            name="Ambient"
+                            number_of_elements="1">
+        <DoubleRangeDomain max="1"
+                           min="0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetDiffuse"
+                            default_values="1.0"
+                            name="Diffuse"
+                            number_of_elements="1">
+        <DoubleRangeDomain max="1"
+                           min="0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetSpecular"
+                            default_values="0.0"
+                            name="Specular"
+                            number_of_elements="1">
+        <DoubleRangeDomain max="1"
+                           min="0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetSpecularPower"
+                            default_values="100.0"
+                            name="SpecularPower"
+                            number_of_elements="1">
+        <DoubleRangeDomain max="100"
+                           min="0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetAmbientColor"
+                            default_values="1.0 1.0 1.0"
+                            name="AmbientColor"
+                            number_of_elements="3">
+        <DoubleRangeDomain max="1 1 1"
+                           min="0 0 0"
+                           name="range" />
+        <Hints>
+          <GlobalPropertyLink type="ColorPalette" property="ForegroundColor" />
+        </Hints>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetDiffuseColor"
+                            default_values="1.0 1.0 1.0"
+                            name="DiffuseColor"
+                            number_of_elements="3"
+                            panel_widget="color_selector_with_palette">
+        <DoubleRangeDomain max="1 1 1"
+                           min="0 0 0"
+                           name="range" />
+        <Hints>
+          <GlobalPropertyLink type="ColorPalette" property="SurfaceColor" />
+        </Hints>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetSpecularColor"
+                            default_values="1.0 1.0 1.0"
+                            name="SpecularColor"
+                            number_of_elements="3">
+        <DoubleRangeDomain max="1 1 1"
+                           min="0 0 0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetLineWidth"
+                            default_values="1.0"
+                            name="LineWidth"
+                            number_of_elements="1">
+        <DoubleRangeDomain min="0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetOpacity"
+                            default_values="1.0"
+                            name="Opacity"
+                            number_of_elements="1">
+        <DoubleRangeDomain max="1"
+                           min="0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetLuminosity"
+                            default_values="0.0"
+                            name="Luminosity"
+                            number_of_elements="1">
+        <DoubleRangeDomain max="100.0"
+                           min="0"
+                           name="range" />
+        <Documentation>Makes the object emit light.
+        Only takes effect with OSPRay's path traced renderer.
+        </Documentation>
+        <Hints>
+          <PropertyWidgetDecorator type="OSPRayHidingDecorator" />
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="EnableOSPRay"
+                                   values="1" />
+        </Hints>
+      </DoubleVectorProperty>
+      <IntVectorProperty command="SetRenderLinesAsTubes"
+                         default_values="0"
+                         name="RenderLinesAsTubes"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          When set, all lines are rendered as 3D tubes, if supported by OpenGL driver.
+        </Documentation>
+      </IntVectorProperty>
       <!-- end of AMROutlineRepresentation -->
     </RepresentationProxy>
 
@@ -10467,6 +10900,13 @@ Select how you want the text to be represented in the view.
         <DoubleRangeDomain max="1"
                            min="0"
                            name="range" />
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3"
+                                   inverse="1" />
+        </Hints>
       </DoubleVectorProperty>
       <DoubleVectorProperty command="SetDiffuse"
                             default_values="1.0"
@@ -10483,7 +10923,248 @@ Select how you want the text to be represented in the view.
         <DoubleRangeDomain max="1"
                            min="0"
                            name="range" />
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3"
+                                   inverse="1" />
+        </Hints>
       </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetRoughness"
+                            default_values="0.3"
+                            name="Roughness"
+                            number_of_elements="1">
+        <Documentation>
+          Set how rough is the surface
+        </Documentation>
+        <DoubleRangeDomain max="1"
+                           min="0"
+                           name="range" />
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3" />
+        </Hints>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetMetallic"
+                            default_values="0.0"
+                            name="Metallic"
+                            number_of_elements="1">
+        <Documentation>
+          Set metalness of the surface. It is usually either 0 or 1 but any value is valid.
+        </Documentation>
+        <DoubleRangeDomain max="1"
+                           min="0"
+                           name="range" />
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3" />
+        </Hints>
+      </DoubleVectorProperty>
+      <ProxyProperty command="SetTexture"
+                     name="Texture"
+                     panel_widget="texture_selector"
+                     null_on_empty="1" >
+        <Documentation>
+          Set the diffuse color texture.
+        </Documentation>
+        <ProxyGroupDomain name="groups">
+          <Group name="textures" />
+        </ProxyGroupDomain>
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3"
+                                   inverse="1" />
+          <TextureSelectorWidget check_tcoords="1" />
+          <!-- enable the texture selector only when tcoords is available. -->
+        </Hints>
+      </ProxyProperty>
+      <IntVectorProperty command="SetRepeatTextures"
+                         default_values="1"
+                         name="RepeatTextures"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Should textures be clamped or repeated when texture coordinates go
+          outside the range of 0 to 1.
+        </Documentation>
+      </IntVectorProperty>
+      <IntVectorProperty command="SetInterpolateTextures"
+                         default_values="0"
+                         name="InterpolateTextures"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          When sampling a texture should linear interpolations be used. If false
+          then nearest neighbor sampling will be used.
+        </Documentation>
+      </IntVectorProperty>
+      <IntVectorProperty command="SetUseMipmapTextures"
+                         default_values="0"
+                         name="UseMipmapTextures"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>
+          Should mipmaps be used for textures. Mipmaps are espcially useful when
+          working with large detailed textures or situations where you might be
+          viewing a texture map from far away.
+        </Documentation>
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="InterpolateTextures"
+                                   value="1" />
+        </Hints>
+      </IntVectorProperty>
+      <ProxyProperty command="SetBaseColorTexture"
+                     name="BaseColorTexture"
+                     panel_widget="texture_selector"
+                     null_on_empty="1" >
+        <Documentation>
+          Set the base color (also called albedo) texture. It will define the diffuse color for a
+          non metallic surface or the specular color for a metallic surface.
+        </Documentation>
+        <ProxyGroupDomain name="groups">
+          <Group name="textures" />
+        </ProxyGroupDomain>
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3" />
+          <TextureSelectorWidget check_tcoords="1" />
+          <!-- enable the texture selector only when tcoords is available. -->
+        </Hints>
+      </ProxyProperty>
+      <ProxyProperty command="SetMaterialTexture"
+                     name="MaterialTexture"
+                     panel_widget="texture_selector"
+                     null_on_empty="1" >
+        <Documentation>
+          Set the material texture. This texture encodes occlusion, roughness and metalness
+          on the red, green, blue channel respectively.
+        </Documentation>
+        <ProxyGroupDomain name="groups">
+          <Group name="textures" />
+        </ProxyGroupDomain>
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3" />
+          <TextureSelectorWidget check_tcoords="1" />
+          <!-- enable the texture selector only when tcoords is available. -->
+        </Hints>
+      </ProxyProperty>
+      <DoubleVectorProperty command="SetOcclusionStrength"
+                            default_values="1.0"
+                            name="OcclusionStrength"
+                            number_of_elements="1">
+        <Documentation>
+          Set the ambient occlusion strength of the material texture.
+        </Documentation>
+        <DoubleRangeDomain max="5"
+                           min="0"
+                           name="range" />
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="MaterialTexture"
+                                   value="null"
+                                   inverse="1" />
+        </Hints>
+      </DoubleVectorProperty>
+      <ProxyProperty command="SetNormalTexture"
+                     name="NormalTexture"
+                     panel_widget="texture_selector"
+                     null_on_empty="1" >
+        <Documentation>
+          Set the normal mapping texture.
+        </Documentation>
+        <ProxyGroupDomain name="groups">
+          <Group name="textures" />
+        </ProxyGroupDomain>
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="0"
+                                   inverse="1" />
+          <TextureSelectorWidget check_tcoords="1" check_tangents="1" />
+          <!-- enable the texture selector only when tcoords is available. -->
+        </Hints>
+      </ProxyProperty>
+      <DoubleVectorProperty command="SetNormalScale"
+                            default_values="1.0"
+                            name="NormalScale"
+                            number_of_elements="1">
+        <Documentation>
+          Set the scale of normal mapping deviation.
+        </Documentation>
+        <DoubleRangeDomain max="5"
+                           min="0"
+                           name="range" />
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="NormalTexture"
+                                   value="null"
+                                   inverse="1" />
+        </Hints>
+      </DoubleVectorProperty>
+      <ProxyProperty command="SetEmissiveTexture"
+                     name="EmissiveTexture"
+                     panel_widget="texture_selector"
+                     null_on_empty="1" >
+        <Documentation>
+          Set the emissive texture.
+        </Documentation>
+        <ProxyGroupDomain name="groups">
+          <Group name="textures" />
+        </ProxyGroupDomain>
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3" />
+          <TextureSelectorWidget check_tcoords="1" />
+          <!-- enable the texture selector only when tcoords is available. -->
+        </Hints>
+      </ProxyProperty>
+      <DoubleVectorProperty command="SetEmissiveFactor"
+                            default_values="1.0 1.0 1.0"
+                            name="EmissiveFactor"
+                            number_of_elements="3">
+        <Documentation>
+          Set the factor of the red, green, blue channels of the emissive texture.
+        </Documentation>
+        <DoubleRangeDomain max="10"
+                           min="0"
+                           name="range" />
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="EmissiveTexture"
+                                   value="null"
+                                   inverse="1" />
+        </Hints>
+      </DoubleVectorProperty>
+      <IntVectorProperty command="SetFlipTextures"
+                         default_values="0"
+                         name="FlipTextures"
+                         number_of_elements="1">
+        <Documentation>
+          Enable texture coordinate flip on Y axis. Depending on some format specification, the
+          origin of the texture could be either at the bottom left or the top left of the image.
+        </Documentation>
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
       <IntVectorProperty command="SetSuppressLOD"
                          default_values="0"
                          name="SuppressLOD"
@@ -10520,6 +11201,13 @@ Select how you want the text to be represented in the view.
         <DoubleRangeDomain max="1 1 1"
                            min="0 0 0"
                            name="range" />
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3"
+                                   inverse="1" />
+        </Hints>
       </DoubleVectorProperty>
       <DoubleVectorProperty command="SetLineWidth"
                             default_values="1.0"
@@ -10564,7 +11252,8 @@ Select how you want the text to be represented in the view.
                  value="0" />
           <Entry text="Gouraud"
                  value="1" />
-          <!--<Entry value="2" text="Phong" />-->
+          <Entry text="PBR"
+                 value="3" />
         </EnumerationDomain>
       </IntVectorProperty>
       <IntVectorProperty command="SetTriangulate"
@@ -10640,6 +11329,13 @@ Select how you want the text to be represented in the view.
         <DoubleRangeDomain max="100"
                            min="0"
                            name="range" />
+        <Hints>
+          <PropertyWidgetDecorator type="GenericDecorator"
+                                   mode="visibility"
+                                   property="Interpolation"
+                                   value="3"
+                                   inverse="1" />
+        </Hints>
       </DoubleVectorProperty>
       <DoubleVectorProperty command="SetLuminosity"
                             default_values="0.0"
@@ -10722,14 +11418,6 @@ Select how you want the text to be represented in the view.
         </Hints>
         <BooleanDomain name="bool" />
       </IntVectorProperty>
-      <ProxyProperty command="SetTexture"
-                     name="Texture"
-                     panel_widget="texture_selector"
-                     null_on_empty="1" >
-        <ProxyGroupDomain name="groups">
-          <Group name="textures" />
-        </ProxyGroupDomain>
-      </ProxyProperty>
       <ProxyProperty command="SetLookupTable"
                      name="LookupTable" >
         <Documentation>Set the lookup-table to use to map data array to colors.

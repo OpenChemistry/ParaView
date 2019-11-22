@@ -116,6 +116,8 @@ void vtkPVLODActor::Render(vtkRenderer* ren, vtkMapper* vtkNotUsed(m))
     this->Device->SetBackfaceProperty(this->BackfaceProperty);
   }
   this->Device->SetProperty(this->Property);
+  bool inTrans = this->IsRenderingTranslucentPolygonalGeometry();
+  this->Device->SetIsRenderingTranslucentPolygonalGeometry(inTrans);
 
   /* render the texture */
   if (this->Texture)
@@ -133,12 +135,14 @@ void vtkPVLODActor::Render(vtkRenderer* ren, vtkMapper* vtkNotUsed(m))
   // We might want to estimate time from the number of polygons in mapper.
   vtkInformation* info = this->GetPropertyKeys();
   this->Device->SetPropertyKeys(info);
+  this->Device->SetMapper(mapper);
   this->Device->Render(ren, mapper);
   if (this->Texture)
   {
     this->Texture->PostRender(ren);
   }
   this->Property->PostRender(this, ren);
+  this->Device->SetIsRenderingTranslucentPolygonalGeometry(false);
   this->EstimatedRenderTime = mapper->GetTimeToDraw();
 }
 
@@ -161,7 +165,7 @@ int vtkPVLODActor::RenderOpaqueGeometry(vtkViewport* vp)
 
   // is this actor opaque ?
   // Do this check only when not in selection mode
-  if (this->GetIsOpaque() || (ren->GetSelector() && this->Property->GetOpacity() > 0.0))
+  if (this->HasOpaqueGeometry() || (ren->GetSelector() && this->Property->GetOpacity() > 0.0))
   {
     this->Render(ren, this->Mapper);
     renderedSomething = 1;

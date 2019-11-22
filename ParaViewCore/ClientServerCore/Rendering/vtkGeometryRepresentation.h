@@ -23,7 +23,7 @@
  * @par Thanks:
  * The addition of a transformation matrix was supported by CEA/DIF
  * Commissariat a l'Energie Atomique, Centre DAM Ile-De-France, Arpajon, France.
-*/
+ */
 
 #ifndef vtkGeometryRepresentation_h
 #define vtkGeometryRepresentation_h
@@ -39,7 +39,6 @@ class vtkCompositeDataDisplayAttributes;
 class vtkCompositePolyDataMapper2;
 class vtkMapper;
 class vtkPiecewiseFunction;
-class vtkPVCacheKeeper;
 class vtkPVGeometryFilter;
 class vtkPVLODActor;
 class vtkScalarsToColors;
@@ -69,14 +68,6 @@ public:
    */
   int ProcessViewRequest(vtkInformationRequestKey* request_type, vtkInformation* inInfo,
     vtkInformation* outInfo) override;
-
-  /**
-   * This needs to be called on all instances of vtkGeometryRepresentation when
-   * the input is modified. This is essential since the geometry filter does not
-   * have any real-input on the client side which messes with the Update
-   * requests.
-   */
-  void MarkModified() override;
 
   /**
    * Get/Set the visibility for this representation. When the visibility of
@@ -175,6 +166,15 @@ public:
   virtual void SetLuminosity(double val);
   virtual void SetRenderPointsAsSpheres(bool);
   virtual void SetRenderLinesAsTubes(bool);
+  virtual void SetRoughness(double val);
+  virtual void SetMetallic(double val);
+  virtual void SetBaseColorTexture(vtkTexture* tex);
+  virtual void SetMaterialTexture(vtkTexture* tex);
+  virtual void SetNormalTexture(vtkTexture* tex);
+  virtual void SetEmissiveTexture(vtkTexture* tex);
+  virtual void SetNormalScale(double val);
+  virtual void SetOcclusionStrength(double val);
+  virtual void SetEmissiveFactor(double rval, double gval, double bval);
 
   //***************************************************************************
   // Forwarded to Actor.
@@ -185,6 +185,16 @@ public:
   virtual void SetScale(double, double, double);
   virtual void SetTexture(vtkTexture*);
   virtual void SetUserTransform(const double[16]);
+  virtual void SetFlipTextures(bool);
+
+  //***************************************************************************
+  // Forwarded to all textures
+  virtual void SetRepeatTextures(bool);
+  vtkGetMacro(RepeatTextures, bool);
+  virtual void SetInterpolateTextures(bool);
+  vtkGetMacro(InterpolateTextures, bool);
+  virtual void SetUseMipmapTextures(bool);
+  vtkGetMacro(UseMipmapTextures, bool);
 
   //***************************************************************************
   // Forwarded to Mapper and LODMapper.
@@ -354,11 +364,6 @@ protected:
    */
   virtual vtkPVLODActor* GetRenderedProp() { return this->Actor; }
 
-  /**
-   * Overridden to check with the vtkPVCacheKeeper to see if the key is cached.
-   */
-  bool IsCached(double cache_key) override;
-
   // Progress Callback
   void HandleGeometryRepresentationProgress(vtkObject* caller, unsigned long, void*);
 
@@ -382,9 +387,16 @@ protected:
    */
   void UpdateShaderReplacements();
 
+  /**
+   * Returns true if this representation has translucent geometry. Unlike
+   * `vtkActor::HasTranslucentPolygonalGeometry` which cannot be called in
+   * `Update`, this method can be called in `Update` i.e. before the mapper has
+   * all the data to decide if it is doing translucent rendering.
+   */
+  virtual bool NeedsOrderedCompositing();
+
   vtkAlgorithm* GeometryFilter;
   vtkAlgorithm* MultiBlockMaker;
-  vtkPVCacheKeeper* CacheKeeper;
   vtkGeometryRepresentation_detail::DecimationFilterType* Decimator;
   vtkPVGeometryFilter* LODOutlineFilter;
 
@@ -393,6 +405,9 @@ protected:
   vtkPVLODActor* Actor;
   vtkProperty* Property;
 
+  bool RepeatTextures;
+  bool InterpolateTextures;
+  bool UseMipmapTextures;
   double Ambient;
   double Specular;
   double Diffuse;

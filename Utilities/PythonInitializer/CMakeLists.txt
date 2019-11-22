@@ -4,8 +4,13 @@ set(sources
 vtk_module_add_module(ParaView::PythonInitializer
   SOURCES ${sources})
 
-# TODO: Frozen python support
-
 vtk_module_link(ParaView::PythonInitializer
   PRIVATE
-    ParaView::pvpythonmodules)
+    ParaView::pvpythonmodules
+    VTK::vtkpythonmodules)
+
+if (PARAVIEW_FREEZE_PYTHON)
+  vtk_module_definitions(ParaView::PythonInitializer
+    PRIVATE
+      PARAVIEW_FREEZE_PYTHON)
+endif ()

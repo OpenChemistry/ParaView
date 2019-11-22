@@ -29,6 +29,39 @@
     </NewWidgetRepresentationProxy>
     <!-- ================================================================== -->
     <NewWidgetRepresentationProxy class="vtk3DWidgetRepresentation"
+                                  name="LightWidgetRepresentation">
+      <IntVectorProperty command="SetEnabled"
+                         default_values="0"
+                         name="Enabled"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>Enable/Disable widget interaction.</Documentation>
+      </IntVectorProperty>
+      <SubProxy>
+        <Proxy name="Prop"
+               proxygroup="3d_widget_representations"
+               proxyname="LightRepresentation"></Proxy>
+        <ExposedProperties>
+          <Property name="Positional" />
+          <Property name="Visibility" />
+          <Property name="WorldPositionInfo" />
+          <Property name="WorldPosition" />
+          <Property name="FocalPointInfo" />
+          <Property name="FocalPoint" />
+          <Property name="ConeAngleInfo" />
+          <Property name="ConeAngle" />
+          <Property name="LightColorInfo" />
+          <Property name="LightColor" />
+        </ExposedProperties>
+      </SubProxy>
+      <SubProxy>
+        <Proxy name="Widget"
+               proxygroup="3d_widgets"
+               proxyname="LightWidget"></Proxy>
+      </SubProxy>
+    </NewWidgetRepresentationProxy>
+    <!-- ================================================================== -->
+    <NewWidgetRepresentationProxy class="vtk3DWidgetRepresentation"
                                   name="LineWidgetRepresentation">
       <IntVectorProperty command="SetEnabled"
                          default_values="0"
@@ -102,6 +135,8 @@
           <Property name="Visibility" />
           <Property name="PlaceFactor" />
           <Property name="Reset" />
+          <Property name="AlwaysSnapToNearestAxis" />
+          <Property name="AlwaysSnapToNearestAxisInfo" />
         </ExposedProperties>
       </SubProxy>
       <SubProxy>
@@ -345,6 +380,8 @@
           <Property name="HandlePositionsInfo" />
           <Property name="Closed" />
           <Property name="LineColor" />
+          <Property name="CurrentHandleIndex" />
+          <Property name="CurrentHandleIndexInfo" />
         </ExposedProperties>
       </SubProxy>
       <SubProxy>
@@ -374,10 +411,13 @@
         <ExposedProperties>
           <Property name="PlaceWidget" />
           <Property name="Visibility" />
+          <Property name="DirectionalLine"/>
           <Property name="HandlePositions" />
           <Property name="HandlePositionsInfo" />
           <Property name="Closed" />
           <Property name="LineColor" />
+          <Property name="CurrentHandleIndex" />
+          <Property name="CurrentHandleIndexInfo" />
         </ExposedProperties>
       </SubProxy>
       <SubProxy>
@@ -674,6 +714,46 @@
       </SubProxy>
       <!-- End of ProgressBarWidgetRepresentation -->
     </NewWidgetRepresentationProxy>
+    <!-- ================================================================== -->
+    <NewWidgetRepresentationProxy class="vtk3DWidgetRepresentation"
+                                   name="LogoWidgetRepresentation">
+      <Documentation>LogoWidgetRepresentation is a representation for a logo widget
+      </Documentation>
+      <IntVectorProperty command="SetEnabled"
+                         default_values="1"
+                         name="Enabled"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+        <Documentation>Enable/Disable widget interaction.</Documentation>
+      </IntVectorProperty>
+      <IntVectorProperty command="SetUseNonCompositedRenderer"
+                         default_values="1"
+                         name="UseNonCompositedRenderer"
+                         number_of_elements="1"></IntVectorProperty>
+      <SubProxy>
+        <Proxy name="Prop2D"
+               proxygroup="3d_widget_representations"
+               proxyname="LogoRepresentation"></Proxy>
+        <ExposedProperties>
+          <Property name="Visibility" />
+          <Property name="Position" />
+          <Property name="Position2" />
+          <Property name="PositionInfo" />
+          <Property name="Position2Info" />
+        </ExposedProperties>
+      </SubProxy>
+      <SubProxy>
+        <Proxy name="Widget"
+               proxygroup="3d_widgets"
+               proxyname="LogoWidget"></Proxy>
+        <ExposedProperties>
+          <Property name="ProcessEvents" />
+          <Property name="Selectable" />
+          <Property name="Resizable" />
+        </ExposedProperties>
+      </SubProxy>
+      <!-- End of LogoWidgetRepresentation -->
+    </NewWidgetRepresentationProxy>
   </ProxyGroup>
   <!-- ****************************************************************** -->
   <ProxyGroup name="3d_widget_representations">
@@ -780,6 +860,12 @@
                          number_of_elements="1">
         <BooleanDomain name="bool" />
       </IntVectorProperty>
+      <IntVectorProperty command="SetDirectionalLine"
+                            default_values="1"
+                            name="DirectionalLine"
+                            number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
       <DoubleVectorProperty argument_is_array="1"
                             command="PlaceWidget"
                             default_values="none"
@@ -822,6 +908,16 @@
                            min="0 0 0"
                            name="range" />
       </DoubleVectorProperty>
+      <IntVectorProperty name="CurrentHandleIndexInfo"
+        command="GetCurrentHandleIndex"
+        information_only="1"/>
+      <IntVectorProperty name="CurrentHandleIndex"
+        number_of_elements="1"
+        default_values="-1"
+        command="SetCurrentHandleIndex"
+        information_property="CurrentHandleIndexInfo"
+        panel_visibility="never">
+      </IntVectorProperty>
       <!-- End of SplineRepresentation -->
     </Proxy>
     <!-- ================================================================== -->
@@ -835,6 +931,12 @@
                          number_of_elements="1">
         <BooleanDomain name="bool" />
       </IntVectorProperty>
+      <IntVectorProperty command="SetDirectionalLine"
+                            default_values="1"
+                            name="DirectionalLine"
+                            number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
       <DoubleVectorProperty argument_is_array="1"
                             command="PlaceWidget"
                             default_values="none"
@@ -877,6 +979,16 @@
                            min="0 0 0"
                            name="range" />
       </DoubleVectorProperty>
+      <IntVectorProperty name="CurrentHandleIndexInfo"
+        command="GetCurrentHandleIndex"
+        information_only="1"/>
+      <IntVectorProperty name="CurrentHandleIndex"
+        number_of_elements="1"
+        default_values="-1"
+        command="SetCurrentHandleIndex"
+        information_property="CurrentHandleIndexInfo"
+        panel_visibility="never">
+      </IntVectorProperty>
     </Proxy>
     <!-- ================================================================== -->
     <Proxy class="vtkSliderRepresentation3D"
@@ -1291,6 +1403,21 @@
                          number_of_elements="1">
         <BooleanDomain name="bool" />
       </IntVectorProperty>
+      <IntVectorProperty command="SetAlwaysSnapToNearestAxis"
+                         default_values="0"
+                         information_property="AlwaysSnapToNearestAxisInfo"
+                         name="AlwaysSnapToNearestAxis"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty command="GetAlwaysSnapToNearestAxis"
+                         information_only="1"
+                         default_values="0"
+                         name="AlwaysSnapToNearestAxisInfo"
+                         number_of_elements="1">
+        <SimpleIntInformationHelper />
+      </IntVectorProperty>
+
       <Property command="Reset"
                 name="Reset"></Property>
       <DoubleVectorProperty command="SetOrigin"
@@ -1404,6 +1531,75 @@
       <DoubleVectorProperty command="GetWorldPosition"
                             information_only="1"
                             name="WorldPositionInfo">
+        <SimpleDoubleInformationHelper />
+      </DoubleVectorProperty>
+    </Proxy>
+    <!-- ================================================================== -->
+    <Proxy class="vtkLightRepresentation"
+           name="LightRepresentation">
+      <IntVectorProperty animateable="1"
+                         command="SetVisibility"
+                         default_values="1"
+                         name="Visibility"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty animateable="1"
+                         command="SetPositional"
+                         default_values="0"
+                         name="Positional"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <DoubleVectorProperty argument_is_array="1"
+                            command="SetLightPosition"
+                            default_values="0 0 1"
+                            information_property="WorldPositionInfo"
+                            name="WorldPosition"
+                            number_of_elements="3">
+        <DoubleRangeDomain name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="GetLightPosition"
+                            information_only="1"
+                            name="WorldPositionInfo">
+        <SimpleDoubleInformationHelper />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty argument_is_array="1"
+                            command="SetFocalPoint"
+                            default_values="0 0 0"
+                            information_property="FocalPointInfo"
+                            name="FocalPoint"
+                            number_of_elements="3">
+        <DoubleRangeDomain name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="GetFocalPoint"
+                            information_only="1"
+                            name="FocalPointInfo">
+        <SimpleDoubleInformationHelper />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetConeAngle"
+                            default_values="30"
+                            information_property="ConeAngleInfo"
+                            name="ConeAngle"
+                            number_of_elements="1">
+        <DoubleRangeDomain name="range" min="0" max="180"/>
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="GetConeAngle"
+                            information_only="1"
+                            name="ConeAngleInfo">
+        <SimpleDoubleInformationHelper />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty argument_is_array="1"
+                            command="SetLightColor"
+                            default_values="1.0 1.0 1.0"
+                            information_property="LightColorInfo"
+                            name="LightColor"
+                            number_of_elements="3">
+        <DoubleRangeDomain name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="GetLightColor"
+                            information_only="1"
+                            name="LightColorInfo">
         <SimpleDoubleInformationHelper />
       </DoubleVectorProperty>
     </Proxy>
@@ -1658,6 +1854,46 @@
         <BooleanDomain name="bool" />
       </IntVectorProperty>
     </Proxy>
+    <!-- ================================================================== -->
+    <Proxy class="vtkLogoRepresentation"
+           name="LogoRepresentation">
+      <IntVectorProperty animateable="1"
+                         command="SetVisibility"
+                         default_values="1"
+                         name="Visibility"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <DoubleVectorProperty command="SetPosition"
+                            default_values="0.02 0.02"
+                            information_property="PositionInfo"
+                            name="Position"
+                            number_of_elements="2">
+        <DoubleRangeDomain max="1 1"
+                           min="0 0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="GetPosition"
+                            information_only="1"
+                            name="PositionInfo">
+        <SimpleDoubleInformationHelper />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="SetPosition2"
+                            default_values="0.08 0.08"
+                            information_property="Position2Info"
+                            name="Position2"
+                            number_of_elements="2">
+        <DoubleRangeDomain max="1 1"
+                           min="0 0"
+                           name="range" />
+      </DoubleVectorProperty>
+      <DoubleVectorProperty command="GetPosition2"
+                            information_only="1"
+                            name="Position2Info">
+        <SimpleDoubleInformationHelper />
+      </DoubleVectorProperty>
+    </Proxy>
+
   </ProxyGroup>
   <!-- ****************************************************************** -->
   <ProxyGroup name="3d_widgets">
@@ -1685,6 +1921,10 @@
            base_proxyname="WidgetBase"
            class="vtkHandleWidget"
            name="HandleWidget"></Proxy>
+    <Proxy base_proxygroup="3d_widgets"
+           base_proxyname="WidgetBase"
+           class="vtkLightWidget"
+           name="LightWidget"></Proxy>
     <Proxy base_proxygroup="3d_widgets"
            base_proxyname="WidgetBase"
            class="vtkLineWidget2"
@@ -1824,6 +2064,31 @@
         <BooleanDomain name="bool" />
       </IntVectorProperty>
       <!-- End of ProgressBarWidget -->
+    </Proxy>
+    <Proxy base_proxygroup="3d_widgets"
+           base_proxyname="WidgetBase"
+           class="vtkLogoWidget"
+           name="LogoWidget">
+      <IntVectorProperty command="SetSelectable"
+                         default_values="0"
+                         name="Selectable"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty animateable="0"
+                         command="SetResizable"
+                         default_values="1"
+                         name="Resizable"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <IntVectorProperty command="SetProcessEvents"
+                         default_values="1"
+                         name="ProcessEvents"
+                         number_of_elements="1">
+        <BooleanDomain name="bool" />
+      </IntVectorProperty>
+      <!-- End of LogoWidget -->
     </Proxy>
     <Proxy base_proxygroup="3d_widgets"
            base_proxyname="WidgetBase"

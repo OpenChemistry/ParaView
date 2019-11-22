@@ -167,36 +167,6 @@ if (PARAVIEW_BUILD_QT_GUI)
     set_tests_properties(CoProcessingFullWorkflow PROPERTIES RUN_SERIAL ON)
     _set_standard_test_properties(CoProcessingFullWorkflow)
 
-    add_test(NAME CoProcessingFullWorkflowNewUI
-      COMMAND ${CMAKE_COMMAND}
-      -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
-      -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
-      -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CatalystExporterGUI.xml
-      -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
-      -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/waveletdriver.py
-      -DCOPROCESSING_IMAGE_TESTER:FILEPATH=$<TARGET_FILE:CoProcessingCompareImagesTester>
-      -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}/Testing/Data/Baseline
-      -DCOPROCESSING_OUTPUTCHECK_SCRIPT:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/outputcheck.py
-      -DTEST_NAME:STRING=CoProcessingFullWorkflowNewUI
-      -P ${CMAKE_CURRENT_SOURCE_DIR}/CoProcessingFullWorkflowTest.cmake)
-    set_tests_properties(CoProcessingFullWorkflowNewUI PROPERTIES RUN_SERIAL ON)
-    _set_standard_test_properties(CoProcessingFullWorkflowNewUI)
-
-    add_test(NAME CoProcessingFullWorkflowWithOnlyExtracts
-      COMMAND ${CMAKE_COMMAND}
-      -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
-      -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
-      -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CatalystGUIOnlyExtracts.xml
-      -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
-      -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/waveletdriver.py
-      -DCOPROCESSING_IMAGE_TESTER:FILEPATH=$<TARGET_FILE:CoProcessingCompareImagesTester>
-      -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}/Testing/Data/Baseline
-      -DCOPROCESSING_OUTPUTCHECK_SCRIPT:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/outputcheck.py
-      -DTEST_NAME:STRING=CoProcessingFullWorkflowWithOnlyExtracts
-      -P ${CMAKE_CURRENT_SOURCE_DIR}/CoProcessingFullWorkflowTest.cmake)
-    set_tests_properties(CoProcessingFullWorkflowWithOnlyExtracts PROPERTIES RUN_SERIAL ON)
-    _set_standard_test_properties(CoProcessingFullWorkflowWithOnlyExtracts)
-
     ExternalData_add_test("${_vtk_build_TEST_DATA_TARGET}" NAME CoProcessingFullWorkflowWithPlots
       COMMAND ${CMAKE_COMMAND}
       -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
@@ -214,22 +184,6 @@ if (PARAVIEW_BUILD_QT_GUI)
     set_tests_properties(CoProcessingFullWorkflowWithPlots PROPERTIES RUN_SERIAL ON)
     _set_standard_test_properties(CoProcessingFullWorkflowWithPlots)
 
-    ExternalData_add_test("${_vtk_build_TEST_DATA_TARGET}" NAME CoProcessingFullWorkflowWithOnlyPlots
-      COMMAND ${CMAKE_COMMAND}
-      -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
-      -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
-      -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CatalystGUIOnlyPlots.xml
-      -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
-      -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/waveletdriver.py
-      -DCOPROCESSING_IMAGE_TESTER:FILEPATH=$<TARGET_FILE:CoProcessingCompareImagesTester>
-      -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}/Testing/Data/Baseline
-      -DCOPROCESSING_OUTPUTCHECK_SCRIPT:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/outputcheck.py
-      -DTEST_NAME:STRING=CoProcessingFullWorkflowWithOnlyPlots
-      -P ${CMAKE_CURRENT_SOURCE_DIR}/CoProcessingFullWorkflowTest.cmake
-      DATA{${_vtk_build_TEST_INPUT_DATA_DIRECTORY}/Data/Baseline/CPFullWorkflowPlot2.png} )
-    set_tests_properties(CoProcessingFullWorkflowWithOnlyPlots PROPERTIES RUN_SERIAL ON)
-    _set_standard_test_properties(CoProcessingFullWorkflowWithOnlyPlots)
-
     find_python_module(numpy numpy_found)
     if (numpy_found AND TARGET ParaView::CinemaReader)
       add_test(NAME CoProcessingFullWorkflowCinema
@@ -244,6 +198,18 @@ if (PARAVIEW_BUILD_QT_GUI)
       set_tests_properties(CoProcessingFullWorkflowCinema PROPERTIES RUN_SERIAL ON)
       _set_standard_test_properties(CoProcessingFullWorkflowCinema)
 
+      add_test(NAME CoProcessingFullWorkflowCinemaFilters
+        COMMAND ${CMAKE_COMMAND}
+        -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+        -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+        -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CatalystCinemaFiltersGUI.xml
+        -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+        -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/waveletdriver.py
+        -DTEST_NAME:STRING=CoProcessingFullWorkflowCinemaFilters
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/CoProcessingFullWorkflowTest.cmake)
+      set_tests_properties(CoProcessingFullWorkflowCinemaFilters PROPERTIES RUN_SERIAL ON)
+      _set_standard_test_properties(CoProcessingFullWorkflowCinemaFilters)
+
       add_test(NAME CoProcessingFullWorkflowCinemaComposite
         COMMAND ${CMAKE_COMMAND}
         -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
@@ -256,17 +222,31 @@ if (PARAVIEW_BUILD_QT_GUI)
       set_tests_properties(CoProcessingFullWorkflowCinemaComposite PROPERTIES RUN_SERIAL ON)
       _set_standard_test_properties(CoProcessingFullWorkflowCinemaComposite)
 
-      add_test(NAME CoProcessingFullWorkflowCinemaCompositeFloat
+      # temporarily disabling until VTK level change removes INVERTIBLE_LUT
+      #
+      #add_test(NAME CoProcessingFullWorkflowCinemaRecolorable
+      #  COMMAND ${CMAKE_COMMAND}
+      #  -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+      #  -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+      #  -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CatalystCinemaRecolorableGUI.xml
+      #  -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+      #  -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/waveletdriver.py
+      #  -DTEST_NAME:STRING=CoProcessingFullWorkflowCinemaRecolorable
+      #  -P ${CMAKE_CURRENT_SOURCE_DIR}/CoProcessingFullWorkflowTest.cmake)
+      #set_tests_properties(CoProcessingFullWorkflowCinemaRecolorable PROPERTIES RUN_SERIAL ON)
+      #_set_standard_test_properties(CoProcessingFullWorkflowCinemaRecolorable)
+
+      add_test(NAME CoProcessingFullWorkflowCinemaPose
         COMMAND ${CMAKE_COMMAND}
         -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
         -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
-        -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CatalystCinemaCompositeFloatGUI.xml
+        -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CatalystCinemaPoseGUI.xml
         -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
         -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/waveletdriver.py
-        -DTEST_NAME:STRING=CoProcessingFullWorkflowCinemaCompositeFloat
+        -DTEST_NAME:STRING=CoProcessingFullWorkflowCinemaPose
         -P ${CMAKE_CURRENT_SOURCE_DIR}/CoProcessingFullWorkflowTest.cmake)
-      set_tests_properties(CoProcessingFullWorkflowCinemaCompositeFloat PROPERTIES RUN_SERIAL ON)
-      _set_standard_test_properties(CoProcessingFullWorkflowCinemaCompositeFloat)
+      set_tests_properties(CoProcessingFullWorkflowCinemaPose PROPERTIES RUN_SERIAL ON)
+      _set_standard_test_properties(CoProcessingFullWorkflowCinemaPose)
 
     endif()
 
@@ -293,6 +273,174 @@ if (PARAVIEW_BUILD_QT_GUI)
       -P ${CMAKE_CURRENT_SOURCE_DIR}/CoProcessingFullWorkflowTest.cmake)
     set_tests_properties(ExportNow PROPERTIES RUN_SERIAL ON)
     _set_standard_test_properties(ExportNow)
+
+    if (NOT PARAVIEW_USE_MPI)
+      add_test(NAME CinemaExportGeometry
+        COMMAND ${CMAKE_COMMAND}
+        -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+        -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+        -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CinemaExportGeometry.xml
+        -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+        -DPVPYTHON_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvpython>
+        -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}
+        -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_SOURCE_DIR}/Examples/Catalyst/SampleScripts/filedriver.py
+        -DCINEMA_DATABASE_TESTER:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportCheck.py
+        -DCINEMA_INPUT_DATA:FILEPATH=${CMAKE_BINARY_DIR}/ExternalData/Testing/Data/can.ex2
+        -DCINEMA_BATCH_SCRIPT:FILEPATH=cinema/CinemaExportGeometry.py
+        -DUSE_MPI:BOOL=FALSE
+        -DTEST_NAME:STRING=CinemaExportGeometry
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportFullWorkflowTest.cmake)
+      set_tests_properties(CinemaExportGeometry PROPERTIES RUN_SERIAL ON)
+      _set_standard_test_properties(CinemaExportGeometry)
+    
+      if(NOT WIN32)
+        add_test(NAME CinemaExportGeometryAndImages
+          COMMAND ${CMAKE_COMMAND}
+          -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+          -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+          -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CinemaExportGeometryAndImages.xml
+          -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+          -DPVPYTHON_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvpython>
+          -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}
+          -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_SOURCE_DIR}/Examples/Catalyst/SampleScripts/filedriver.py
+          -DCINEMA_DATABASE_TESTER:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportCheck.py
+          -DCINEMA_INPUT_DATA:FILEPATH=${CMAKE_BINARY_DIR}/ExternalData/Testing/Data/can.ex2
+          -DCINEMA_BATCH_SCRIPT:FILEPATH=cinema/CinemaExportGeometryAndImages.py
+          -DUSE_MPI:BOOL=FALSE
+          -DTEST_NAME:STRING=CinemaExportGeometryAndImages
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportFullWorkflowTest.cmake)
+        set_tests_properties(CinemaExportGeometryAndImages PROPERTIES RUN_SERIAL ON)
+        _set_standard_test_properties(CinemaExportGeometryAndImages)
+    
+        add_test(NAME CinemaExportNoTimesteps
+          COMMAND ${CMAKE_COMMAND}
+          -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+          -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+          -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CinemaExportNoTimesteps.xml
+          -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+          -DPVPYTHON_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvpython>
+          -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}
+          -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_SOURCE_DIR}/Examples/Catalyst/SampleScripts/filedriver.py
+          -DCINEMA_DATABASE_TESTER:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportCheck.py
+          -DCINEMA_INPUT_DATA:FILEPATH=${CMAKE_BINARY_DIR}/ExternalData/Testing/Data/cube.vtu
+          -DCINEMA_BATCH_SCRIPT:FILEPATH=cinema/CinemaExportNoTimesteps.py
+          -DUSE_MPI:BOOL=FALSE
+          -DTEST_NAME:STRING=CinemaExportNoTimesteps
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportFullWorkflowTest.cmake)
+        set_tests_properties(CinemaExportNoTimesteps PROPERTIES RUN_SERIAL ON)
+        _set_standard_test_properties(CinemaExportNoTimesteps)
+
+        add_test(NAME CinemaExportFloatFiles
+          COMMAND ${CMAKE_COMMAND}
+          -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+          -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+          -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CinemaExportFloatFiles.xml
+          -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+          -DPVPYTHON_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvpython>
+          -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}
+          -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_SOURCE_DIR}/Examples/Catalyst/SampleScripts/filedriver.py
+          -DCINEMA_DATABASE_TESTER:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportCheck.py
+          -DCINEMA_INPUT_DATA:FILEPATH=${CMAKE_BINARY_DIR}/ExternalData/Testing/Data/cube.vtu
+          -DCINEMA_BATCH_SCRIPT:FILEPATH=cinema/CinemaExportFloatFiles.py
+          -DUSE_MPI:BOOL=FALSE
+          -DTEST_NAME:STRING=CinemaExportFloatFiles
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportFullWorkflowTest.cmake)
+        set_tests_properties(CinemaExportNoTimesteps PROPERTIES RUN_SERIAL ON)
+        _set_standard_test_properties(CinemaExportFloatFiles)
+
+      endif()
+    else()
+      add_test(NAME CinemaExportGeometry
+        COMMAND ${CMAKE_COMMAND}
+        -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+        -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+        -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CinemaExportGeometry.xml
+        -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+        -DPVPYTHON_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvpython>
+        -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}
+        -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_SOURCE_DIR}/Examples/Catalyst/SampleScripts/filedriver.py
+        -DCINEMA_DATABASE_TESTER:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportCheck.py
+        -DCINEMA_INPUT_DATA:FILEPATH=${CMAKE_BINARY_DIR}/ExternalData/Testing/Data/can.ex2
+        -DCINEMA_BATCH_SCRIPT:FILEPATH=cinema/CinemaExportGeometry.py
+        -DUSE_MPI:BOOL=TRUE
+        -DMPIEXEC:FILEPATH=${MPIEXEC_EXECUTABLE}
+        -DMPIEXEC_NUMPROC_FLAG:STRING=${MPIEXEC_NUMPROC_FLAG}
+        -DMPIEXEC_NUMPROCS=1
+        -DMPIEXEC_PREFLAGS:STRING=${MPIEXEC_PREFLAGS}
+        -DTEST_NAME:STRING=CinemaExportGeometry
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportFullWorkflowTest.cmake)
+      set_tests_properties(CinemaExportGeometry PROPERTIES RUN_SERIAL ON)
+      _set_standard_test_properties(CinemaExportGeometry)
+    
+      if(NOT WIN32)
+        add_test(NAME CinemaExportGeometryAndImages
+          COMMAND ${CMAKE_COMMAND}
+          -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+          -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+          -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CinemaExportGeometryAndImages.xml
+          -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+          -DPVPYTHON_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvpython>
+          -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}
+          -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_SOURCE_DIR}/Examples/Catalyst/SampleScripts/filedriver.py
+          -DCINEMA_DATABASE_TESTER:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportCheck.py
+          -DCINEMA_INPUT_DATA:FILEPATH=${CMAKE_BINARY_DIR}/ExternalData/Testing/Data/can.ex2
+          -DCINEMA_BATCH_SCRIPT:FILEPATH=cinema/CinemaExportGeometryAndImages.py
+          -DUSE_MPI:BOOL=TRUE
+          -DMPIEXEC:FILEPATH=${MPIEXEC_EXECUTABLE}
+          -DMPIEXEC_NUMPROC_FLAG:STRING=${MPIEXEC_NUMPROC_FLAG}
+          -DMPIEXEC_NUMPROCS=1
+          -DMPIEXEC_PREFLAGS:STRING=${MPIEXEC_PREFLAGS}
+          -DTEST_NAME:STRING=CinemaExportGeometryAndImages
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportFullWorkflowTest.cmake)
+        set_tests_properties(CinemaExportGeometryAndImages PROPERTIES RUN_SERIAL ON)
+        _set_standard_test_properties(CinemaExportGeometryAndImages)
+    
+        add_test(NAME CinemaExportNoTimesteps
+          COMMAND ${CMAKE_COMMAND}
+          -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+          -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+          -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CinemaExportNoTimesteps.xml
+          -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+          -DPVPYTHON_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvpython>
+          -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}
+          -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_SOURCE_DIR}/Examples/Catalyst/SampleScripts/filedriver.py
+          -DCINEMA_DATABASE_TESTER:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportCheck.py
+          -DCINEMA_INPUT_DATA:FILEPATH=${CMAKE_BINARY_DIR}/ExternalData/Testing/Data/cube.vtu
+          -DCINEMA_BATCH_SCRIPT:FILEPATH=cinema/CinemaExportNoTimesteps.py
+          -DUSE_MPI:BOOL=TRUE
+          -DMPIEXEC:FILEPATH=${MPIEXEC_EXECUTABLE}
+          -DMPIEXEC_NUMPROC_FLAG:STRING=${MPIEXEC_NUMPROC_FLAG}
+          -DMPIEXEC_NUMPROCS=1
+          -DMPIEXEC_PREFLAGS:STRING=${MPIEXEC_PREFLAGS}
+          -DTEST_NAME:STRING=CinemaExportNoTimesteps
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportFullWorkflowTest.cmake)
+        set_tests_properties(CinemaExportNoTimesteps PROPERTIES RUN_SERIAL ON)
+        _set_standard_test_properties(CinemaExportNoTimesteps)
+    
+        add_test(NAME CinemaExportFloatFiles
+          COMMAND ${CMAKE_COMMAND}
+          -DPARAVIEW_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::paraview>
+          -DCOPROCESSING_TEST_DIR:PATH=${CMAKE_BINARY_DIR}/Testing/Temporary
+          -DPARAVIEW_TEST_XML:FILEPATH=${ParaView_SOURCE_DIR}/Applications/ParaView/Testing/XML/CinemaExportFloatFiles.xml
+          -DPVBATCH_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvbatch>
+          -DPVPYTHON_EXECUTABLE:FILEPATH=$<TARGET_FILE:ParaView::pvpython>
+          -DCOPROCESSING_DATA_DIR:PATH=${paraview_test_data_directory_output}
+          -DCOPROCESSING_DRIVER_SCRIPT:FILEPATH=${CMAKE_SOURCE_DIR}/Examples/Catalyst/SampleScripts/filedriver.py
+          -DCINEMA_DATABASE_TESTER:FILEPATH=${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportCheck.py
+          -DCINEMA_INPUT_DATA:FILEPATH=${CMAKE_BINARY_DIR}/ExternalData/Testing/Data/cube.vtu
+          -DCINEMA_BATCH_SCRIPT:FILEPATH=cinema/CinemaExportFloatFiles.py
+          -DUSE_MPI:BOOL=TRUE
+          -DMPIEXEC:FILEPATH=${MPIEXEC_EXECUTABLE}
+          -DMPIEXEC_NUMPROC_FLAG:STRING=${MPIEXEC_NUMPROC_FLAG}
+          -DMPIEXEC_NUMPROCS=1
+          -DMPIEXEC_PREFLAGS:STRING=${MPIEXEC_PREFLAGS}
+          -DTEST_NAME:STRING=CinemaExportFloatFiles
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/CinemaExportFullWorkflowTest.cmake)
+        set_tests_properties(CinemaExportNoTimesteps PROPERTIES RUN_SERIAL ON)
+        _set_standard_test_properties(CinemaExportFloatFiles)
+      endif()
+
+    endif()
 
   ENDIF ()
 endif()
