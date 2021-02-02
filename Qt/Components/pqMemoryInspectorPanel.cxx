@@ -59,10 +59,6 @@ using Ui::pqMemoryInspectorPanelForm;
 #include <QTreeWidgetItem>
 #include <QTreeWidgetItemIterator>
 
-#if QT_VERSION < 0x050000
-#include <QPlastiqueStyle>
-#endif
-
 #include <map>
 using std::map;
 using std::pair;
@@ -84,8 +80,15 @@ using std::setfill;
 #include <algorithm>
 using std::min;
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+#define QT_ENDL endl
+#else
+#define QT_ENDL Qt::endl
+#endif
+
 #define pqErrorMacro(estr)                                                                         \
-  qDebug() << "Error in:" << endl << __FILE__ << ", line " << __LINE__ << endl << "" estr << endl;
+  qDebug() << "Error in:" << QT_ENDL << __FILE__ << ", line " << __LINE__ << QT_ENDL << "" estr    \
+           << QT_ENDL;
 
 // User interface
 //=============================================================================
@@ -127,7 +130,6 @@ enum
 
 namespace
 {
-#if QT_VERSION >= 0x050000
 // ****************************************************************************
 QStyle* getMemoryUseWidgetStyle()
 {
@@ -139,19 +141,6 @@ QStyle* getMemoryUseWidgetStyle()
   static QStyle* style = QStyleFactory::create("fusion");
   return style;
 }
-#else
-// ****************************************************************************
-QPlastiqueStyle* getMemoryUseWidgetStyle()
-{
-  // this sets the style for the progress bar used to
-  // display % memory usage. If we didn't do this the
-  // display will look different on each OS. The ownership
-  // of the style does not change hands when it's set to
-  // the widget thus a single static instance is convenient.
-  static QPlastiqueStyle style;
-  return &style;
-}
-#endif
 // ****************************************************************************
 float getSystemWarningThreshold()
 {
@@ -218,13 +207,9 @@ void setMemoryUseWidgetColor(QPalette& palette, float fracUsed, float fracWarn, 
 // ****************************************************************************
 void setWidgetContainerColor(QPalette& palette, int rank)
 {
-  if (rank % 2)
+  if (rank % 2 != 0)
   {
-    palette.setColor(QPalette::Base, QColor(250, 250, 250));
-  }
-  else
-  {
-    palette.setColor(QPalette::Base, QColor(237, 237, 237));
+    palette.setColor(QPalette::Base, palette.alternateBase().color());
   }
 }
 
@@ -390,12 +375,6 @@ void RankData::InitializeMemoryUseWidget()
   QLabel* rank = new QLabel;
   rank->setText(QString("%1").arg(this->Rank));
 
-  QFrame* vline = new QFrame;
-  vline->setFrameStyle(QFrame::VLine | QFrame::Plain);
-
-  QFrame* vline2 = new QFrame;
-  vline2->setFrameStyle(QFrame::VLine | QFrame::Plain);
-
   QLabel* pid = new QLabel;
   pid->setText(QString("%1").arg(this->Pid));
 
@@ -406,16 +385,14 @@ void RankData::InitializeMemoryUseWidget()
 
   QHBoxLayout* l = new QHBoxLayout;
   l->addWidget(rank);
-  l->addWidget(vline);
   l->addWidget(pid);
-  l->addWidget(vline2);
   l->addLayout(w);
   l->setContentsMargins(1, 0, 1, 0);
   l->setSpacing(0);
 
   this->WidgetContainer = new QFrame;
   this->WidgetContainer->setLayout(l);
-  this->WidgetContainer->setFrameStyle(QFrame::Box | QFrame::Plain);
+  this->WidgetContainer->setFrameStyle(QFrame::Plain);
   this->WidgetContainer->setLineWidth(1);
   QFont font(this->WidgetContainer->font());
   font.setPointSize(8);
@@ -424,18 +401,15 @@ void RankData::InitializeMemoryUseWidget()
   QPalette palette(rank->palette());
   ::setWidgetContainerColor(palette, this->Rank);
 
-  rank->setPalette(palette);
-  rank->setAutoFillBackground(true);
-
-  pid->setPalette(palette);
-  pid->setAutoFillBackground(true);
+  this->WidgetContainer->setPalette(palette);
+  this->WidgetContainer->setAutoFillBackground(true);
 
   QFontMetrics fontMet(font);
-  int rankWid = fontMet.width("555555");
+  int rankWid = fontMet.horizontalAdvance("555555");
   rank->setMinimumWidth(rankWid);
   rank->setMaximumWidth(rankWid);
 
-  int pidWid = fontMet.width("555555555");
+  int pidWid = fontMet.horizontalAdvance("555555555");
   pid->setMinimumWidth(pidWid);
   pid->setMaximumWidth(pidWid);
 
@@ -717,15 +691,15 @@ pqMemoryInspectorPanel::pqMemoryInspectorPanel(QWidget* pWidget, Qt::WindowFlags
   cerr << ":::::pqMemoryInspectorPanel::pqMemoryInspectorPanel" << endl;
 #endif
 
-  this->ClientOnly = 1;
-  this->ClientHost = 0;
+  this->ClientOnly = true;
+  this->ClientHost = nullptr;
   this->AutoUpdate = true;
-  this->UpdateEnabled = 0;
+  this->UpdateEnabled = false;
 
   // Construct Qt form.
   this->Ui = new pqMemoryInspectorPanelUI;
   this->Ui->setupUi(this);
-  this->Ui->updateMemUse->setIcon(QPixmap(":/pqWidgets/Icons/pqRedo24.png"));
+  this->Ui->updateMemUse->setIcon(QPixmap(":/pqWidgets/Icons/pqRedo.svg"));
 
   // attempt initialization here before we begin to listen
   // for event's that could trigger and update.
@@ -807,7 +781,7 @@ void pqMemoryInspectorPanel::ClearClient()
   {
     delete this->ClientHost;
   }
-  this->ClientHost = 0;
+  this->ClientHost = nullptr;
 }
 
 //-----------------------------------------------------------------------------
@@ -831,7 +805,7 @@ void pqMemoryInspectorPanel::ClearServer(map<string, HostData*>& hosts, vector<R
 //-----------------------------------------------------------------------------
 void pqMemoryInspectorPanel::ClearServers()
 {
-  this->ClientOnly = 1;
+  this->ClientOnly = true;
   this->ClearServer(this->ServerHosts, this->ServerRanks);
   this->ClearServer(this->DataServerHosts, this->DataServerRanks);
   this->ClearServer(this->RenderServerHosts, this->RenderServerRanks);
@@ -844,8 +818,7 @@ void pqMemoryInspectorPanel::ServerDisconnected()
   cerr << ":::::pqMemoryInspectorPanel:;ServerDisconnected" << endl;
 #endif
 
-  this->ClearClient();
-  this->ClearServers();
+  this->Clear();
 }
 
 //-----------------------------------------------------------------------------
@@ -889,7 +862,7 @@ void pqMemoryInspectorPanel::EnableUpdate()
   cerr << ":::::pqMemoryInspectorPanel::EnableUpdate" << endl;
 #endif
 
-  this->UpdateEnabled = 1;
+  this->UpdateEnabled = true;
 }
 
 //-----------------------------------------------------------------------------
@@ -935,7 +908,7 @@ void pqMemoryInspectorPanel::RenderCompleted()
         // there are two still renders after the last
         // interactive render.
         QTimer::singleShot(2000, this, SLOT(Update()));
-        this->PendingUpdate=1;
+        this->PendingUpdate=true;
         }
       }
     }
@@ -1039,10 +1012,10 @@ void pqMemoryInspectorPanel::InitializeServerGroup(long long clientPid,
 }
 
 //-----------------------------------------------------------------------------
-int pqMemoryInspectorPanel::Initialize()
+void pqMemoryInspectorPanel::Clear()
 {
 #if defined pqMemoryInspectorPanelDEBUG
-  cerr << ":::::pqMemoryInspectorPanel::Initialize" << endl;
+  cerr << ":::::pqMemoryInspectorPanel::Clear" << endl;
 #endif
 
   this->ClearClient();
@@ -1059,6 +1032,16 @@ int pqMemoryInspectorPanel::Initialize()
   this->StackTraceOnRenderServer = 0;
 
   this->Ui->configView->clear();
+}
+
+//-----------------------------------------------------------------------------
+int pqMemoryInspectorPanel::Initialize()
+{
+#if defined pqMemoryInspectorPanelDEBUG
+  cerr << ":::::pqMemoryInspectorPanel::Initialize" << endl;
+#endif
+
+  this->Clear();
 
   pqServer* server = pqActiveObjects::instance().activeServer();
   if (!server)
@@ -1210,11 +1193,11 @@ int pqMemoryInspectorPanel::Initialize()
   configs->Delete();
 
   //
-  this->ClientOnly = 0;
+  this->ClientOnly = false;
   if ((this->RenderServerHosts.size() == 0) && (this->DataServerHosts.size() == 0) &&
     (this->ServerHosts.size() == 0))
   {
-    this->ClientOnly = 1;
+    this->ClientOnly = true;
   }
   else
   {
@@ -1281,8 +1264,8 @@ void pqMemoryInspectorPanel::Update()
   this->UpdateRanks();
   this->UpdateHosts();
 
-  this->PendingUpdate = 0;
-  this->UpdateEnabled = 0;
+  this->PendingUpdate = false;
+  this->UpdateEnabled = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -1522,7 +1505,8 @@ void pqMemoryInspectorPanel::ExecuteRemoteCommand()
         }
 
         // select and configure a command
-        pqRemoteCommandDialog dialog(this, 0, this->ClientSystemType, serverSystemType);
+        pqRemoteCommandDialog dialog(
+          this, Qt::WindowFlags{}, this->ClientSystemType, serverSystemType);
 
         dialog.SetActiveHost(host);
         dialog.SetActivePid(pid);

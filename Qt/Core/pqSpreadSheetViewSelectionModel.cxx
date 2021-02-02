@@ -34,8 +34,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Server Manager Includes.
 #include "vtkPVDataInformation.h"
 #include "vtkProcessModule.h"
+#include "vtkSMPropertyHelper.h"
 #include "vtkSMSessionProxyManager.h"
 #include "vtkSMSourceProxy.h"
+#include "vtkSMTrace.h"
 #include "vtkSMVectorProperty.h"
 #include "vtkSelection.h"
 #include "vtkSelectionNode.h"
@@ -155,7 +157,7 @@ void pqSpreadSheetViewSelectionModel::select(
   selSource.TakeReference(this->getSelectionSource());
   if (!selSource)
   {
-    emit this->selection(0);
+    Q_EMIT this->selection(0);
     return;
   }
 
@@ -239,9 +241,22 @@ void pqSpreadSheetViewSelectionModel::select(
   {
     pqSMAdaptor::setMultipleElementProperty(vp, ids);
     selSource->UpdateVTKObjects();
+
+    // Map from selection source proxy name to trace function
+    std::string functionName(selSource->GetXMLName());
+    functionName.erase(functionName.size() - sizeof("SelectionSource") + 1);
+    functionName.append("s");
+    functionName.insert(0, "Select");
+
+    // Trace the selection
+    SM_SCOPED_TRACE(CallFunction)
+      .arg(functionName.c_str())
+      .arg("IDs", vtkSMPropertyHelper(selSource, "IDs").GetIntArray())
+      .arg("FieldType", vtkSMPropertyHelper(selSource, "FieldType").GetAsInt())
+      .arg("ContainingCells", vtkSMPropertyHelper(selSource, "ContainingCells").GetAsInt());
   }
 
-  emit this->selection(selSource);
+  Q_EMIT this->selection(selSource);
 }
 
 //-----------------------------------------------------------------------------

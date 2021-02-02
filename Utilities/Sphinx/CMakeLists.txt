@@ -1,20 +1,15 @@
 # Build Sphinx documentation for Python modules.
-if (NOT PARAVIEW_ENABLE_PYTHON)
+if (NOT PARAVIEW_USE_PYTHON)
   return()
 endif()
 
-find_program(sphinx-build
-  NAMES sphinx-build
-  DOC "Path to sphinx-build executable.")
-
-if (NOT sphinx-build)
+include(FindPythonModules)
+find_python_module("sphinx" sphinx_found)
+if (NOT sphinx_found)
   message(STATUS
     "Please install Sphinx to generate documentation for Python modules.")
   return()
 endif()
-
-# mark these advanced if found.
-mark_as_advanced(sphinx-build)
 
 # Copy Sphinx configuration files to the build directory.
 file(COPY config
@@ -33,14 +28,20 @@ configure_file(config/conf.py.in config/conf.py @ONLY)
 # CMakeLists.txt file, that indeed is true.
 add_custom_target(ParaViewPythonDoc
   COMMAND $<TARGET_FILE:pvpython>
+          --no-mpi
           "${CMAKE_CURRENT_SOURCE_DIR}/sphinx_apidoc.py"
           -o "${CMAKE_CURRENT_BINARY_DIR}/config"
           "${ParaView_BINARY_DIR}/${PARAVIEW_PYTHON_SITE_PACKAGES_SUFFIX}/paraview"
-  COMMAND ${sphinx-build}
+  COMMAND $<TARGET_FILE:pvpython>
+          --no-mpi
+          -m sphinx
           -b html "${CMAKE_CURRENT_BINARY_DIR}/config"
           "${PARAVIEW_GENERATED_DOCUMENTATION_OUTPUT_DIRECTORY}/python"
   SOURCES sphinx_apidoc.py
           config/index.rst
           config/quick-start.rst
           config/api-changes.rst
-          config/conf.py.in)
+          config/conf.py.in
+  # ensures that the output is continuously generated
+  # when using ninja; avoids builder from timing out
+  USES_TERMINAL)

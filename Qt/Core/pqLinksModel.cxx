@@ -377,7 +377,7 @@ QVariant pqLinksModel::data(const QModelIndex& idx, int role) const
 
     if (idx.column() == 0)
     {
-      return name == QString::null ? "Unknown" : name;
+      return name.isNull() ? "Unknown" : name;
     }
     else if (idx.column() == 1)
     {
@@ -593,7 +593,7 @@ void pqLinksModel::addProxyLink(
   }
   iter->Delete();
   link->Delete();
-  emit this->linkAdded(pqLinksModel::Proxy);
+  Q_EMIT this->linkAdded(pqLinksModel::Proxy);
   CLEAR_UNDO_STACK();
 }
 
@@ -610,7 +610,7 @@ void pqLinksModel::addCameraLink(
   link->AddLinkedProxy(outputProxy, vtkSMLink::INPUT);
   link->AddLinkedProxy(inputProxy, vtkSMLink::OUTPUT);
   link->Delete();
-  emit this->linkAdded(pqLinksModel::Camera);
+  Q_EMIT this->linkAdded(pqLinksModel::Camera);
   CLEAR_UNDO_STACK();
 
   SM_SCOPED_TRACE(CallFunction)
@@ -679,7 +679,7 @@ void pqLinksModel::addPropertyLink(const QString& name, vtkSMProxy* inputProxy,
   link->AddLinkedProperty(outputProxy, outputProp.toLocal8Bit().data(), vtkSMLink::INPUT);
   link->AddLinkedProperty(inputProxy, inputProp.toLocal8Bit().data(), vtkSMLink::OUTPUT);
   link->Delete();
-  emit this->linkAdded(pqLinksModel::Property);
+  Q_EMIT this->linkAdded(pqLinksModel::Property);
   CLEAR_UNDO_STACK();
 }
 
@@ -698,7 +698,7 @@ void pqLinksModel::addSelectionLink(
   link->AddLinkedSelection(inputProxy, vtkSMLink::INPUT);
 
   link->Delete();
-  emit this->linkAdded(pqLinksModel::Selection);
+  Q_EMIT this->linkAdded(pqLinksModel::Selection);
   CLEAR_UNDO_STACK();
 }
 
@@ -719,7 +719,7 @@ void pqLinksModel::removeLink(const QModelIndex& idx)
 
 void pqLinksModel::removeLink(const QString& name)
 {
-  if (name != QString::null)
+  if (!name.isNull())
   {
     vtkSMSessionProxyManager* pxm = this->Internal->Server->proxyManager();
     pxm->UnRegisterLink(name.toLocal8Bit().data());
@@ -735,7 +735,7 @@ void pqLinksModel::emitLinkRemoved(const QString& name)
     delete this->Internal->InteractiveViewLinks[name];
     this->Internal->InteractiveViewLinks.remove(name);
   }
-  emit this->linkRemoved(name);
+  Q_EMIT this->linkRemoved(name);
 }
 
 pqProxy* pqLinksModel::representativeProxy(vtkSMProxy* pxy)

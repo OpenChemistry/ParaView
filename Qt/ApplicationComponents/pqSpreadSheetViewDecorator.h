@@ -95,14 +95,20 @@ public:
   */
   void setAllowChangeOfSource(bool val);
 
-signals:
+  /**
+   * Reimplemented to handle copy to clipboard in CSV format.
+   */
+  bool eventFilter(QObject* object, QEvent* e) override;
+
+Q_SIGNALS:
   void uiModified();
 
-protected slots:
+protected Q_SLOTS:
   void currentIndexChanged(pqOutputPort*);
   void showing(pqDataRepresentation*);
   void displayPrecisionChanged(int);
   void toggleFixedRepresentation(bool);
+  void copyToClipboard();
 
 protected:
   pqSpreadSheetView* Spreadsheet;

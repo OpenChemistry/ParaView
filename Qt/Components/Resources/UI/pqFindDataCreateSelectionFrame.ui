@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
+    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,1">
      <item>
       <widget class="QLabel" name="label">
        <property name="text">
@@ -50,14 +50,14 @@
     </layout>
    </item>
    <item>
-    <widget class="pqQueryClauseWidget" name="queryClauseWidget" native="true">
+    <widget class="pqMultiQueryClauseWidget" name="queryClauseWidget" native="true">
      <property name="enabled">
       <bool>false</bool>
      </property>
      <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+      <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
        <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
+       <verstretch>1</verstretch>
       </sizepolicy>
      </property>
     </widget>
@@ -81,9 +81,9 @@
    <header>pqOutputPortComboBox.h</header>
   </customwidget>
   <customwidget>
-   <class>pqQueryClauseWidget</class>
+   <class>pqMultiQueryClauseWidget</class>
    <extends>QWidget</extends>
-   <header>pqQueryClauseWidget.h</header>
+   <header>pqMultiQueryClauseWidget.h</header>
    <container>1</container>
   </customwidget>
  </customwidgets>

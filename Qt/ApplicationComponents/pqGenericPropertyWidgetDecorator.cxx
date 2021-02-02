@@ -82,7 +82,7 @@ public:
     if (helper.GetNumberOfElements() == 0)
     {
       // if there is no proxy, 'its value' does not match this->Value.
-      bool status = false;
+      bool status = this->Values.size() == 1 && this->Values[0] == "null";
       return this->Inverse ? !status : status;
     }
 
@@ -266,12 +266,12 @@ void pqGenericPropertyWidgetDecorator::updateState()
   {
     case pqInternals::ENABLED_STATE:
       this->Internals->Enabled = valueMatch;
-      emit this->enableStateChanged();
+      Q_EMIT this->enableStateChanged();
       break;
 
     case pqInternals::VISIBILITY:
       this->Internals->Visible = valueMatch;
-      emit this->visibilityChanged();
+      Q_EMIT this->visibilityChanged();
       break;
   }
 }

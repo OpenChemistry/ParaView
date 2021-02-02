@@ -108,16 +108,11 @@ pqDataInformationWidget::pqDataInformationWidget(QWidget* _parent /*=0*/)
 
   this->View->verticalHeader()->hide();
   this->View->installEventFilter(this);
-#if QT_VERSION >= 0x050000
   this->View->horizontalHeader()->setSectionsMovable(true);
-#else
-  this->View->horizontalHeader()->setMovable(true);
-#endif
   this->View->horizontalHeader()->setHighlightSections(false);
   this->View->horizontalHeader()->setStretchLastSection(true);
   // this->View->horizontalHeader()->setSortIndicatorShown(true);
   this->View->setSelectionBehavior(QAbstractItemView::SelectRows);
-  // this->View->sortByColumn(0);
 
   QVBoxLayout* _layout = new QVBoxLayout(this);
   if (_layout)

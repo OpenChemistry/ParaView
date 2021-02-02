@@ -1,5 +1,5 @@
 /***************************************************************************************************
- * Copyright 2019 NVIDIA Corporation. All rights reserved.
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
  **************************************************************************************************/
 /// \file mi/base/enums.h
 /// \brief Basic enums.
@@ -11,11 +11,13 @@
 
 #include <mi/base/assert.h>
 
-namespace mi
-{
+namespace mi {
 
-namespace base
-{
+namespace base {
+
+/// Namespace for details of the Base API.
+/// \ingroup mi_base
+namespace details {
 
 /** \addtogroup mi_base_ilogger
 @{
@@ -24,30 +26,35 @@ namespace base
 /// Constants for possible message severities.
 ///
 /// \see #mi::base::ILogger::message()
-///
+///      
 enum Message_severity
 {
-  /// A fatal error has occurred.
-  MESSAGE_SEVERITY_FATAL = 0,
-  /// An error has occurred.
-  MESSAGE_SEVERITY_ERROR = 1,
-  /// A warning has occurred.
-  MESSAGE_SEVERITY_WARNING = 2,
-  /// This is a normal operational message.
-  MESSAGE_SEVERITY_INFO = 3,
-  /// This is a more verbose message.
-  MESSAGE_SEVERITY_VERBOSE = 4,
-  /// This is debug message.
-  MESSAGE_SEVERITY_DEBUG = 5,
-  //  Undocumented, for alignment only
-  MESSAGE_SEVERITY_FORCE_32_BIT = 0xffffffffU
+    /// A fatal error has occurred.
+    MESSAGE_SEVERITY_FATAL          = 0,
+    /// An error has occurred.
+    MESSAGE_SEVERITY_ERROR          = 1,
+    /// A warning has occurred.
+    MESSAGE_SEVERITY_WARNING        = 2,
+    /// This is a normal operational message.
+    MESSAGE_SEVERITY_INFO           = 3,
+    /// This is a more verbose message.
+    MESSAGE_SEVERITY_VERBOSE        = 4,
+    /// This is debug message.
+    MESSAGE_SEVERITY_DEBUG          = 5,
+    //  Undocumented, for alignment only
+    MESSAGE_SEVERITY_FORCE_32_BIT   = 0xffffffffU
 };
 
-mi_static_assert(sizeof(Message_severity) == 4);
+mi_static_assert( sizeof( Message_severity) == 4);
 
 /*@}*/ // end group mi_base_ilogger
 
+}
+
+using namespace details;
+
 } // namespace base
+
 } // namespace mi
 
 #endif // MI_BASE_ENUMS_H

@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqActiveObjects.h"
 #include "pqApplicationCore.h"
 #include "pqCoreUtilities.h"
+#include "pqEventDispatcher.h"
 #include "pqFileDialog.h"
 #include "pqImageUtil.h"
 #include "pqProxyWidgetDialog.h"
@@ -178,10 +179,6 @@ void pqSaveScreenshotReaction::saveScreenshot(bool clipboardMode)
 
   vtkNew<vtkSMParaViewPipelineController> controller;
   controller->PreInitializeProxy(shProxy);
-  vtkSMPropertyHelper(shProxy, "View").Set(viewProxy);
-  vtkSMPropertyHelper(shProxy, "Layout").Set(layout);
-  shProxy->UpdateDefaultsAndVisibilities(filename.toLocal8Bit().data());
-  controller->PostInitializeProxy(shProxy);
 
   if (layout)
   {
@@ -194,6 +191,8 @@ void pqSaveScreenshotReaction::saveScreenshot(bool clipboardMode)
       vtkVector2i layoutSize = layout->GetSize();
       previewHelper.Set(layoutSize.GetData(), 2);
       restorePreviewMode = true;
+      // essential to give the UI a change to update after the preview change.
+      pqEventDispatcher::processEvents();
     }
     else
     {
@@ -201,6 +200,11 @@ void pqSaveScreenshotReaction::saveScreenshot(bool clipboardMode)
       vtkSMPropertyHelper(shProxy, "SaveAllViews").Set(1);
     }
   }
+
+  vtkSMPropertyHelper(shProxy, "View").Set(viewProxy);
+  vtkSMPropertyHelper(shProxy, "Layout").Set(layout);
+  shProxy->UpdateDefaultsAndVisibilities(filename.toLocal8Bit().data());
+  controller->PostInitializeProxy(shProxy);
 
   pqProxyWidgetDialog dialog(shProxy, pqCoreUtilities::mainWidget());
   dialog.setObjectName("SaveScreenshotDialog");

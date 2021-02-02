@@ -64,7 +64,7 @@ vtkVRSpaceNavigatorGrabWorldStyle::~vtkVRSpaceNavigatorGrabWorldStyle()
 // ----------------------------------------------------------------------------
 void vtkVRSpaceNavigatorGrabWorldStyle::HandleAnalog(const vtkVREventData& data)
 {
-  vtkStdString role = this->GetAnalogRole(data.name);
+  std::string role = this->GetAnalogRole(data.name);
   if (role == "Move")
   {
     // Values for Space Navigator
@@ -78,7 +78,6 @@ void vtkVRSpaceNavigatorGrabWorldStyle::HandleAnalog(const vtkVREventData& data)
     {
       vtkCamera* camera;
       double pos[3], fp[3], up[3], dir[3];
-      double orient[3];
       const double* channel = data.data.analog.channel;
 
       camera = viewProxy->GetActiveCamera();

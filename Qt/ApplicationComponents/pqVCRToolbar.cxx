@@ -80,6 +80,9 @@ void pqVCRToolbar::constructor()
     controller, SIGNAL(timeRanges(double, double)), this, SLOT(setTimeRanges(double, double)));
   QObject::connect(controller, SIGNAL(loop(bool)), ui.actionVCRLoop, SLOT(setChecked(bool)));
   QObject::connect(controller, SIGNAL(playing(bool)), this, SLOT(onPlaying(bool)));
+
+  this->Controller->setAnimationScene(
+    pqPVApplicationCore::instance()->animationManager()->getActiveScene());
 }
 
 //-----------------------------------------------------------------------------
@@ -103,14 +106,14 @@ void pqVCRToolbar::onPlaying(bool playing)
   {
     disconnect(this->UI->actionVCRPlay, SIGNAL(triggered()), this->Controller, SLOT(onPlay()));
     connect(this->UI->actionVCRPlay, SIGNAL(triggered()), this->Controller, SLOT(onPause()));
-    this->UI->actionVCRPlay->setIcon(QIcon(":/pqWidgets/Icons/pqVcrPause.png"));
+    this->UI->actionVCRPlay->setIcon(QIcon(":/pqWidgets/Icons/pqVcrPause.svg"));
     this->UI->actionVCRPlay->setText("Pa&use");
   }
   else
   {
     connect(this->UI->actionVCRPlay, SIGNAL(triggered()), this->Controller, SLOT(onPlay()));
     disconnect(this->UI->actionVCRPlay, SIGNAL(triggered()), this->Controller, SLOT(onPause()));
-    this->UI->actionVCRPlay->setIcon(QIcon(":/pqWidgets/Icons/pqVcrPlay.png"));
+    this->UI->actionVCRPlay->setIcon(QIcon(":/pqWidgets/Icons/pqVcrPlay.svg"));
     this->UI->actionVCRPlay->setText("&Play");
   }
 

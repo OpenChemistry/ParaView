@@ -45,6 +45,7 @@ class pqDataRepresentation;
 class pqOutputPort;
 class pqPipelineSourceInternal;
 class pqView;
+class vtkCommand;
 class vtkObject;
 class vtkPVDataInformation;
 class vtkSMSourceProxy;
@@ -158,7 +159,7 @@ public:
   */
   vtkSMSourceProxy* getSourceProxy();
 
-signals:
+Q_SIGNALS:
   /**
   * fired when a connection is created between two pqPipelineSources.
   */
@@ -196,13 +197,18 @@ signals:
   */
   void dataUpdated(pqPipelineSource* source);
 
-protected slots:
+  /**
+   * Fired when the selection on a port has changed.
+   */
+  void selectionChanged(pqOutputPort* port);
+
+protected Q_SLOTS:
   /**
   * Called when the visibility of any representation for this source changes.
   */
   void onRepresentationVisibilityChanged();
 
-private slots:
+private Q_SLOTS:
   /**
   * Slots called when corresponding signals are fired from pqOutputPort.
   * These slots simply fire the appropriate signals.
@@ -215,6 +221,9 @@ private slots:
   void portRepresentationRemoved(pqOutputPort* op, pqDataRepresentation* cons);
   void portVisibilityChanged(pqOutputPort* op, pqDataRepresentation* cons);
   void dataUpdated();
+
+  void onSelectionChanged(
+    vtkObject*, unsigned long, void* client_data, void* call_data, vtkCommand*);
 
 protected:
   friend class pqPipelineFilter;

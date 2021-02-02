@@ -1,29 +1,29 @@
-/* Copyright 2019 NVIDIA Corporation. All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions
-* are met:
-*  * Redistributions of source code must retain the above copyright
-*    notice, this list of conditions and the following disclaimer.
-*  * Redistributions in binary form must reproduce the above copyright
-*    notice, this list of conditions and the following disclaimer in the
-*    documentation and/or other materials provided with the distribution.
-*  * Neither the name of NVIDIA CORPORATION nor the names of its
-*    contributors may be used to endorse or promote products derived
-*    from this software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-* EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-* PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-* CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-* EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-* PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-* PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-* OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+/* Copyright 2020 NVIDIA Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #include <cassert>
 #include <cstdio>
@@ -33,6 +33,7 @@
 #include <sstream>
 
 #ifdef _WIN32
+#define NOMINMAX
 #include <windows.h>
 #endif // _WIN32
 
@@ -53,6 +54,8 @@
 #include "vtkMultiThreader.h"
 #include "vtkObjectFactory.h"
 #include "vtkOpenGLRenderWindow.h"
+#include "vtkPKdTree.h"
+#include "vtkPVRenderViewSettings.h"
 #include "vtkPointData.h"
 #include "vtkRenderWindow.h"
 #include "vtkRenderer.h"
@@ -71,29 +74,19 @@
 #include "vtknvindex_utilities.h"
 #include "vtknvindex_volumemapper.h"
 
-#ifdef NVINDEX_INTERNAL_BUILD
-#include "version.h"
-#endif
-
-#if defined(MI_VERSION_STRING) && defined(MI_DATE_STRING)
-// Embed version string in output binary.
-const static volatile std::string NVINDEX_VERSION_STRING(
-  "==@@== NVIDIA IndeX for ParaView Plug-In, "
-  "r" MI_VERSION_STRING ", " MI_DATE_STRING "\n");
-#endif
-
 vtkStandardNewMacro(vtknvindex_volumemapper);
 
 //----------------------------------------------------------------------------
 vtknvindex_volumemapper::vtknvindex_volumemapper()
   : m_is_caching(false)
-  , m_is_mapper_intialized(false)
+  , m_is_mapper_initialized(false)
   , m_config_settings_changed(false)
   , m_opacity_changed(false)
   , m_slices_changed(false)
   , m_volume_changed(false)
   , m_rtc_kernel_changed(false)
   , m_rtc_param_changed(false)
+  , m_is_mpi_rendering(false)
 
 {
   m_index_instance = vtknvindex_instance::get();
@@ -159,29 +152,30 @@ static void reset_orthogonal_projection_matrix(mi::Sint32& win_width, mi::Sint32
 }
 
 //-------------------------------------------------------------------------------------------------
-bool vtknvindex_volumemapper::prepare_data(mi::Sint32 time_step, vtkVolume* /*vol*/)
+bool vtknvindex_volumemapper::prepare_data(mi::Sint32 time_step)
 {
   vtkTimerLog::MarkStartEvent("NVIDIA-IndeX: Preparing data");
 
   int extent[6];
-  this->GetInput()->GetExtent(extent);
+  vtkImageData* image_piece = vtkImageData::SafeDownCast(this->GetInput());
+  image_piece->GetExtent(extent);
 
   // Get ParaView's volume data
   vtkDataArray* scalar_array = m_scalar_array;
   if (m_cluster_properties->get_regular_volume_properties()->is_timeseries_data())
   {
     // Get the input
-    vtkImageData* image_piece = this->GetInput();
     if (image_piece == NULL)
     {
       ERROR_LOG << "vtkImageData in representation is invalid!";
       return false;
     }
 
-    mi::Sint32 use_cell_colors;
+    mi::Sint32 cell_flag;
     scalar_array = this->GetScalars(image_piece, this->ScalarMode, this->ArrayAccessMode,
-      this->ArrayId, this->ArrayName,
-      use_cell_colors); // CellFlag
+      this->ArrayId, this->ArrayName, cell_flag);
+
+    m_subset_ptrs[time_step] = scalar_array->GetVoidPointer(0);
   }
 
   // Write volume data to shared memory.
@@ -202,53 +196,93 @@ bool vtknvindex_volumemapper::prepare_data(mi::Sint32 time_step, vtkVolume* /*vo
 }
 
 //-------------------------------------------------------------------------------------------------
-bool vtknvindex_volumemapper::initialize_mapper(vtkRenderer* /*ren*/, vtkVolume* vol)
+bool vtknvindex_volumemapper::initialize_mapper(vtkVolume* vol)
 {
-
-#if defined(MI_VERSION_STRING) && defined(MI_DATE_STRING)
-  INFO_LOG << "NVIDIA IndeX for ParaView Plug-In "
-           << "(build " << MI_VERSION_STRING << ", " << MI_DATE_STRING ").";
-#endif
-
   vtkTimerLog::MarkStartEvent("NVIDIA-IndeX: Initialization");
 
-  bool is_MPI = (m_controller->GetNumberOfProcesses() > 1);
-  const mi::Sint32 cur_global_rank = is_MPI ? m_controller->GetLocalProcessId() : 0;
+  // Initialize and start IndeX (if not initialized yet and if this is an IndeX rank)
+  m_index_instance->init_index();
+
+  m_is_mpi_rendering = (m_controller->GetNumberOfProcesses() > 1);
+  const mi::Sint32 cur_global_rank = m_is_mpi_rendering ? m_controller->GetLocalProcessId() : 0;
+
+  // Init scalar pointers array
+  if (m_cluster_properties->get_regular_volume_properties()->is_timeseries_data())
+  {
+    m_subset_ptrs.resize(
+      m_cluster_properties->get_regular_volume_properties()->get_nb_time_steps());
+  }
+  else
+  {
+    m_subset_ptrs.resize(1);
+  }
 
   // Update in_volume first to make sure states are current.
   vol->Update();
 
   // Get the input.
-  vtkImageData* image_piece = this->GetInput();
+  vtkImageData* image_piece = vtkImageData::SafeDownCast(this->GetInput());
   if (image_piece == NULL)
   {
     ERROR_LOG << "vtkImageData in representation is invalid.";
     return false;
   }
 
-  mi::Sint32 use_cell_colors;
+  mi::Sint32 cell_flag;
   m_scalar_array = this->GetScalars(image_piece, this->ScalarMode, this->ArrayAccessMode,
-    this->ArrayId, this->ArrayName,
-    use_cell_colors); // CellFlag
+    this->ArrayId, this->ArrayName, cell_flag);
 
-  // check for scalar per cell values
-  if (use_cell_colors)
+  bool is_data_supported = true;
+
+  // Data can only have a single component (not RGB/HSV format)
+  const int components = m_scalar_array->GetNumberOfComponents();
+  if (components > 1)
   {
-    ERROR_LOG << "Scalar values per cell are not supported in NVIDIA IndeX.";
-    return false;
+    ERROR_LOG << "The data array '" << this->ArrayName << "' has " << components << " components, "
+              << "which is not supported by NVIDIA IndeX.";
+    is_data_supported = false;
   }
 
-  // check for valid data types
+  // Only per cell scalars are allowed
+  if (cell_flag > 0)
+  {
+    ERROR_LOG << "The data array '" << this->ArrayName << "' uses "
+              << (cell_flag == 1 ? "per cell" : "per field")
+              << " scalars, but only per point scalars are supported by NVIDIA IndeX "
+              << "(cellFlag is " << cell_flag << ").";
+    is_data_supported = false;
+  }
+
+  // Check for valid data types
   const std::string scalar_type = m_scalar_array->GetDataTypeAsString();
-  if (scalar_type != "unsigned char" && scalar_type != "unsigned short" && scalar_type != "char" &&
-    scalar_type != "short" && scalar_type != "float" && scalar_type != "double")
+  if (vtknvindex_regular_volume_properties::get_scalar_size(scalar_type) == 0)
   {
-    ERROR_LOG << "The scalar type: " << scalar_type << " is not supported by NVIDIA IndeX.";
+    ERROR_LOG << "The data array '" << this->ArrayName << "' uses the scalar type '" << scalar_type
+              << "', which is not supported by NVIDIA IndeX.";
     return false;
   }
+  else if (scalar_type == "double" && is_data_supported)
+  {
+    // Only print the warning once per data array, and do not repeat when switching between arrays.
+    if (m_data_array_warning_printed.find(this->ArrayName) == m_data_array_warning_printed.end())
+    {
+      WARN_LOG << "The data array '" << this->ArrayName << "' has scalar values "
+               << "in double precision format, which is not natively supported by NVIDIA IndeX. "
+               << "The plugin will proceed to convert the values from double to float with the "
+               << "corresponding overhead.";
+      m_data_array_warning_printed.emplace(this->ArrayName);
+    }
+  }
+
+  if (!is_data_supported)
+  {
+    return false;
+  }
+
+  m_subset_ptrs[0] = m_scalar_array->GetVoidPointer(0);
 
   vtknvindex_regular_volume_data volume_data;
-  volume_data.scalars = m_scalar_array->GetVoidPointer(0);
+  volume_data.scalars = &m_subset_ptrs[0];
 
   int extent[6];
   image_piece->GetExtent(extent);
@@ -271,14 +305,40 @@ bool vtknvindex_volumemapper::initialize_mapper(vtkRenderer* /*ren*/, vtkVolume*
   dataset_parameters.bounds[4] = extent[4];
   dataset_parameters.bounds[5] = extent[5];
 
-  dataset_parameters.volume_data = static_cast<void*>(&volume_data);
+  dataset_parameters.volume_data = &volume_data;
+
+  if (m_is_mpi_rendering)
+  {
+    bool matches_whole_bounds = true;
+    for (int i = 0; i < 6; ++i)
+    {
+      if (static_cast<int>(m_whole_bounds[i]) != extent[i])
+      {
+        matches_whole_bounds = false;
+        break;
+      }
+    }
+
+    if (matches_whole_bounds)
+    {
+      WARN_LOG << "Parallel rendering disabled, only a single GPU will be used! "
+               << "The extent of the volume piece on MPI rank " << cur_global_rank << " (of "
+               << m_controller->GetNumberOfProcesses() << ") "
+               << "is equal to the extent of the entire volume: [" << extent[0] << " " << extent[2]
+               << " " << extent[4] << "; " << extent[1] << " " << extent[3] << " " << extent[5]
+               << "]. "
+               << "This typically happens when using a file format that does not support parallel "
+               << "processing, such as the legacy VTK file format.";
+      m_is_mpi_rendering = false;
+    }
+  }
 
   // clean shared memory
   m_cluster_properties->unlink_shared_memory(true);
 
   // Collect dataset type, ranges, bounding boxes, scalar values and affinity to be passed to NVIDIA
   // IndeX.
-  if (is_MPI)
+  if (m_is_mpi_rendering)
   {
     mi::Sint32 current_hostid = 0;
     if (m_index_instance->is_index_rank())
@@ -305,9 +365,12 @@ bool vtknvindex_volumemapper::initialize_mapper(vtkRenderer* /*ren*/, vtkVolume*
     }
   }
 
-  m_is_mapper_intialized = true;
+  m_is_mapper_initialized = true;
 
-  m_controller->Barrier();
+  if (m_is_mpi_rendering)
+  {
+    m_controller->Barrier();
+  }
 
   vtkTimerLog::MarkEndEvent("NVIDIA-IndeX: Initialization");
 
@@ -331,20 +394,20 @@ void vtknvindex_volumemapper::set_cluster_properties(
 //-------------------------------------------------------------------------------------------------
 void vtknvindex_volumemapper::update_canvas(vtkRenderer* ren)
 {
-  mi::Sint32* window_size = ren->GetVTKWindow()->GetActualSize();
+  vtkWindow* win = ren->GetVTKWindow();
+  int* window_size = win->GetSize();
 
   const mi::math::Vector_struct<mi::Sint32, 2> main_window_resolution = { window_size[0],
     window_size[1] };
 
-  m_index_instance->m_opengl_canvas.set_buffer_resolution(main_window_resolution);
   m_index_instance->m_opengl_canvas.set_vtk_renderer(ren);
+  m_index_instance->m_opengl_canvas.set_buffer_resolution(main_window_resolution);
 
   if (ren->GetNumberOfPropsRendered())
   {
     m_index_instance->m_opengl_app_buffer.resize_buffer(main_window_resolution);
 
-    vtkOpenGLRenderWindow* vtk_gl_render_window =
-      vtkOpenGLRenderWindow::SafeDownCast(ren->GetVTKWindow());
+    vtkOpenGLRenderWindow* vtk_gl_render_window = vtkOpenGLRenderWindow::SafeDownCast(win);
     mi::Sint32 depth_bits = vtk_gl_render_window->GetDepthBufferSize();
     m_index_instance->m_opengl_app_buffer.set_z_buffer_precision(depth_bits);
 
@@ -375,12 +438,18 @@ void vtknvindex_volumemapper::slices_changed()
 }
 
 //-------------------------------------------------------------------------------------------------
-void vtknvindex_volumemapper::rtc_kernel_changed(
-  vtknvindex_rtc_kernels kernel, const void* params_buffer, mi::Uint32 buffer_size)
+void vtknvindex_volumemapper::rtc_kernel_changed(vtknvindex_rtc_kernels kernel,
+  const std::string& kernel_program, const void* params_buffer, mi::Uint32 buffer_size)
 {
   if (kernel != m_volume_rtc_kernel.rtc_kernel)
   {
     m_volume_rtc_kernel.rtc_kernel = kernel;
+    m_rtc_kernel_changed = true;
+  }
+
+  if (kernel_program != m_volume_rtc_kernel.kernel_program)
+  {
+    m_volume_rtc_kernel.kernel_program = kernel_program;
     m_rtc_kernel_changed = true;
   }
 
@@ -392,12 +461,37 @@ void vtknvindex_volumemapper::rtc_kernel_changed(
 //-------------------------------------------------------------------------------------------------
 void vtknvindex_volumemapper::Render(vtkRenderer* ren, vtkVolume* vol)
 {
+  if (!m_cluster_properties->is_active_instance())
+  {
+    return;
+  }
+
+  // Ensure IceT is enabled in MPI mode, print warning only on first rank
+  if (m_controller->GetNumberOfProcesses() > 1 && m_controller->GetLocalProcessId() == 0)
+  {
+    static bool IceT_was_enabled = false;
+    if (!vtkPVRenderViewSettings::GetInstance()->GetDisableIceT())
+    {
+      WARN_LOG << "IceT compositing must be disabled when using the NVIDIA IndeX plugin with MPI, "
+                  "otherwise nothing will be rendered. "
+               << "Please open 'Edit | Settings', go to the 'Render View' tab, activate 'Advanced "
+                  "Properties' (gear icon) and check 'Disable IceT'. "
+               << "Then restart ParaView for the setting to take effect.";
+      IceT_was_enabled = true;
+    }
+    else if (IceT_was_enabled)
+    {
+      WARN_LOG << "Please restart ParaView so that IceT compositing is fully disabled.";
+      IceT_was_enabled = false; // only print this once
+    }
+  }
+
   // check if volume data was modified
   if (!m_cluster_properties->get_regular_volume_properties()->is_timeseries_data())
   {
-    mi::Sint32 use_cell_colors;
+    mi::Sint32 cell_flag;
     vtkDataArray* scalar_array = this->GetScalars(this->GetInput(), this->ScalarMode,
-      this->ArrayAccessMode, this->ArrayId, this->ArrayName, use_cell_colors);
+      this->ArrayAccessMode, this->ArrayId, this->ArrayName, cell_flag);
 
     vtkMTimeType cur_MTime = scalar_array->GetMTime();
 
@@ -405,7 +499,7 @@ void vtknvindex_volumemapper::Render(vtkRenderer* ren, vtkVolume* vol)
     {
       m_last_MTime = cur_MTime;
     }
-    else if (m_last_MTime < cur_MTime)
+    else if (m_last_MTime != cur_MTime)
     {
       m_last_MTime = cur_MTime;
       m_volume_changed = true;
@@ -421,7 +515,7 @@ void vtknvindex_volumemapper::Render(vtkRenderer* ren, vtkVolume* vol)
   }
 
   // Initialize the mapper
-  if ((!m_is_mapper_intialized || m_volume_changed) && !initialize_mapper(ren, vol))
+  if ((!m_is_mapper_initialized || m_volume_changed) && !initialize_mapper(vol))
   {
     ERROR_LOG << "Failed to initialize the mapper in "
               << "vtknvindex_volumemapper::Render().";
@@ -434,18 +528,54 @@ void vtknvindex_volumemapper::Render(vtkRenderer* ren, vtkVolume* vol)
   mi::Sint32 cur_time_step =
     m_cluster_properties->get_regular_volume_properties()->get_current_time_step();
 
-  if ((!is_data_prepared(cur_time_step) || m_volume_changed) && !prepare_data(cur_time_step, vol))
+  bool needs_activate = m_cluster_properties->activate();
+  if (needs_activate)
   {
-    ERROR_LOG << "Failed to prepare data in "
-              << "vtknvindex_volumemapper::Render().";
-    ERROR_LOG << "NVIDIA IndeX rendering was aborted.";
-    return;
+    // Importers might be triggered again, so data must be made available
+    m_time_step_data_prepared.clear();
   }
 
-  // Wait all ranks finish to write volume data before the render starts.
-  m_controller->Barrier();
+  if (!is_data_prepared(cur_time_step) || m_volume_changed)
+  {
+    if (!prepare_data(cur_time_step))
+    {
+      ERROR_LOG << "Failed to prepare data in "
+                << "vtknvindex_volumemapper::Render().";
+      ERROR_LOG << "NVIDIA IndeX rendering was aborted.";
+      return;
+    }
 
-  if (m_index_instance->is_index_viewer())
+    // Ensure border data is available, fetching it from other hosts if necessary
+    vtknvindex_host_properties* host_props =
+      m_cluster_properties->get_host_properties(m_controller->GetLocalProcessId());
+
+    const void* piece_data = nullptr;
+    if (m_cluster_properties->get_regular_volume_properties()->is_timeseries_data())
+    {
+      piece_data = m_subset_ptrs[cur_time_step];
+    }
+    else if (m_scalar_array)
+    {
+      piece_data = m_scalar_array->GetVoidPointer(0);
+    }
+
+    std::string scalar_type;
+    m_cluster_properties->get_regular_volume_properties()->get_scalar_type(scalar_type);
+
+    if (m_is_mpi_rendering)
+    {
+      host_props->fetch_remote_volume_border_data(
+        m_controller, cur_time_step, piece_data, scalar_type);
+    }
+  }
+
+  if (m_is_mpi_rendering)
+  {
+    // Wait for all ranks to finish writing volume data before the render starts.
+    m_controller->Barrier();
+  }
+
+  if (m_index_instance->is_index_viewer() && m_index_instance->is_index_initialized())
   {
     vtkTimerLog::MarkStartEvent("NVIDIA-IndeX: Rendering");
 
@@ -457,9 +587,22 @@ void vtknvindex_volumemapper::Render(vtkRenderer* ren, vtkVolume* vol)
 
       // Setup scene information
       if (!m_scene.scene_created())
+      {
         m_scene.create_scene(ren, vol, dice_transaction, vtknvindex_scene::VOLUME_TYPE_REGULAR);
+        needs_activate = true;
+      }
       else if (m_volume_changed)
+      {
         m_scene.update_volume(dice_transaction, vtknvindex_scene::VOLUME_TYPE_REGULAR);
+        needs_activate = true;
+      }
+
+      if (needs_activate)
+      {
+        m_cluster_properties->warn_if_multiple_visible_instances(this->GetArrayName());
+        m_scene.activate(dice_transaction.get());
+        m_config_settings_changed = true; // force setting region-of-interest
+      }
 
       // Update scene parameters
       m_scene.update_scene(
@@ -539,7 +682,7 @@ void vtknvindex_volumemapper::Render(vtkRenderer* ren, vtkVolume* vol)
 
         // log performance values if requested
         if (m_cluster_properties->get_config_settings()->is_log_performance())
-          m_performance_values.print_perf_values(frame_results);
+          m_performance_values.print_perf_values(frame_results, cur_time_step);
       }
 
       dice_transaction->commit();
@@ -547,11 +690,22 @@ void vtknvindex_volumemapper::Render(vtkRenderer* ren, vtkVolume* vol)
 
     vtkTimerLog::MarkEndEvent("NVIDIA-IndeX: Rendering");
   }
+  else if (m_index_instance->is_index_viewer())
+  {
+    static bool first = true;
+    if (first)
+      ERROR_LOG << "The NVIDIA IndeX plugin was not initialized! See the log output for details.";
+    first = false;
+  }
 
   m_volume_changed = false;
 
+  if (m_is_mpi_rendering)
+  {
+    m_controller->Barrier();
+  }
+
   // clean shared memory
-  m_controller->Barrier();
   m_cluster_properties->unlink_shared_memory(false);
 }
 
@@ -586,5 +740,5 @@ bool vtknvindex_volumemapper::is_caching() const
 //-------------------------------------------------------------------------------------------------
 void vtknvindex_volumemapper::set_visibility(bool visibility)
 {
-  m_scene.set_visibility(visibility);
+  m_cluster_properties->set_visibility(visibility);
 }

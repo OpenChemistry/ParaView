@@ -186,10 +186,10 @@ public:
   * Creates a new surface selection given the rectangle in display
   * coordinates.
   */
-  virtual void selectOnSurface(
-    int rectangle[4], int selectionModifier = pqView::PV_SELECTION_DEFAULT);
-  virtual void selectPointsOnSurface(
-    int rectangle[4], int selectionModifier = pqView::PV_SELECTION_DEFAULT);
+  virtual void selectOnSurface(int rectangle[4],
+    int selectionModifier = pqView::PV_SELECTION_DEFAULT, const char* array = nullptr);
+  virtual void selectPointsOnSurface(int rectangle[4],
+    int selectionModifier = pqView::PV_SELECTION_DEFAULT, const char* array = nullptr);
 
   /**
   * Picks the representation at the given position.
@@ -232,11 +232,11 @@ public:
   virtual void selectPolygonCells(
     vtkIntArray* polygon, int selectionModifier = pqView::PV_SELECTION_DEFAULT);
 
-signals:
+Q_SIGNALS:
   // Triggered when interaction mode change underneath
   void updateInteractionMode(int mode);
 
-public slots:
+public Q_SLOTS:
   // Toggle the orientation axes visibility.
   virtual void setOrientationAxesVisibility(bool visible);
 
@@ -306,11 +306,16 @@ public slots:
   */
   virtual void updateInteractionMode(pqOutputPort* opPort);
 
-protected slots:
+protected Q_SLOTS:
   /**
   * Called when VTK event get trigger to notify that the interaction mode has changed
   */
   virtual void onInteractionModeChange();
+
+  /**
+  * Called when VTK event get trigger to notify that the generic filmic presets has changed
+  */
+  virtual void onGenericFilmicPresetsChange();
 
   // Called when vtkSMRenderViewProxy fires
   // ResetCameraEvent.
@@ -355,12 +360,12 @@ protected:
 
 private:
   void selectOnSurfaceInternal(int rect[4], QList<pqOutputPort*>&, bool select_points,
-    int selectionModifier, bool select_blocks);
+    int selectionModifier, bool select_blocks, const char* array = nullptr);
 
   void selectPolygonInternal(vtkIntArray* polygon, QList<pqOutputPort*>&, bool select_points,
     int selectionModifier, bool select_blocks);
 
-  void emitSelectionSignal(QList<pqOutputPort*>);
+  void emitSelectionSignal(QList<pqOutputPort*> outputPorts, int selectionModifier);
 
   void collectSelectionPorts(vtkCollection* selectedRepresentations,
     vtkCollection* selectionSources, QList<pqOutputPort*>& pqPorts, int selectionModifier,

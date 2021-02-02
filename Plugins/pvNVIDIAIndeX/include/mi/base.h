@@ -1,5 +1,5 @@
 /***************************************************************************************************
- * Copyright 2019 NVIDIA Corporation. All rights reserved.
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
  **************************************************************************************************/
 /// \file mi/base.h
 /// \brief Base API.
@@ -17,8 +17,8 @@
 #include <mi/base/enums.h>
 #include <mi/base/handle.h>
 #include <mi/base/iallocator.h>
-#include <mi/base/iinterface.h>
 #include <mi/base/ilogger.h>
+#include <mi/base/iinterface.h>
 #include <mi/base/interface_declare.h>
 #include <mi/base/interface_implement.h>
 #include <mi/base/interface_merger.h>
@@ -31,13 +31,11 @@
 
 /// Common namespace for APIs of NVIDIA Advanced Rendering Center GmbH.
 /// \ingroup mi_base
-namespace mi
-{
+namespace mi {
 
 /// Namespace for the Base API.
 /// \ingroup mi_base
-namespace base
-{
+namespace base {
 
 /// \defgroup mi_base Base API
 /// \brief Basic types, configuration, and assertion support.

@@ -1,4 +1,4 @@
-/* Copyright 2019 NVIDIA Corporation. All rights reserved.
+/* Copyright 2020 NVIDIA Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,6 @@
 #include <map>
 #include <vector>
 
-//#include <mi/dice.h>
 #include "vtknvindex_opengl_app_buffer.h"
 #include "vtknvindex_opengl_canvas.h"
 #include <nv/index/iindex_debug_configuration.h>
@@ -51,7 +50,9 @@ public:
   bool is_index_rank() const;
   mi::Sint32 get_cur_local_rank_id() const;
 
+  // Initialize IndeX
   void init_index();
+  bool is_index_initialized() const;
 
   // Cameras
   mi::neuraylib::Tag get_perspective_camera() const;
@@ -66,6 +67,9 @@ public:
 
   // Get the NVIDIA IndeX interface handle.
   mi::base::Handle<nv::index::IIndex>& get_interface();
+
+  // Plugin version
+  const char* get_version() const;
 
 public:
   // DiCE database
@@ -98,16 +102,16 @@ private:
   bool unload_nvindex();
 
   // Authenticate NVIDIA IndeX license.
-  bool authenticate_nvindex();
+  mi::Sint32 authenticate_nvindex();
 
   // Setup and start NVIDIA IndeX library.
-  mi::Uint32 setup_nvindex();
+  bool setup_nvindex();
 
   // Shutting down NVIDIA IndeX library.
   bool shutdown_nvindex();
 
-  // Initialize application rendering context.
-  void initialize_arc();
+  // Initialize IndeX session
+  void initialize_session();
 
   // Initialize IndeX scene graph
   void init_scene_graph();
@@ -116,7 +120,7 @@ private:
   bool m_is_index_viewer;
   bool m_is_index_initialized;
 
-  std::map<std::string, std::vector<mi::Sint32> > m_hostmane_to_rankids; // Hostname to rank_id.
+  std::map<std::string, std::vector<mi::Sint32> > m_hostname_to_rankids; // Hostname to rank_id.
   std::vector<std::string> m_host_list;                                  // List of host
 
   std::string m_nvindexlib_fname;                          // libnvindex.so/dll string name.
@@ -137,5 +141,9 @@ private:
 
   // IndeX instance
   static vtknvindex_instance* s_index_instance;
+
+  // Name of the configuration file for the plugin.
+  static const std::string s_config_filename;
 };
+
 #endif // vtknvindex_instance_h

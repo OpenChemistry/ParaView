@@ -104,7 +104,7 @@ public:
   */
   void frameConnected(pqViewFrame* frame, pqView* view) override;
 
-protected slots:
+protected Q_SLOTS:
   /**
   * Called before the "Convert To" menu is shown. We populate the menu with
   * actions for available view types.
@@ -223,6 +223,8 @@ private:
   QPointer<QShortcut> ShortCutFrustumPoints;
   QPointer<QShortcut> ShortCutBlocks;
   QPointer<QShortcut> ShortCutEsc;
+  QPointer<QShortcut> ShortCutGrow;
+  QPointer<QShortcut> ShortCutShrink;
   static bool ViewTypeComparator(const ViewType& one, const ViewType& two);
 };
 

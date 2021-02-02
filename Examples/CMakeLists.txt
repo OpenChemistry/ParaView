@@ -1,16 +1,13 @@
 cmake_minimum_required(VERSION 3.8)
 project(ParaViewExamples)
 
-if (CMAKE_VERSION VERSION_LESS "3.11" AND
-    CMAKE_GENERATOR STREQUAL "Ninja")
-  message(WARNING
-    "CMake < 3.11 with the Ninja generator causes issues with the way "
-    "examples are built. Skipping examples for now.")
-  return ()
-endif ()
-
 if (ParaView_BINARY_DIR)
   function (add_example dir)
+    cmake_parse_arguments(arg "" "TEST_TIMEOUT" "" ${ARGN})
+    if (arg_UNPARSED_ARGUMENTS)
+      message(FATAL_ERROR "Unknown arguments passed to 'add_example': ${arg_UNPARSED_ARGUMENTS}")
+    endif()
+
     add_test(
       NAME    "ParaViewExample-${dir}"
       COMMAND "${CMAKE_CTEST_COMMAND}"
@@ -24,11 +21,6 @@ if (ParaView_BINARY_DIR)
                 "-DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}"
                 "-DBUILD_SHARED_LIBS:BOOL=${BUILD_SHARED_LIBS}"
                 "-DParaView_DIR:PATH=${paraview_cmake_build_dir}"
-                # XXX(paraview-config): `find_package(ParaView)` should provide
-                # this information automatically. In this case, VTK should be
-                # providing this information.
-                # https://gitlab.kitware.com/vtk/vtk/issues/17503
-                "-DQt5_DIR:PATH=${Qt5_DIR}"
               --test-command
                 "${CMAKE_CTEST_COMMAND}"
                   -C $<CONFIGURATION>)
@@ -39,6 +31,16 @@ if (ParaView_BINARY_DIR)
         PROPERTY
           ENVIRONMENT "PATH=${example_path}")
     endif ()
+    set_property(TEST "ParaViewExample-${dir}" APPEND
+      PROPERTY
+        SKIP_REGULAR_EXPRESSION "Skipping example")
+
+    if (arg_TEST_TIMEOUT)
+      # override timeout, if specified.
+      set_property(TEST "ParaViewExample-${dir}"
+        PROPERTY
+          TIMEOUT "${arg_TEST_TIMEOUT}")
+    endif()
   endfunction ()
 else ()
   find_package(ParaView REQUIRED)
@@ -71,7 +73,16 @@ add_example(CustomApplications/Clone2)
 add_example(CustomApplications/Demo0)
 add_example(CustomApplications/Demo1)
 add_example(CustomApplications/MultiServerClient)
+add_example(CustomApplications/SimpleParaView)
 # TODO Update this custom application to load only specific data types.
 # add_example(CustomApplications/Spreadsheet)
 
-add_example(Catalyst)
+# increate timeout for this test since it builds multiple executables
+# which be timeconsuming on static builds.
+add_example(Catalyst
+  TEST_TIMEOUT 600)
+
+add_example(Catalyst2/CFullExample)
+add_example(Catalyst2/CxxFullExample)
+add_example(Catalyst2/CxxImageDataExample)
+add_example(Catalyst2/CxxMultiChannelInputExample)

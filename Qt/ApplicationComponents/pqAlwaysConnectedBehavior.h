@@ -58,8 +58,7 @@ public:
   void setDefaultServer(const pqServerResource& resource) { this->DefaultServer = resource; }
   const pqServerResource& defaultServer() const { return this->DefaultServer; }
 
-protected slots:
-  void delayedServerCheck();
+protected Q_SLOTS:
   void serverCheck();
 
 protected:

@@ -1,29 +1,29 @@
-/* Copyright 2019 NVIDIA Corporation. All rights reserved.
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions
-* are met:
-*  * Redistributions of source code must retain the above copyright
-*    notice, this list of conditions and the following disclaimer.
-*  * Redistributions in binary form must reproduce the above copyright
-*    notice, this list of conditions and the following disclaimer in the
-*    documentation and/or other materials provided with the distribution.
-*  * Neither the name of NVIDIA CORPORATION nor the names of its
-*    contributors may be used to endorse or promote products derived
-*    from this software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-* EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-* IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-* PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-* CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-* EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-* PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-* PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-* OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+/* Copyright 2020 NVIDIA Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *  * Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *  * Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *  * Neither the name of NVIDIA CORPORATION nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+ * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 #ifndef vtknvindex_irregular_volume_representation_h
 #define vtknvindex_irregular_volume_representation_h
@@ -32,20 +32,15 @@
 
 #include "vtkIndeXRepresentationsModule.h"
 #include "vtkPVConfig.h"
-#include "vtkPVDataRepresentation.h"
+#include "vtkVolumeRepresentation.h"
 
 #include "vtknvindex_rtc_kernel_params.h"
-
-//#if PARAVIEW_VERSION_MAJOR == 5 && PARAVIEW_VERSION_MINOR >= 2
-#define PARAVIEW_UGRID_USE_PARTITIONS
-//#endif
 
 class vtkColorTransferFunction;
 class vtkMultiProcessController;
 class vtkOrderedCompositeDistributor;
 class vtkPiecewiseFunction;
 class vtkPolyDataMapper;
-class vtkPVCacheKeeper;
 class vtkPVGeometryFilter;
 class vtkPVLODVolume;
 class vtkPVUpdateSuppressor;
@@ -55,7 +50,6 @@ class vtkUnstructuredGridVolumeMapper;
 class vtkVolumeProperty;
 class vtkVolumeRepresentationPreprocessor;
 
-class vtknvindex_affinity;
 class vtknvindex_config_settings;
 class vtknvindex_cluster_properties;
 class vtknvindex_irregular_volume_mapper;
@@ -64,11 +58,11 @@ class vtknvindex_irregular_volume_mapper;
 // of irregular volume data (unstructured volume grids) in NVIDIA IndeX.
 
 class VTKINDEXREPRESENTATIONS_EXPORT vtknvindex_irregular_volume_representation
-  : public vtkPVDataRepresentation
+  : public vtkVolumeRepresentation
 {
 public:
   static vtknvindex_irregular_volume_representation* New();
-  vtkTypeMacro(vtknvindex_irregular_volume_representation, vtkPVDataRepresentation);
+  vtkTypeMacro(vtknvindex_irregular_volume_representation, vtkVolumeRepresentation);
   void PrintSelf(ostream& os, vtkIndent indent) override;
 
   // Register a volume mapper with the representation.
@@ -84,12 +78,6 @@ public:
   // PrepareForRendering.
   int ProcessViewRequest(vtkInformationRequestKey* request_type, vtkInformation* inInfo,
     vtkInformation* outInfo) override;
-
-  // This needs to be called on all instances of vtkGeometryRepresentation when
-  // the input is modified. This is essential since the geometry filter does not
-  // have any real-input on the client side which messes with the Update
-  // requests.
-  void MarkModified() override;
 
   // Get/Set the visibility for this representation. When the visibility of
   // representation of false, all view passes are ignored.
@@ -108,25 +96,11 @@ public:
   }
 
   void SetSamplingDimensions(int xdim, int ydim, int zdim);
-  //***************************************************************************
-  // Forwarded to Actor.
-  void SetOrientation(double, double, double);
-  void SetOrigin(double, double, double);
-  void SetPickable(int val);
-  void SetPosition(double, double, double);
-  void SetScale(double, double, double);
 
   //***************************************************************************
   // Forwarded to vtkVolumeProperty and vtkProperty (when applicable).
-  void SetInterpolationType(int val);
-  void SetColor(vtkColorTransferFunction* lut);
-  void SetScalarOpacity(vtkPiecewiseFunction* pwf);
   void SetScalarOpacityUnitDistance(double val);
 
-  // Provides access to the actor used by this representation.
-  vtkPVLODVolume* GetActor() { return this->Actor; }
-
-#ifdef PARAVIEW_UGRID_USE_PARTITIONS
   //@{
   /**
    * Specify whether or not to redistribute the data. The default is false
@@ -136,9 +110,7 @@ public:
    */
   vtkSetMacro(UseDataPartitions, bool);
   vtkGetMacro(UseDataPartitions, bool);
-//@}
-
-#endif // PARAVIEW_UGRID_USE_PARTITIONS
+  //@}
 
   //
   // Configuration options set from ParaView GUI.
@@ -150,12 +122,6 @@ public:
 
   // Set subcube border size.
   void set_subcube_border(int border);
-
-  // Set filtering mode.
-  void set_filter_mode(int filter_mode);
-
-  // Set pre-integration mode.
-  void set_preintegration(bool enable_preint);
 
   // Set dump internal state of NVIDIA IndeX.
   void set_dump_internal_state(bool is_dump);
@@ -193,6 +159,18 @@ public:
   void set_edge_range(double edge_range);
   void set_edge_samples(int edge_samples);
 
+  // Set custom parameters.
+  void set_kernel_filename(const char* kernel_filename);
+  void set_kernel_update();
+  void set_custom_pfloat_1(double custom_cf1);
+  void set_custom_pfloat_2(double custom_cf2);
+  void set_custom_pfloat_3(double custom_cf3);
+  void set_custom_pfloat_4(double custom_cf4);
+  void set_custom_pint_1(int ci1);
+  void set_custom_pint_2(int ci2);
+  void set_custom_pint_3(int ci3);
+  void set_custom_pint_4(int ci4);
+
   // Set region of interest.
   void update_index_roi();
 
@@ -227,25 +205,15 @@ protected:
   // Returns true if the removal succeeds.
   bool RemoveFromView(vtkView* view) override;
 
-  // Overridden to check with the vtkPVCacheKeeper to see if the key is cached.
-  bool IsCached(double cache_key) override;
-
   // Passes on parameters to the active volume mapper.
   virtual void UpdateMapperParameters();
 
-  vtkVolumeRepresentationPreprocessor* Preprocessor;
-  vtkPVCacheKeeper* CacheKeeper;
-
-  vtknvindex_irregular_volume_mapper* DefaultMapper;
-
-  vtkVolumeProperty* Property;
-  vtkPVLODVolume* Actor;
+  vtkNew<vtkVolumeRepresentationPreprocessor> Preprocessor;
+  vtkNew<vtknvindex_irregular_volume_mapper> DefaultMapper;
 
   double DataBounds[6];
 
-#ifdef PARAVIEW_UGRID_USE_PARTITIONS
-  bool UseDataPartitions;
-#endif // PARAVIEW_UGRID_USE_PARTITIONS
+  bool UseDataPartitions = false;
 
 private:
   vtknvindex_irregular_volume_representation(
@@ -263,7 +231,7 @@ private:
   double m_roi_range_J[2];
   double m_roi_range_K[2];
 
-  vtkResampleToImage* ResampleToImageFilter;
+  vtkNew<vtkResampleToImage> ResampleToImageFilter;
   vtkMultiProcessController* m_controller;           // MPI controller from ParaView.
   vtknvindex_config_settings* m_app_config_settings; // Application side config settings.
   vtknvindex_cluster_properties*
@@ -271,12 +239,19 @@ private:
   mi::math::Bbox_struct<mi::Float32, 3> m_roi_gui;    // Region of interest set in the GUI.
   mi::math::Bbox<mi::Float32, 3> m_volume_dimensions; // Cached volume dimensions
 
+  // backup of original Image Reduction Factors
+  mi::Sint32 m_still_image_reduction_factor;
+  mi::Sint32 m_interactive_image_reduction_factor;
+
   mi::Float32 m_prev_time_step;
 
   // rtc kernel params
   vtknvindex_ivol_isosurface_params m_isosurface_params;
   vtknvindex_ivol_depth_enhancement_params m_depth_enhancement_params;
   vtknvindex_ivol_edge_enhancement_params m_edge_enhancement_params;
+  vtknvindex_ivol_custom_params m_custom_params;
+  std::string m_custom_kernel_filename;
+  std::string m_custom_kernel_program;
 };
 
 #endif // vtknvindex_irregular_volume_representation_h

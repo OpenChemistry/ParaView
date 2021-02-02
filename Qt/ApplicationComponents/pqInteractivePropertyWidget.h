@@ -111,7 +111,17 @@ public:
    */
   vtkSMPropertyGroup* propertyGroup() const;
 
-public slots:
+  /**
+   * Overriden in order to hide the VTK widget.
+   */
+  void hideEvent(QHideEvent*) override;
+
+  /**
+   * Overriden in order to show the VTK widget.
+   */
+  void showEvent(QShowEvent*) override;
+
+public Q_SLOTS:
   /**
   * Toggle the interactive widget's visibility. This, along with
   * pqPropertyWidget's selected state controls whether the widget proxy is
@@ -126,7 +136,7 @@ public slots:
   */
   void setDataSource(vtkSMProxy* dataSource);
 
-protected slots:
+protected Q_SLOTS:
   /**
   * Places the interactive widget using current data source information.
   */
@@ -137,7 +147,7 @@ protected slots:
   */
   void render();
 
-signals:
+Q_SIGNALS:
   /**
   * Fired whenever setWidgetVisible() changes the widget's visibility.
   */
@@ -159,13 +169,16 @@ signals:
 
   void dummySignal();
 
-private slots:
+private Q_SLOTS:
   /**
   * This method is called to update the state of Visibility and Enabled
   * properties on the widget based on the state of isWidgetVisible() and
   * isSelected().
   */
   void updateWidgetVisibility();
+
+protected:
+  bool VisibleState = true;
 
 private:
   void handleUserEvent(vtkObject*, unsigned long, void*);

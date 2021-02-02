@@ -53,7 +53,7 @@ public:
 
   bool isBoolProperty() const { return this->BoolProperty; }
 
-signals:
+Q_SIGNALS:
   void boolPropertyChanged();
 
 protected:
@@ -62,6 +62,7 @@ protected:
   int Index;
   unsigned long ObserverId;
   bool BoolProperty;
+  QString Value;
 
 private:
   Q_DISABLE_COPY(pqBoolPropertyWidgetDecorator)

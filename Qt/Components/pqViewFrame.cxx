@@ -52,7 +52,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "vtksys/SystemInformation.hxx"
 
-const int ICON_SIZE = 12;
+// Other toolbars are ~24 pixels, set somewhat smaller.
+const int ICON_SIZE = 18;
 
 class pqViewFrame::pqInternals
 {
@@ -87,21 +88,20 @@ pqViewFrame::pqViewFrame(QWidget* parentObject)
 
   // Create standard buttons.
   this->StandardToolButtons[SplitVertical] = this->createButton(
-    new QAction(QIcon(":/pqWidgets/Icons/pqSplitViewV12.png"), "Split Vertical", this)
+    new QAction(QIcon(":/pqWidgets/Icons/pqSplitVertical.svg"), "Split Vertical Axis", this)
     << pqSetName("SplitVertical"));
   this->StandardToolButtons[SplitHorizontal] = this->createButton(
-    new QAction(QIcon(":/pqWidgets/Icons/pqSplitViewH12.png"), "Split Horizontal", this)
+    new QAction(QIcon(":/pqWidgets/Icons/pqSplitHorizontal.svg"), "Split Horizontal Axis", this)
     << pqSetName("SplitHorizontal"));
   this->StandardToolButtons[Maximize] = this->createButton(
-    new QAction(
-      QIcon(this->style()->standardPixmap(QStyle::SP_TitleBarMaxButton)), "Maximize", this)
+    new QAction(QIcon(this->style()->standardIcon(QStyle::SP_TitleBarMaxButton)), "Maximize", this)
     << pqSetName("Maximize"));
   this->StandardToolButtons[Restore] = this->createButton(
     new QAction(
-      QIcon(this->style()->standardPixmap(QStyle::SP_TitleBarNormalButton)), "Restore", this)
+      QIcon(this->style()->standardIcon(QStyle::SP_TitleBarNormalButton)), "Restore", this)
     << pqSetName("Minimize"));
   this->StandardToolButtons[Close] = this->createButton(
-    new QAction(QIcon(this->style()->standardPixmap(QStyle::SP_TitleBarCloseButton)), "Close", this)
+    new QAction(QIcon(this->style()->standardIcon(QStyle::SP_TitleBarCloseButton)), "Close", this)
     << pqSetName("Close"));
 
   // Setup the title bar.
@@ -116,7 +116,7 @@ pqViewFrame::pqViewFrame(QWidget* parentObject)
   this->ContextMenu->addAction(this->StandardToolButtons[SplitVertical]->defaultAction());
   this->ContextMenu->addAction(this->StandardToolButtons[Close]->defaultAction());
 
-  this->setBorderColor(QColor("blue"));
+  this->setBorderColor(this->palette().link().color());
   this->Internals->Ui.TitleLabel->installEventFilter(this);
 
   this->setStandardButtons(SplitVertical | SplitHorizontal | Maximize | Close);
@@ -259,7 +259,7 @@ void pqViewFrame::buttonClicked()
     StandardButton key = this->StandardToolButtons.key(toolButton, NoButton);
     if (key != NoButton)
     {
-      emit this->buttonPressed(key);
+      Q_EMIT this->buttonPressed(key);
     }
   }
 }
@@ -366,7 +366,7 @@ void pqViewFrame::drag()
   if (dragObj->exec() == Qt::MoveAction)
   {
     // Let the target know that the drag operation has concluded.
-    emit this->finishDrag(this);
+    Q_EMIT this->finishDrag(this);
   }
   // It seems we are not supposed to call delete on QDrag. It gets deleted on
   // its own. Calling delete was causing segfaults on Linux in obscure call
@@ -402,7 +402,7 @@ void pqViewFrame::drop(QDropEvent* evt)
 void pqViewFrame::finishedDrag(pqViewFrame* source)
 {
   assert(source != NULL);
-  emit this->swapPositions(source->uniqueID().toString());
+  Q_EMIT this->swapPositions(source->uniqueID().toString());
 }
 
 //-----------------------------------------------------------------------------

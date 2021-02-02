@@ -4,6 +4,170 @@ Major API Changes             {#MajorAPIChanges}
 This page documents major API/design changes between different versions since we
 started tracking these (starting after version 4.2).
 
+Changes in 5.9
+--------------
+
+###Representations and Ordered Compositing for Render View###
+
+We have refactored the code that manages how data redistribution is done when
+ordered compositing is needed. Ordered compositing is used for rendering
+translucent geometries or volume rendering in parallel. Previous implementation
+used `vtkDistributedDataFilter` internally which required building of
+`vtkPKdTree` for deciding how the data is distributed. The new implementation
+uses `vtkRedistributeDataSetFilter` which supports arbitrary non-intersecting
+bounding boxes. This also results is lots of code simplification. However, it
+has resulted in API changes that will impact vtkPVDataRepresentation subclasses.
+
+* `vtkPVRenderView::MarkAsRedistributable` and
+  `vtkPVRenderView::SetOrderedCompositingInformation` have been removed. Instead one
+  should use `vtkPVRenderView::SetOrderedCompositingConfiguration` which enables
+  developers to specify exactly how the representation's data products
+  participate in the data-redistribution stage.
+* For representations based on `vtkImageVolumeRepresentation`, such
+  representation no longer need to provide a `vtkExtentTranslator` subclass to
+  the render view via `vtkPVRenderView::SetOrderedCompositingInformation` to
+  enable the view to rebuild a KdTree. The view can now simply use the data
+  bounds provided either via `vtkPVRenderView::SetGeometryBounds` or
+  `vtkPVRenderView::SetOrderedCompositingInformation`.
+
+Since most custom representations are based on vtkImageVolumeRepresentation,
+vtkUnstructuredGridVolumeRepresentation or vtkGeometryRepresentation, developers
+are advised to look at the changes to those representations to get a better feel
+for how to use `vtkPVRenderView::SetOrderedCompositingInformation` instead of
+the legacy APIs.
+
+###Changes where ParaView applications settings files are stored on Windows
+
+Due to a bug prior to 5.9 on Windows only, user settings JSON files (`<application>-UserSettings.json`)
+written from ParaView-based applications were stored in the wrong directory on Windows.
+Settings file are normally stored in a directory with the name of the organization,
+but ParaView was storing them in a directory with the name of the application instead.
+In ParaView 5.9, the `<application>-UserSettings.json` file is stored in the directory named
+for the organization as expected.
+
+###Run-time selection of OpenGL Widget rendering implementation###
+
+We have enabled run-time selection of Widget rendering OpenGL implementation, by
+default it is set to _native_ mode. However, this can be changed to _Stereo_ mode
+in startup time by adding the flag `--stereo` to the _Paraview_ binary.
+
+This also makes `pqQVTKWidget` not to extend from `pqQVTKWidgetBase`, instead,
+extend from QWidget and contain (composition) either an instance of
+`QVTKOpenGLNativeWidget` or `QVTKOpenGLStereoWidget`.
+
+###Consistent font size in text source
+
+Corrected a setting that resulted in unwanted scaling of the font size from the
+*Text Source* that scaled according to the size of the *RenderView*.
+
+Changes in 5.8
+---------------
+
+###Changes to caching in representation###
+
+Previously, caching for animation playback was handled by representations using
+`vtkPVCacheKeeper` filter in the representation pipelines. This had several
+issues:
+
+1. Each representations had to explicitly handle it, which was error-prone and
+   often ended up not being used correctly.
+2. Caching happened on the pre-data-movement i.e. during animation playback, the
+   geometry still needed to be delivered to the rendering nodes.
+3. Cache was incapable of distinguishing between pipelines that were modified
+   during animation playback and those that weren't. Consequently, animations
+   that simply moved the camera still ended up executing the representation
+   pipelines for each time step.
+4. Not all views / representations participated in caching, only render view
+   did. Thus, if you had an animation that used a Spreadsheet view, for example,
+   you'd get no benefit from caching.
+5. Even with caching enabled, animation playback was slow.
+
+
+With 5.8, we have refactored handling of caches in views and representations.
+Major highlights/changes are as follows:
+
+1. Caching is now the responsibility of the view. vtkPVDataDeliveryManager
+   handles caching along with data movement for views. All views, not just
+   render views, use vtkPVDataDeliveryManager (or subclass) to handle data
+   movement from data-processing nodes to rendering nodes. Representations
+   like `vtkChartRepresentation`, `vtkSpreadSheetRepresentation` can no longer
+   do data movement in `RequestData` but instead have to follow the same pattern
+   as `vtkGeometryRepresentation` and other render view representations to let
+   the view (using vtkPVDataDeliveryManager) handle data movement.
+   Consequently, if your `vtkPVDataRepresentation` subclass used a
+   `vtkPVCacheKeeper` in your representation pipeline, you can simply remove it.
+   Representation provide prepared data to the view using `vtkPVView::SetPiece`
+   in `vtkPVView::REQUEST_UPDATE` pass, and obtain delivered data for rendering
+   using `vtkPVView::GetDeliveredPiece` in `vtkPVView::REQUEST_RENDER`
+   (`vtkPVRenderView::GetPieceProducer` is still supported, but we encourage developers
+   to prefer the new `GetDeliveredPiece` API instead).
+2. To ensure that the view creates a delivery manager of appropriate type, you
+   may have to add the delivery manager as a subproxy, as shown in the example
+   below:
+
+    <SubProxy command="SetDeliveryManager">
+       <Proxy name="DeliveryManager"
+         proxygroup="delivery_managers"
+         proxyname="ContextViewDeliveryManager"/>
+     </SubProxy>
+
+3. When cached data is available, `REQUEST_UPDATE` request will no longer result
+   in a call to `vtkPVDataRepresentation::RequestData`. The representation will
+   be provided the cached data during `REQUEST_RENDER` pass. Note, if using
+   cache, you may get data that has older `MTime`, thus representation should
+   not assume monotonically increasing m-times for delivered data. Rendering
+   pipelines in representations can thus rely on the mtime and data pointer to
+   build their own rendering objects cache, if needed.
+4. Representations always have to let the view do data transfer and obtain the
+   data to render from the view and never simply connect the data prepared in
+   `RequestData` to mappers, for example. This was acceptable in certain cases
+   before, but not longer supported since `RequestData` will not get called
+   when cache data is being used.
+
+###Plugin loading (including auto loaded plugins)###
+
+With this version, ParaView is now formalizing that all plugins, including the
+ones that are flagged as "auto-load" are loaded **after** the main window has
+been instantiated. This ensures that plugin developers can assume existence of a
+main window irrespective of whether the plugin was auto-loaded or loaded after
+the application has started.
+
+
+###GlobalPropertyLink XML hints###
+
+The implementation for settings proxies and the proxy for color palette has been
+combined thus removing the need for a separate `vtkSMGlobalPropertiesProxy`
+class. The color-palette proxy is now same as other settings proxies and is
+registered under `settings` group and not `global_properties` group. To simply
+XML hints to reflect this change, we have deprecated `GlobalPropertyLink` hint.
+Following XML snippet shows how to change existing `GlobalPropertyLink` element
+to `PropertyLink`.
+
+    <!-- OLD XML -->
+    <DoubleVectorProperty name="GridColor"
+                          number_of_elements="3" ... >
+      ...
+      <Hints>
+        <GlobalPropertyLink type="ColorPalette" property="ForegroundColor" />
+      </Hints>
+    </DoubleVectorProperty>
+
+    <!-- NEW XML -->
+    <DoubleVectorProperty name="GridColor"
+                          number_of_elements="3" ... >
+      ...
+      <Hints>
+        <PropertyLink group="settings" proxy="ColorPalette" property="ForegroundColor"
+          unlink_if_modified="1" />
+      </Hints>
+    </DoubleVectorProperty>
+
+Note, the `PropertyLink` hint was already present and used in earlier versions
+for linking with properties on other settings proxies. We simply are following
+the same pattern for color palette. The new `unlink_if_modified` attribute
+ensures that the link with the settings proxy is broken if the user explicitly
+modifies the property.
+
 Changes in 5.7
 --------------
 
@@ -545,13 +709,13 @@ XMLs to JSON.
 
 ###Changes to `pqViewFrame`###
 
-Commit [afaf6a510](https://gitlab.kitware.com/paraview/paraview/commit/afaf6a510ecb872c49461cd850022817741e1558)
+Commit [afaf6a510](https://gitlab.kitware.com/paraview/paraview/-/commit/afaf6a510ecb872c49461cd850022817741e1558)
 changes the internal widgets created in `pqViewFrame` to add a new `QFrame` named
 **CentralWidgetFrame** around the rendering viewport. While this shouldn't break any
 code, this will certainly break tests since the widgets have changed. The change to the testing
 XML is fairly simple. Just add the **CentralWidgetFrame** to the widget hierarchy at the appropriate
 location. See the original
-[merge request](https://gitlab.kitware.com/paraview/paraview/merge_requests/167)
+[merge request](https://gitlab.kitware.com/paraview/paraview/-/merge_requests/167)
 for details.
 
 ###Changes to `vtkSMProxyIterator`###

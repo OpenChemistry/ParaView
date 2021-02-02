@@ -38,7 +38,7 @@ class PQCOMPONENTS_EXPORT pqMemoryInspectorPanel : public QWidget
 {
   Q_OBJECT
 public:
-  pqMemoryInspectorPanel(QWidget* parent = 0, Qt::WindowFlags f = 0);
+  pqMemoryInspectorPanel(QWidget* parent = nullptr, Qt::WindowFlags f = Qt::WindowFlags{});
   ~pqMemoryInspectorPanel() override;
 
   // Description:
@@ -50,7 +50,7 @@ protected:
   // Update when the panel is made visible.
   void showEvent(QShowEvent* event) override;
 
-protected slots:
+protected Q_SLOTS:
 
   // Description:
   // Configure the UI based on conneccted servers.
@@ -65,6 +65,10 @@ protected slots:
   void ConnectToView(pqView* view);
   void RenderCompleted();
   void EnableUpdate();
+
+  // Description:
+  // Clear all member variables and models.
+  void Clear();
 
   // Description:
   // Update the UI with values from the server(s).
@@ -125,7 +129,7 @@ private:
 private:
   pqMemoryInspectorPanelUI* Ui;
 
-  int ClientOnly;
+  bool ClientOnly;
   HostData* ClientHost;
   int ClientSystemType;
   bool StackTraceOnClient;
@@ -145,8 +149,8 @@ private:
   int RenderServerSystemType;
   bool StackTraceOnRenderServer;
 
-  int UpdateEnabled;
-  int PendingUpdate;
+  bool UpdateEnabled;
+  bool PendingUpdate;
   bool AutoUpdate;
 };
 

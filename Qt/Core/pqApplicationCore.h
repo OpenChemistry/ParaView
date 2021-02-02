@@ -231,10 +231,15 @@ public:
   void clearSettings();
 
   /**
-  * Save the ServerManager state.
+  * Save the ServerManager state to a XML element.
   */
   vtkPVXMLElement* saveState();
-  void saveState(const QString& filename);
+
+  /**
+  * Save the ServerManager state to a file.
+  * Return true if the operation succeeded otherwise return false.
+  */
+  bool saveState(const QString& filename);
 
   /**
   * Loads the ServerManager state. Emits the signal
@@ -284,17 +289,16 @@ public:
   pqServer* getActiveServer() const;
 
   /**
-  * Called to load the configuration xml bundled with the application the
-  * lists the plugins that the application is aware by default. If no filename
-  * is specified, {executable-path}/.plugins is loaded.
-  */
-  void loadDistributedPlugins(const char* filename = 0);
-
-  /**
   * Destructor.
   */
   ~pqApplicationCore() override;
-public slots:
+
+  /**
+   * INTERNAL. Do not use.
+   */
+  void _paraview_client_environment_complete();
+
+public Q_SLOTS:
 
   /**
   * Applications calls this to ensure
@@ -320,7 +324,7 @@ public slots:
   */
   void render();
 
-signals:
+Q_SIGNALS:
   /**
   * Fired before a state xml is being loaded. One can add slots for this signal
   * and modify the fired xml-element as part of pre-processing before
@@ -364,12 +368,18 @@ signals:
   */
   void updateMasterEnableState(bool);
 
-protected slots:
+  /**
+   * Fired when the ParaView Client infrastructure has completed setting up the
+   * environment.
+   */
+  void clientEnvironmentDone();
+
+protected Q_SLOTS:
   void onStateLoaded(vtkPVXMLElement* root, vtkSMProxyLocator* locator);
   void onStateSaved(vtkPVXMLElement* root);
   void onHelpEngineWarning(const QString&);
 
-private slots:
+private Q_SLOTS:
   /**
    * called when vtkPVGeneralSettings::GetInstance() fired
    * `vtkCommand::ModifiedEvent`. We update pqDoubleLineEdit's global precision

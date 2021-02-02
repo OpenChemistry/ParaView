@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqPointPickingHelper.h"
 #include "pqRenderView.h"
 #include "vtkCamera.h"
+#include "vtkSMIntVectorProperty.h"
 #include "vtkSMNewWidgetRepresentationProxy.h"
 #include "vtkSMPropertyGroup.h"
 #include "vtkSMPropertyHelper.h"
@@ -111,6 +112,17 @@ pqImplicitPlanePropertyWidget::pqImplicitPlanePropertyWidget(
   else
   {
     qCritical("Missing required property for function 'Normal'.");
+  }
+
+  if (vtkSMIntVectorProperty* alwaysSnapToNearestAxis =
+        vtkSMIntVectorProperty::SafeDownCast(smgroup->GetProperty("AlwaysSnapToNearestAxis")))
+  {
+    if (alwaysSnapToNearestAxis->GetNumberOfElements())
+    {
+      vtkSMNewWidgetRepresentationProxy* wdgProxy = this->widgetProxy();
+      vtkSMPropertyHelper(wdgProxy, "AlwaysSnapToNearestAxis")
+        .Set(alwaysSnapToNearestAxis->GetElements()[0]);
+    }
   }
 
   // link a few buttons
@@ -208,7 +220,7 @@ void pqImplicitPlanePropertyWidget::resetToDataBounds()
     vtkSMPropertyHelper(wdgProxy, "WidgetBounds").Set(bounds, 6);
     wdgProxy->UpdateProperty("WidgetBounds", true);
     wdgProxy->UpdateVTKObjects();
-    emit this->changeAvailable();
+    Q_EMIT this->changeAvailable();
     this->render();
   }
 }
@@ -255,7 +267,7 @@ void pqImplicitPlanePropertyWidget::setNormal(double wx, double wy, double wz)
   double n[3] = { wx, wy, wz };
   vtkSMPropertyHelper(wdgProxy, "Normal").Set(n, 3);
   wdgProxy->UpdateVTKObjects();
-  emit this->changeAvailable();
+  Q_EMIT this->changeAvailable();
   this->render();
 }
 
@@ -266,6 +278,6 @@ void pqImplicitPlanePropertyWidget::setOrigin(double wx, double wy, double wz)
   double o[3] = { wx, wy, wz };
   vtkSMPropertyHelper(wdgProxy, "Origin").Set(o, 3);
   wdgProxy->UpdateVTKObjects();
-  emit this->changeAvailable();
+  Q_EMIT this->changeAvailable();
   this->render();
 }

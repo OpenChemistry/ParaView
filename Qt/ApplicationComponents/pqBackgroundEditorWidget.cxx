@@ -44,27 +44,29 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqUndoStack.h"
 #include "vtkSMProperty.h"
 #include "vtkSMPropertyGroup.h"
+#include "vtkSMPropertyHelper.h"
 #include "vtkSMProxy.h"
 
 const char* COLOR_PROPERTY = "Background";
 const char* COLOR2_PROPERTY = "Background2";
 const char* GRADIENT_BACKGROUND_PROPERTY = "UseGradientBackground";
 const char* IMAGE_BACKGROUND_PROPERTY = "UseTexturedBackground";
+const char* SKYBOX_BACKGROUND_PROPERTY = "UseSkyboxBackground";
 const char* IMAGE_PROPERTY = "BackgroundTexture";
+const char* ENV_LIGHTING_PROPERTY = "UseEnvironmentLighting";
+
+const char* ENV_COLOR_PROPERTY = "EnvironmentalBG";
+const char* ENV_COLOR2_PROPERTY = "EnvironmentalBG2";
+const char* ENV_GRADIENT_BACKGROUND_PROPERTY = "UseGradientEnvironmentalBG";
+const char* ENV_IMAGE_BACKGROUND_PROPERTY = "UseTexturedEnvironmentalBG";
+const char* ENV_IMAGE_PROPERTY = "EnvironmentalBGTexture";
 
 enum BackgroundType
 {
   SINGLE_COLOR_TYPE,
   GRADIENT_TYPE,
   IMAGE_TYPE,
-  TYPE_COUNT
-};
-
-enum BackgroundTypeEncoding
-{
-  GRADIENT_TYPE_ENCODING,
-  IMAGE_TYPE_ENCODING,
-  TYPE_ENCODING_COUNT
+  SKYBOX_TYPE
 };
 
 class pqBackgroundEditorWidget::pqInternal : public Ui::BackgroundEditorWidget
@@ -72,6 +74,10 @@ class pqBackgroundEditorWidget::pqInternal : public Ui::BackgroundEditorWidget
 public:
   enum BackgroundType PreviousType;
   pqTextureSelectorPropertyWidget* TextureSelector = nullptr;
+
+  // whether the widget is customized for Environmental background settings or
+  // the more typical Backplate type background.
+  bool ForEnvironment = false;
 
   pqInternal(pqBackgroundEditorWidget* self)
     : PreviousType(SINGLE_COLOR_TYPE)
@@ -88,20 +94,42 @@ public:
 };
 
 pqBackgroundEditorWidget::pqBackgroundEditorWidget(
-  vtkSMProxy* smProxy, vtkSMPropertyGroup* smGroup, QWidget* parentObject)
+  vtkSMProxy* smProxy, vtkSMPropertyGroup* smGroup, QWidget* parentObject, bool forEnvironment)
   : Superclass(smProxy, smGroup, parentObject)
   , Internal(new pqInternal(this))
 {
   Ui::BackgroundEditorWidget& ui = *this->Internal;
+  this->Internal->ForEnvironment = forEnvironment;
+
+  if (this->Internal->ForEnvironment)
+  {
+    ui.BackgroundType->removeItem(3); // SkyBox
+  }
   connect(ui.BackgroundType, SIGNAL(currentIndexChanged(int)), this,
     SLOT(currentIndexChangedBackgroundType(int)));
   connect(ui.RestoreDefaultColor, SIGNAL(clicked()), this, SLOT(clickedRestoreDefaultColor()));
   connect(ui.RestoreDefaultColor2, SIGNAL(clicked()), this, SLOT(clickedRestoreDefaultColor2()));
 
-  this->addPropertyLink(ui.Color, COLOR_PROPERTY);
-  this->addPropertyLink(ui.Color2, COLOR2_PROPERTY);
+  if (!this->Internal->ForEnvironment)
+  {
+    this->addPropertyLink(ui.Color, COLOR_PROPERTY);
+    this->addPropertyLink(ui.Color2, COLOR2_PROPERTY);
+  }
+  else
+  {
+    this->addPropertyLink(ui.Color, ENV_COLOR_PROPERTY);
+    this->addPropertyLink(ui.Color2, ENV_COLOR2_PROPERTY);
+  }
 
-  vtkSMProperty* smProperty = smGroup->GetProperty(GRADIENT_BACKGROUND_PROPERTY);
+  vtkSMProperty* smProperty;
+  if (!this->Internal->ForEnvironment)
+  {
+    smProperty = smGroup->GetProperty(GRADIENT_BACKGROUND_PROPERTY);
+  }
+  else
+  {
+    smProperty = smGroup->GetProperty(ENV_GRADIENT_BACKGROUND_PROPERTY);
+  }
   if (smProperty)
   {
     this->addPropertyLink(
@@ -112,7 +140,14 @@ pqBackgroundEditorWidget::pqBackgroundEditorWidget(
     ui.BackgroundType->hide();
   }
 
-  smProperty = smGroup->GetProperty(IMAGE_BACKGROUND_PROPERTY);
+  if (!this->Internal->ForEnvironment)
+  {
+    smProperty = smGroup->GetProperty(IMAGE_BACKGROUND_PROPERTY);
+  }
+  else
+  {
+    smProperty = smGroup->GetProperty(ENV_IMAGE_BACKGROUND_PROPERTY);
+  }
   if (smProperty)
   {
     this->addPropertyLink(this, "imageBackground", SIGNAL(imageBackgroundChanged()), smProperty);
@@ -121,9 +156,47 @@ pqBackgroundEditorWidget::pqBackgroundEditorWidget(
   {
     ui.BackgroundType->hide();
   }
+
+  smProperty = smGroup->GetProperty(SKYBOX_BACKGROUND_PROPERTY);
+  if (smProperty)
+  {
+    this->addPropertyLink(this, "skyboxBackground", SIGNAL(skyboxBackgroundChanged()), smProperty);
+  }
+  else
+  {
+    if (!this->Internal->ForEnvironment)
+    {
+      ui.BackgroundType->hide();
+    }
+  }
+
+  smProperty = smGroup->GetProperty(ENV_LIGHTING_PROPERTY);
+  if (smProperty)
+  {
+    this->addPropertyLink(
+      this, "environmentLighting", SIGNAL(environmentLightingChanged()), smProperty);
+  }
+  else
+  {
+    if (!this->Internal->ForEnvironment)
+    {
+      ui.BackgroundType->hide();
+    }
+  }
+
+  QObject::connect(this->Internal->EnvLighting, SIGNAL(stateChanged(int)), this,
+    SIGNAL(environmentLightingChanged()));
+
   currentIndexChangedBackgroundType(this->Internal->PreviousType);
 
-  smProperty = smGroup->GetProperty(IMAGE_PROPERTY);
+  if (!this->Internal->ForEnvironment)
+  {
+    smProperty = smGroup->GetProperty(IMAGE_PROPERTY);
+  }
+  else
+  {
+    smProperty = smGroup->GetProperty(ENV_IMAGE_PROPERTY);
+  }
   if (smProperty)
   {
     // Can't use property link with texture, create the widget manually and connect signals
@@ -145,15 +218,16 @@ pqBackgroundEditorWidget::~pqBackgroundEditorWidget()
 
 void pqBackgroundEditorWidget::currentIndexChangedBackgroundType(int type)
 {
-  const int ROWS = 3;
+  const int ROWS = 4;
   const int COLS = 2;
   Ui::BackgroundEditorWidget& ui = *this->Internal;
-  const char* colorButtonName[TYPE_COUNT] = { "Color", "Color 1", "Color" };
-  int currentPage[TYPE_COUNT] = { 0, 0, 1 };
-  bool visibleControls[TYPE_COUNT][ROWS] = { { true, false, false }, { true, true, false },
-    { false, false, true } };
+  const char* colorButtonName[4] = { "Color", "Color 1", "Color", "Color" };
+  int currentPage[4] = { 0, 0, 1, 1 };
+  bool visibleControls[4][ROWS] = { { true, false, false, false }, { true, true, false, false },
+    { false, false, true, false }, { false, false, true, true } };
   QWidget* controls[ROWS][COLS] = { { ui.Color, ui.RestoreDefaultColor },
-    { ui.Color2, ui.RestoreDefaultColor2 }, { this->Internal->TextureSelector, 0 } };
+    { ui.Color2, ui.RestoreDefaultColor2 }, { this->Internal->TextureSelector, nullptr },
+    { ui.EnvLighting, nullptr } };
   for (int i = 0; i < ROWS; ++i)
   {
     for (int j = 0; j < COLS; ++j)
@@ -178,9 +252,9 @@ bool pqBackgroundEditorWidget::gradientBackground() const
 
 void pqBackgroundEditorWidget::setGradientBackground(bool gradientValue)
 {
-  enum BackgroundType typeFunction[TYPE_COUNT][2] = { { SINGLE_COLOR_TYPE, GRADIENT_TYPE },
-    { SINGLE_COLOR_TYPE, GRADIENT_TYPE },
-    { IMAGE_TYPE, GRADIENT_TYPE } }; // gradient has precendece over image
+  enum BackgroundType typeFunction[4][2] = { { SINGLE_COLOR_TYPE, GRADIENT_TYPE },
+    { SINGLE_COLOR_TYPE, GRADIENT_TYPE }, { IMAGE_TYPE, GRADIENT_TYPE },
+    { SKYBOX_TYPE, GRADIENT_TYPE } };
   int newType = typeFunction[this->Internal->PreviousType][gradientValue];
   fireGradientAndImageChanged(this->Internal->PreviousType, newType);
   this->Internal->BackgroundType->setCurrentIndex(newType);
@@ -193,38 +267,81 @@ bool pqBackgroundEditorWidget::imageBackground() const
 
 void pqBackgroundEditorWidget::setImageBackground(bool imageValue)
 {
-  enum BackgroundType typeFunction[TYPE_COUNT][2] = { { SINGLE_COLOR_TYPE, IMAGE_TYPE },
-    { GRADIENT_TYPE, GRADIENT_TYPE }, // gradient has precendece over image
-    { SINGLE_COLOR_TYPE, IMAGE_TYPE } };
+  enum BackgroundType typeFunction[4][2] = { { SINGLE_COLOR_TYPE, IMAGE_TYPE },
+    { GRADIENT_TYPE, GRADIENT_TYPE }, // gradient has precedence over image
+    { SINGLE_COLOR_TYPE, IMAGE_TYPE }, { SKYBOX_TYPE, IMAGE_TYPE } };
   enum BackgroundType newType = typeFunction[this->Internal->PreviousType][imageValue];
   fireGradientAndImageChanged(this->Internal->PreviousType, newType);
   this->Internal->BackgroundType->setCurrentIndex(newType);
 }
 
+bool pqBackgroundEditorWidget::skyboxBackground() const
+{
+  return this->Internal->BackgroundType->currentIndex() == SKYBOX_TYPE;
+}
+
+void pqBackgroundEditorWidget::setSkyboxBackground(bool skyboxValue)
+{
+  enum BackgroundType typeFunction[4][2] = { { SINGLE_COLOR_TYPE, SKYBOX_TYPE },
+    { GRADIENT_TYPE, GRADIENT_TYPE }, // gradient has precedence over skybox
+    { IMAGE_TYPE, IMAGE_TYPE },       // image has precedence over skybox
+    { SINGLE_COLOR_TYPE, SKYBOX_TYPE } };
+  enum BackgroundType newType = typeFunction[this->Internal->PreviousType][skyboxValue];
+  fireGradientAndImageChanged(this->Internal->PreviousType, newType);
+  this->Internal->BackgroundType->setCurrentIndex(newType);
+}
+
+bool pqBackgroundEditorWidget::environmentLighting() const
+{
+  return this->Internal->EnvLighting->isChecked();
+}
+
+void pqBackgroundEditorWidget::setEnvironmentLighting(bool envValue)
+{
+  this->Internal->EnvLighting->setChecked(envValue);
+}
+
 void pqBackgroundEditorWidget::fireGradientAndImageChanged(int oldType, int newType)
 {
-  bool gradientChanged[TYPE_COUNT][TYPE_COUNT] = { { false, true, false }, { true, false, true },
-    { false, true, false } };
-  bool imageChanged[TYPE_COUNT][TYPE_COUNT] = { { false, false, true }, { false, false, true },
-    { true, true, false } };
-  if (gradientChanged[oldType][newType])
+  if (oldType != newType)
   {
-    emit gradientBackgroundChanged();
-  }
-  if (imageChanged[oldType][newType])
-  {
-    emit imageBackgroundChanged();
+    if (oldType == GRADIENT_TYPE || newType == GRADIENT_TYPE)
+    {
+      Q_EMIT gradientBackgroundChanged();
+    }
+    if (oldType == IMAGE_TYPE || newType == IMAGE_TYPE)
+    {
+      Q_EMIT imageBackgroundChanged();
+    }
+    if (oldType == SKYBOX_TYPE || newType == SKYBOX_TYPE)
+    {
+      Q_EMIT skyboxBackgroundChanged();
+    }
   }
 }
 
 void pqBackgroundEditorWidget::clickedRestoreDefaultColor()
 {
-  this->changeColor(COLOR_PROPERTY);
+  if (!this->Internal->ForEnvironment)
+  {
+    this->changeColor(COLOR_PROPERTY);
+  }
+  else
+  {
+    this->changeColor(ENV_COLOR_PROPERTY);
+  }
 }
 
 void pqBackgroundEditorWidget::clickedRestoreDefaultColor2()
 {
-  this->changeColor(COLOR2_PROPERTY);
+  if (!this->Internal->ForEnvironment)
+  {
+    this->changeColor(COLOR2_PROPERTY);
+  }
+  else
+  {
+    this->changeColor(ENV_COLOR2_PROPERTY);
+  }
 }
 
 void pqBackgroundEditorWidget::changeColor(const char* propertyName)
@@ -232,6 +349,6 @@ void pqBackgroundEditorWidget::changeColor(const char* propertyName)
   vtkSMProperty* _property = this->propertyGroup()->GetProperty(propertyName);
   BEGIN_UNDO_SET("Restore Default Color");
   _property->ResetToDefault();
-  emit this->changeFinished();
+  Q_EMIT this->changeFinished();
   END_UNDO_SET();
 }

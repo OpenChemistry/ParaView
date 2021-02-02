@@ -76,10 +76,10 @@ public:
   QList<QVariant> values() const;
   void setValues(const QList<QVariant>& values);
 
-signals:
+Q_SIGNALS:
   void valuesChanged();
 
-private slots:
+private Q_SLOTS:
   void domainModified();
 
 private:
@@ -91,6 +91,7 @@ private:
   vtkWeakPointer<vtkSMIntVectorProperty> Property;
   QPointer<pqCompositeDataInformationTreeModel> Model;
   QPointer<pqTreeView> TreeView;
+  int DepthExpansion = 2;
 };
 
 #endif

@@ -87,7 +87,18 @@ public:
   void setHeaderLabel(const QString& label);
   QString headerLabel() const;
   //@}
-signals:
+
+  //@{
+  /**
+   * Specify an icon type to use for a property with the given name.
+   * Supported icon types are point, cell, field, vertex, edge, row,
+   * face, side-set, node-set, face-set, edge-set, cell-set,
+   * node-map, edge-map, face-map.
+   */
+  void setIconType(const QString& pname, const QString& icon_type);
+  const QString& iconType(const QString& pname) const;
+  //@}
+Q_SIGNALS:
   /**
   * fired whenever the check state has been modified.
   */

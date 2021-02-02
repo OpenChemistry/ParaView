@@ -311,7 +311,7 @@ pqDoubleVectorPropertyWidget::pqDoubleVectorPropertyWidget(
     resetButton->setObjectName("Reset");
     QAction* resetActn = new QAction(resetButton);
     resetActn->setToolTip("Reset using current data values");
-    resetActn->setIcon(resetButton->style()->standardIcon(QStyle::SP_BrowserReload));
+    resetActn->setIcon(QIcon(":/pqWidgets/Icons/pqReset.svg"));
     resetButton->addAction(resetActn);
     resetButton->setDefaultAction(resetActn);
 
@@ -343,7 +343,7 @@ pqDoubleVectorPropertyWidget::pqDoubleVectorPropertyWidget(
         tb->addAction(actn);
         tb->setDefaultAction(actn);
         tb->setToolTip("Reset to active data bounds");
-        tb->setIcon(QIcon(":/pqWidgets/Icons/pqZoomToData.png"));
+        tb->setIcon(QIcon(":/pqWidgets/Icons/pqZoomToData.svg"));
         QObject::connect(
           tb, &QToolButton::clicked, this, &pqDoubleVectorPropertyWidget::resetToActiveDataBounds);
         layoutLocal->addWidget(tb, 0, Qt::AlignBottom);
@@ -368,24 +368,24 @@ void pqDoubleVectorPropertyWidget::resetButtonClicked()
   if (vtkSMProperty* smproperty = this->property())
   {
     smproperty->ResetToDomainDefaults(/*use_unchecked_values*/ true);
-    emit this->changeAvailable();
-    emit this->changeFinished();
+    Q_EMIT this->changeAvailable();
+    Q_EMIT this->changeFinished();
   }
-  emit this->clearHighlight();
+  Q_EMIT this->clearHighlight();
 }
 
 //-----------------------------------------------------------------------------
 void pqDoubleVectorPropertyWidget::apply()
 {
   this->Superclass::apply();
-  emit this->clearHighlight();
+  Q_EMIT this->clearHighlight();
 }
 
 //-----------------------------------------------------------------------------
 void pqDoubleVectorPropertyWidget::reset()
 {
   this->Superclass::reset();
-  emit this->clearHighlight();
+  Q_EMIT this->clearHighlight();
 }
 
 //-----------------------------------------------------------------------------
@@ -410,8 +410,8 @@ void pqDoubleVectorPropertyWidget::scale(double factor)
     {
       helper.Set(cc, helper.GetAsDouble(cc) * factor);
     }
-    emit this->changeAvailable();
-    emit this->changeFinished();
+    Q_EMIT this->changeAvailable();
+    Q_EMIT this->changeFinished();
   }
 }
 
@@ -451,7 +451,7 @@ void pqDoubleVectorPropertyWidget::resetToBounds(const double bds[6])
     {
       helper.Set(cc, bds[cc]);
     }
-    emit this->changeAvailable();
-    emit this->changeFinished();
+    Q_EMIT this->changeAvailable();
+    Q_EMIT this->changeFinished();
   }
 }

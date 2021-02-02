@@ -59,6 +59,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QStringList>
 #include <QtDebug>
 
+#include <algorithm>
+
 class pqProxyGroupMenuManager::pqInternal
 {
 public:
@@ -595,7 +597,7 @@ void pqProxyGroupMenuManager::populateMenu()
   }
 
   // Now sort all actions added in temp based on their texts.
-  qSort(someActions.begin(), someActions.end(), ::actionTextSort);
+  std::sort(someActions.begin(), someActions.end(), ::actionTextSort);
   foreach (QAction* action, someActions)
   {
     alphabeticalMenu->addAction(action);
@@ -617,7 +619,7 @@ void pqProxyGroupMenuManager::populateMenu()
     }
   }
 
-  emit this->menuPopulated();
+  Q_EMIT this->menuPopulated();
 }
 
 //-----------------------------------------------------------------------------
@@ -739,7 +741,7 @@ void pqProxyGroupMenuManager::triggered()
     return;
   }
   QPair<QString, QString> key(data_list[0], data_list[1]);
-  emit this->triggered(key.first, key.second);
+  Q_EMIT this->triggered(key.first, key.second);
   if (this->RecentlyUsedMenuSize > 0)
   {
     this->Internal->RecentlyUsed.removeAll(key);
@@ -849,7 +851,7 @@ QList<QAction*> pqProxyGroupMenuManager::actions(const QString& category)
   {
     // sort unless the XML overrode the sorting using the "preserve_order"
     // attribute.
-    qSort(category_actions.begin(), category_actions.end(), ::actionTextSort);
+    std::sort(category_actions.begin(), category_actions.end(), ::actionTextSort);
   }
   return category_actions;
 }

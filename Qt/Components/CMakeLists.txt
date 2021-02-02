@@ -36,6 +36,7 @@ set(classes
   pqAnimatablePropertiesComboBox
   pqAnimatableProxyComboBox
   pqAnimationManager
+  pqAnimationProgressDialog
   pqAnimationTimeWidget
   pqAnimationViewWidget
   pqArrayListDomain
@@ -62,6 +63,7 @@ set(classes
   pqCustomFilterManager
   pqCustomFilterManagerModel
   pqCustomViewpointButtonDialog
+  pqDataAssemblyTreeModel
   pqDataInformationModel
   pqDataInformationWidget
   pqDialog
@@ -99,8 +101,10 @@ set(classes
   pqLiveInsituManager
   pqLiveInsituVisualizationManager
   pqLockViewSizeCustomDialog
+  pqLogViewerDialog
   pqMemoryInspectorPanel
   pqMultiBlockInspectorWidget
+  pqMultiQueryClauseWidget
   pqMultiViewWidget
   pqOrbitCreatorDialog
   pqOutputPortComboBox
@@ -137,9 +141,8 @@ set(classes
   pqRescaleRange
   pqSILModel
   pqSILWidget
+  pqSingleLogViewerWidget
   pqSMSignalAdaptors
-  pqSampleScalarAddRangeDialog
-  pqSampleScalarWidget
   pqScalarSetModel
   pqScalarValueListPropertyWidget
   pqSearchBox
@@ -217,6 +220,7 @@ set(ui_files
   Resources/UI/pqLinksEditor.ui
   Resources/UI/pqLinksManager.ui
   Resources/UI/pqLockViewSizeCustomDialog.ui
+  Resources/UI/pqLogViewerDialog.ui
   Resources/UI/pqMemoryInspectorPanelForm.ui
   Resources/UI/pqMultiBlockInspectorWidget.ui
   Resources/UI/pqOrbitCreatorDialog.ui
@@ -234,8 +238,6 @@ set(ui_files
   Resources/UI/pqRemoteCommandDialogForm.ui
   Resources/UI/pqRemoteCommandTemplateDialogForm.ui
   Resources/UI/pqRescaleRangeDialog.ui
-  Resources/UI/pqSampleScalarAddRangeDialog.ui
-  Resources/UI/pqSampleScalarWidget.ui
   Resources/UI/pqScalarValueListPropertyWidget.ui
   Resources/UI/pqSearchBox.ui
   Resources/UI/pqSelectReaderDialog.ui
@@ -248,39 +250,17 @@ set(ui_files
   Resources/UI/pqTimerLogDisplay.ui
   Resources/UI/pqViewFrame.ui)
 
-set(sources)
-set(private_headers
-  pqSGExportStateWizardInternals.h)
-
-if (TARGET ParaView::pqPython)
-  # code for generating specialized Python scripts
-  # from the GUI using trace information
-  list(APPEND classes
-    pqCatalystExportStateWizard
-    pqCinemaConfiguration
-    pqCinemaTrack
-    pqImageOutputInfo
-    pqSGExportStateWizard
-    pqSGPluginManager
-    pqSGWritersMenuManager)
-  list(APPEND sources
-    pqCinemaTrackSelection.cxx
-    pqExportViewSelection.cxx)
-  list(APPEND private_headers
-    pqCinemaTrackSelection.h
-    pqExportViewSelection.h)
-
-  list(APPEND ui_files
-    Resources/UI/pqCinemaConfiguration.ui
-    Resources/UI/pqCinemaTrack.ui
-    Resources/UI/pqCinemaTrackSelection.ui
-    Resources/UI/pqExportStateWizard.ui
-    Resources/UI/pqExportViewSelection.ui
-    Resources/UI/pqImageOutputInfo.ui)
-endif ()
-
 set(resource_files
   Resources/pqComponents.qrc)
+
+if (NOT VTK_LEGACY_REMOVE)
+  list(APPEND classes
+    pqSampleScalarAddRangeDialog
+    pqSampleScalarWidget)
+  list(APPEND ui_files
+    Resources/UI/pqSampleScalarAddRangeDialog.ui
+    Resources/UI/pqSampleScalarWidget.ui)
+endif()
 
 vtk_module_find_package(
   PACKAGE     Qt5
@@ -298,28 +278,9 @@ set(CMAKE_AUTOUIC_SEARCH_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/Resources/UI")
 vtk_module_add_module(ParaView::pqComponents
   CLASSES ${classes}
   HEADERS ${headers}
-  SOURCES ${sources}
-          ${ui_files}
-          ${resource_files}
-  PRIVATE_HEADERS ${private_headers})
+  SOURCES ${ui_files}
+          ${resource_files})
 vtk_module_link(ParaView::pqComponents
   PRIVATE
     Qt5::Network
     Qt5::Widgets)
-
-if (PARAVIEW_ENABLE_PYTHON)
-  # The pqSGExportStateWizard has subclasses that directly access the UI file,
-  # and currently we don't have a clean way to break this hard dependency, so
-  # for now we manually install this ui file.
-  get_property(generator_is_multi_config GLOBAL
-    PROPERTY GENERATOR_IS_MULTI_CONFIG)
-  if (generator_is_multi_config)
-    set(ui_pqExportStateWizard_path
-      "${CMAKE_CURRENT_BINARY_DIR}/pqComponents_autogen/include_$<CONFIG>/ui_pqExportStateWizard.h")
-  else ()
-    set(ui_pqExportStateWizard_path
-      "${CMAKE_CURRENT_BINARY_DIR}/pqComponents_autogen/include/ui_pqExportStateWizard.h")
-  endif ()
-  vtk_module_install_headers(
-    FILES "${ui_pqExportStateWizard_path}")
-endif ()

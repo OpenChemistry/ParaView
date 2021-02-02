@@ -31,12 +31,12 @@ set(private_headers
   vtknvindex_rtc_kernel_params.h
   vtknvindex_utilities.h)
 set(kernel_sources
-  kernel_gradient.cu
   kernel_irregular_depth_enhancement.cu
   kernel_irregular_edge_enhancement.cu
   kernel_irregular_isosurface.cu
   kernel_depth_enhancement.cu
   kernel_edge_enhancement.cu
+  kernel_gradient.cu
   kernel_isosurface.cu
   kernel_plane_surface_mapping.cu)
 set(kernel_string_sources)
@@ -71,7 +71,7 @@ vtk_module_add_module(pvNVIDIAIndeX::IndeXRepresentations
   PRIVATE_HEADERS ${private_headers})
 vtk_module_include(pvNVIDIAIndeX::IndeXRepresentations
   PUBLIC
-    ${NVINDEX_INCLUDE_DIRS})
+    $<BUILD_INTERFACE:${NVINDEX_INCLUDE_DIRS}>)
 
 if (NVINDEX_SKIP_BUILD_RPATH)
   vtk_module_set_properties(pvNVIDIAIndeX::IndeXRepresentations

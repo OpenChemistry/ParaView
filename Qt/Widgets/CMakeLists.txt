@@ -70,6 +70,7 @@ set(classes
   pqQuickLaunchDialog
   pqScaleByButton
   pqSectionVisibilityContextMenu
+  pqSeriesGeneratorDialog
   pqSetData
   pqSetName
   pqSignalAdaptors
@@ -119,7 +120,8 @@ vtk_module_find_package(
 set(ui_files
   Resources/UI/pqExpanderButton.ui
   Resources/UI/pqHelpWindow.ui
-  Resources/UI/pqQuickLaunchDialog.ui)
+  Resources/UI/pqQuickLaunchDialog.ui
+  Resources/UI/pqSeriesGeneratorDialog.ui)
 
 ##########################################################################
 ## Add resources.

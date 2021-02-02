@@ -1,5 +1,5 @@
-#ifndef CGNS_MANGLE_H
-#define CGNS_MANGLE_H
+#ifndef vtk_cgns_mangle_h
+#define vtk_cgns_mangle_h
 
 #define ADF_Children_IDs vtkcgns_ADF_Children_IDs
 #define ADF_Children_Names vtkcgns_ADF_Children_Names
@@ -14,6 +14,8 @@
 #define ADF_Database_Version vtkcgns_ADF_Database_Version
 #define ADF_Delete vtkcgns_ADF_Delete
 #define ADF_Error_Message vtkcgns_ADF_Error_Message
+#define ADF_error_string vtkcgns_ADF_error_string
+#define ADF_file vtkcgns_ADF_file
 #define ADF_Flush_to_Disk vtkcgns_ADF_Flush_to_Disk
 #define ADF_Get_Data_Type vtkcgns_ADF_Get_Data_Type
 #define ADF_Get_Dimension_Values vtkcgns_ADF_Get_Dimension_Values
@@ -160,9 +162,18 @@
 #define ADF_Read_Data vtkcgns_ADF_Read_Data
 #define ADF_Set_Error_State vtkcgns_ADF_Set_Error_State
 #define ADF_Set_Label vtkcgns_ADF_Set_Label
+#define ADF_sys_err vtkcgns_ADF_sys_err
 #define ADF_Write_All_Data vtkcgns_ADF_Write_All_Data
 #define ADF_Write_Block_Data vtkcgns_ADF_Write_Block_Data
 #define ADF_Write_Data vtkcgns_ADF_Write_Data
+#define AngleUnitsName vtkcgns_AngleUnitsName
+#define ArbitraryGridMotionTypeName vtkcgns_ArbitraryGridMotionTypeName
+#define AreaTypeName vtkcgns_AreaTypeName
+#define AverageInterfaceTypeName vtkcgns_AverageInterfaceTypeName
+#define BCDataTypeName vtkcgns_BCDataTypeName
+#define BCTypeName vtkcgns_BCTypeName
+#define Cdim vtkcgns_Cdim
+#define cg vtkcgns_cg
 #define cg_1to1_average_read vtkcgns_cg_1to1_average_read
 #define cg_1to1_average_write vtkcgns_cg_1to1_average_write
 #define cg_1to1_id vtkcgns_cg_1to1_id
@@ -177,6 +188,8 @@
 #define cg_arbitrary_motion_read vtkcgns_cg_arbitrary_motion_read
 #define cg_arbitrary_motion_write vtkcgns_cg_arbitrary_motion_write
 #define cg_AreaTypeName vtkcgns_cg_AreaTypeName
+#define cg_array_general_read vtkcgns_cg_array_general_read
+#define cg_array_general_write vtkcgns_cg_array_general_write
 #define cg_array_info vtkcgns_cg_array_info
 #define cg_array_read vtkcgns_cg_array_read
 #define cg_array_read_as vtkcgns_cg_array_read_as
@@ -224,6 +237,8 @@
 #define cg_conversion_info vtkcgns_cg_conversion_info
 #define cg_conversion_read vtkcgns_cg_conversion_read
 #define cg_conversion_write vtkcgns_cg_conversion_write
+#define cg_coord_general_read vtkcgns_cg_coord_general_read
+#define cg_coord_general_write vtkcgns_cg_coord_general_write
 #define cg_coord_id vtkcgns_cg_coord_id
 #define cg_coord_info vtkcgns_cg_coord_info
 #define cg_coord_partial_write vtkcgns_cg_coord_partial_write
@@ -273,6 +288,8 @@
 #define cg_family_write vtkcgns_cg_family_write
 #define cg_famname_read vtkcgns_cg_famname_read
 #define cg_famname_write vtkcgns_cg_famname_write
+#define cg_field_general_read vtkcgns_cg_field_general_read
+#define cg_field_general_write vtkcgns_cg_field_general_write
 #define cg_field_id vtkcgns_cg_field_id
 #define cg_field_info vtkcgns_cg_field_info
 #define cg_field_partial_write vtkcgns_cg_field_partial_write
@@ -297,6 +314,8 @@
 #define cg_governing_write vtkcgns_cg_governing_write
 #define cg_gravity_read vtkcgns_cg_gravity_read
 #define cg_gravity_write vtkcgns_cg_gravity_write
+#define cg_grid_bounding_box_read vtkcgns_cg_grid_bounding_box_read
+#define cg_grid_bounding_box_write vtkcgns_cg_grid_bounding_box_write
 #define cg_GridConnectivityTypeName vtkcgns_cg_GridConnectivityTypeName
 #define cg_GridLocationName vtkcgns_cg_GridLocationName
 #define cg_gridlocation_read vtkcgns_cg_gridlocation_read
@@ -313,6 +332,9 @@
 #define cgi_ArbitraryGridMotionType vtkcgns_cgi_ArbitraryGridMotionType
 #define cgi_AreaType vtkcgns_cgi_AreaType
 #define cgi_array_address vtkcgns_cgi_array_address
+#define cgi_array_general_read vtkcgns_cgi_array_general_read
+#define cgi_array_general_verify_range vtkcgns_cgi_array_general_verify_range
+#define cgi_array_general_write vtkcgns_cgi_array_general_write
 #define cgi_array_print vtkcgns_cgi_array_print
 #define cgi_AverageInterfaceType vtkcgns_cgi_AverageInterfaceType
 #define cgi_bcdataset_address vtkcgns_cgi_bcdataset_address
@@ -337,6 +359,7 @@
 #define cgi_equations_address vtkcgns_cgi_equations_address
 #define cgi_error vtkcgns_cgi_error
 #define cgi_exponent_address vtkcgns_cgi_exponent_address
+#define cgi_family_address vtkcgns_cgi_family_address
 #define cgi_famname_address vtkcgns_cgi_famname_address
 #define cgi_free_1to1 vtkcgns_cgi_free_1to1
 #define cgi_free_amotion vtkcgns_cgi_free_amotion
@@ -484,16 +507,18 @@
 #define cgio_path_add vtkcgns_cgio_path_add
 #define cgio_path_delete vtkcgns_cgio_path_delete
 #define cgi_ordinal_address vtkcgns_cgi_ordinal_address
-#define cgio_read_all_data vtkcgns_cgio_read_all_data
-#define cgio_read_block_data vtkcgns_cgio_read_block_data
-#define cgio_read_data vtkcgns_cgio_read_data
+#define cgio_read_all_data_type vtkcgns_cgio_read_all_data_type
+#define cgio_read_block_data_type vtkcgns_cgio_read_block_data_type
+#define cgio_read_data_type vtkcgns_cgio_read_data_type
 #define cgio_release_id vtkcgns_cgio_release_id
 #define cgio_set_dimensions vtkcgns_cgio_set_dimensions
 #define cgio_set_label vtkcgns_cgio_set_label
 #define cgio_set_name vtkcgns_cgio_set_name
 #define cgio_write_all_data vtkcgns_cgio_write_all_data
+#define cgio_write_all_data_type vtkcgns_cgio_write_all_data_type
 #define cgio_write_block_data vtkcgns_cgio_write_block_data
 #define cgio_write_data vtkcgns_cgio_write_data
+#define cgio_write_data_type vtkcgns_cgio_write_data_type
 #define cgi_PointSetType vtkcgns_cgi_PointSetType
 #define cgi_posit_id vtkcgns_cgi_posit_id
 #define cgi_posit_index_dim vtkcgns_cgi_posit_index_dim
@@ -635,10 +660,30 @@
 #define cg_nholes vtkcgns_cg_nholes
 #define cg_nintegrals vtkcgns_cg_nintegrals
 #define cg_nmultifam vtkcgns_cg_nmultifam
+#define cg_node_fambc_read vtkcgns_cg_node_fambc_read
+#define cg_node_fambc_write vtkcgns_cg_node_fambc_write
+#define cg_node_family_name_read vtkcgns_cg_node_family_name_read
+#define cg_node_family_name_write vtkcgns_cg_node_family_name_write
+#define cg_node_family_read vtkcgns_cg_node_family_read
+#define cg_node_family_write vtkcgns_cg_node_family_write
+#define cg_node_geo_read vtkcgns_cg_node_geo_read
+#define cg_node_geo_write vtkcgns_cg_node_geo_write
+#define cg_node_nfamilies vtkcgns_cg_node_nfamilies
+#define cg_node_nfamily_names vtkcgns_cg_node_nfamily_names
+#define cg_node_part_read vtkcgns_cg_node_part_read
+#define cg_node_part_write vtkcgns_cg_node_part_write
 #define cg_npe vtkcgns_cg_npe
 #define cg_n_rigid_motions vtkcgns_cg_n_rigid_motions
+#define cgns_compress vtkcgns_cgns_compress
 #define cg_nsections vtkcgns_cg_nsections
+#define cgns_error_handler vtkcgns_cgns_error_handler
+#define cgns_error_mess vtkcgns_cgns_error_mess
+#define cgns_files vtkcgns_cgns_files
+#define cgns_file_size vtkcgns_cgns_file_size
+#define cgns_filetype vtkcgns_cgns_filetype
+#define CGNSLibVersion vtkcgns_CGNSLibVersion
 #define cg_nsols vtkcgns_cg_nsols
+#define cgns_rindindex vtkcgns_cgns_rindindex
 #define cg_nsubregs vtkcgns_cg_nsubregs
 #define cg_nunits vtkcgns_cg_nunits
 #define cg_nuser_data vtkcgns_cg_nuser_data
@@ -652,6 +697,10 @@
 #define cg_part_read vtkcgns_cg_part_read
 #define cg_part_write vtkcgns_cg_part_write
 #define cg_PointSetTypeName vtkcgns_cg_PointSetTypeName
+#define cg_poly_elements_partial_read vtkcgns_cg_poly_elements_partial_read
+#define cg_poly_elements_partial_write vtkcgns_cg_poly_elements_partial_write
+#define cg_poly_elements_read vtkcgns_cg_poly_elements_read
+#define cg_poly_section_write vtkcgns_cg_poly_section_write
 #define cg_precision vtkcgns_cg_precision
 #define cg_ptset_info vtkcgns_cg_ptset_info
 #define cg_ptset_read vtkcgns_cg_ptset_read
@@ -713,9 +762,47 @@
 #define cg_zone_type vtkcgns_cg_zone_type
 #define cg_ZoneTypeName vtkcgns_cg_ZoneTypeName
 #define cg_zone_write vtkcgns_cg_zone_write
+#define CurrentDim vtkcgns_CurrentDim
+#define CurrentZoneType vtkcgns_CurrentZoneType
+#define data_chunk_start_tag vtkcgns_data_chunk_start_tag
+#define DataClassName vtkcgns_DataClassName
+#define DataTypeName vtkcgns_DataTypeName
+#define ElectricCurrentUnitsName vtkcgns_ElectricCurrentUnitsName
+#define ElementTypeName vtkcgns_ElementTypeName
+#define file_number_offset vtkcgns_file_number_offset
+#define GoverningEquationsTypeName vtkcgns_GoverningEquationsTypeName
+#define GridConnectivityTypeName vtkcgns_GridConnectivityTypeName
+#define GridLocationName vtkcgns_GridLocationName
+#define hdf5_access vtkcgns_hdf5_access
+#define HDF5storage_type vtkcgns_HDF5storage_type
+#define Idim vtkcgns_Idim
+#define LengthUnitsName vtkcgns_LengthUnitsName
+#define LuminousIntensityUnitsName vtkcgns_LuminousIntensityUnitsName
+#define MassUnitsName vtkcgns_MassUnitsName
+#define maximum_files vtkcgns_maximum_files
+#define ModelTypeName vtkcgns_ModelTypeName
+#define n_cgns_files vtkcgns_n_cgns_files
+#define n_open vtkcgns_n_open
+#define NumberOfSteps vtkcgns_NumberOfSteps
+#define Pdim vtkcgns_Pdim
+#define PointSetTypeName vtkcgns_PointSetTypeName
+#define posit vtkcgns_posit
+#define posit_base vtkcgns_posit_base
+#define posit_depth vtkcgns_posit_depth
+#define posit_file vtkcgns_posit_file
+#define posit_stack vtkcgns_posit_stack
+#define posit_zone vtkcgns_posit_zone
+#define RigidGridMotionTypeName vtkcgns_RigidGridMotionTypeName
+#define SimulationTypeName vtkcgns_SimulationTypeName
 #define size_of vtkcgns_size_of
+#define SubstanceAmountUnitsName vtkcgns_SubstanceAmountUnitsName
+#define TemperatureUnitsName vtkcgns_TemperatureUnitsName
+#define TimeUnitsName vtkcgns_TimeUnitsName
 #define type_of vtkcgns_type_of
 #define vcg_gorel vtkcgns_vcg_gorel
 #define vcg_goto vtkcgns_vcg_goto
+#define VersionList vtkcgns_VersionList
+#define WallFunctionTypeName vtkcgns_WallFunctionTypeName
+#define ZoneTypeName vtkcgns_ZoneTypeName
 
 #endif

@@ -161,7 +161,7 @@ void pqPluginManager::loadPluginsFromSettings()
   QString local_plugin_config = settings->value(key).toString();
   if (!local_plugin_config.isEmpty())
   {
-    vtkVLogF(PARAVIEW_LOG_PLUGIN_VERBOSITY(),
+    vtkVLogScopeF(PARAVIEW_LOG_PLUGIN_VERBOSITY(),
       "Loading local Plugin configuration using settings key: %s", key.toLocal8Bit().data());
     vtkSMProxyManager::GetProxyManager()->GetPluginManager()->LoadPluginConfigurationXMLFromString(
       local_plugin_config.toUtf8().data(), NULL, false);
@@ -203,7 +203,7 @@ void pqPluginManager::onServerConnected(pqServer* server)
   // are indeed present on both.
   if (!this->verifyPlugins(server))
   {
-    emit this->requiredPluginsNotLoaded(server);
+    Q_EMIT this->requiredPluginsNotLoaded(server);
   }
 }
 
@@ -234,7 +234,7 @@ void pqPluginManager::onServerDisconnected(pqServer* server)
 //-----------------------------------------------------------------------------
 void pqPluginManager::updatePluginLists()
 {
-  emit this->pluginsUpdated();
+  Q_EMIT this->pluginsUpdated();
 }
 
 //-----------------------------------------------------------------------------

@@ -10,7 +10,7 @@
     <x>0</x>
     <y>0</y>
     <width>422</width>
-    <height>741</height>
+    <height>781</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -107,7 +107,7 @@
            </property>
            <property name="icon">
             <iconset resource="../pqComponents.qrc">
-             <normaloff>:/pqWidgets/Icons/pqXPlus24.png</normaloff>:/pqWidgets/Icons/pqXPlus24.png</iconset>
+             <normaloff>:/pqWidgets/Icons/pqXPlus.svg</normaloff>:/pqWidgets/Icons/pqXPlus.svg</iconset>
            </property>
            <property name="iconSize">
             <size>
@@ -127,7 +127,7 @@
            </property>
            <property name="icon">
             <iconset resource="../pqComponents.qrc">
-             <normaloff>:/pqWidgets/Icons/pqXMinus24.png</normaloff>:/pqWidgets/Icons/pqXMinus24.png</iconset>
+             <normaloff>:/pqWidgets/Icons/pqXMinus.svg</normaloff>:/pqWidgets/Icons/pqXMinus.svg</iconset>
            </property>
            <property name="iconSize">
             <size>
@@ -147,7 +147,7 @@
            </property>
            <property name="icon">
             <iconset resource="../pqComponents.qrc">
-             <normaloff>:/pqWidgets/Icons/pqYPlus24.png</normaloff>:/pqWidgets/Icons/pqYPlus24.png</iconset>
+             <normaloff>:/pqWidgets/Icons/pqYPlus.svg</normaloff>:/pqWidgets/Icons/pqYPlus.svg</iconset>
            </property>
            <property name="iconSize">
             <size>
@@ -167,7 +167,7 @@
            </property>
            <property name="icon">
             <iconset resource="../pqComponents.qrc">
-             <normaloff>:/pqWidgets/Icons/pqYMinus24.png</normaloff>:/pqWidgets/Icons/pqYMinus24.png</iconset>
+             <normaloff>:/pqWidgets/Icons/pqYMinus.svg</normaloff>:/pqWidgets/Icons/pqYMinus.svg</iconset>
            </property>
            <property name="iconSize">
             <size>
@@ -187,7 +187,7 @@
            </property>
            <property name="icon">
             <iconset resource="../pqComponents.qrc">
-             <normaloff>:/pqWidgets/Icons/pqZPlus24.png</normaloff>:/pqWidgets/Icons/pqZPlus24.png</iconset>
+             <normaloff>:/pqWidgets/Icons/pqZPlus.svg</normaloff>:/pqWidgets/Icons/pqZPlus.svg</iconset>
            </property>
            <property name="iconSize">
             <size>
@@ -207,7 +207,7 @@
            </property>
            <property name="icon">
             <iconset resource="../pqComponents.qrc">
-             <normaloff>:/pqWidgets/Icons/pqZMinus24.png</normaloff>:/pqWidgets/Icons/pqZMinus24.png</iconset>
+             <normaloff>:/pqWidgets/Icons/pqZMinus.svg</normaloff>:/pqWidgets/Icons/pqZMinus.svg</iconset>
            </property>
            <property name="iconSize">
             <size>
@@ -416,9 +416,6 @@
          <property name="toolTip">
           <string>Define the rotation speed factor.</string>
          </property>
-         <property name="StrictRange" stdset="0">
-          <bool>true</bool>
-         </property>
         </widget>
        </item>
        <item>
@@ -531,6 +528,61 @@
           </widget>
          </item>
          <item row="3" column="2">
+          <widget class="QLabel" name="label_8">
+           <property name="text">
+            <string>Eye Angle</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="3">
+          <widget class="QDoubleSpinBox" name="eyeAngle">
+           <property name="toolTip">
+            <string>The separation between eyes (in degrees). This is used when rendering in stereo mode.</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="0">
+          <widget class="QLabel" name="label_9">
+           <property name="text">
+            <string>Focal Disk</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="1">
+          <widget class="QDoubleSpinBox" name="focalDisk">
+           <property name="toolTip">
+             <string> The size of the camera's lens in world coordinates. Affects ray traced depth of field rendering.
+             </string>
+           </property>
+           <property name="minimum">
+            <double>0.0</double>
+           </property>
+           <property name="maximum">
+            <double>99999</double>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="2">
+          <widget class="QLabel" name="label_10">
+           <property name="text">
+            <string>Focal Distance</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="3">
+          <widget class="QDoubleSpinBox" name="focalDistance">
+           <property name="toolTip">
+             <string>Depth of field rendering focus distance. Only affects ray traced renderers. 0 (default) disables it.</string>
+           </property>
+           <property name="minimum">
+            <double>0.0</double>
+           </property>
+           <property name="maximum">
+            <double>99999</double>
+           </property>
+          </widget>
+         </item>
+         <item row="5" column="0">
           <widget class="QPushButton" name="loadCameraConfiguration">
            <property name="toolTip">
             <string>Load camera properties.</string>
@@ -540,27 +592,13 @@
            </property>
           </widget>
          </item>
-         <item row="3" column="3">
+         <item row="5" column="1">
           <widget class="QPushButton" name="saveCameraConfiguration">
            <property name="toolTip">
             <string>Save camera properties.</string>
            </property>
            <property name="text">
             <string>Save</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="0">
-          <widget class="QLabel" name="label_8">
-           <property name="text">
-            <string>Eye Angle</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="1">
-          <widget class="QDoubleSpinBox" name="eyeAngle">
-           <property name="toolTip">
-            <string>The separation between eyes (in degrees). This is used when rendering in stereo mode.</string>
            </property>
           </widget>
          </item>
@@ -867,9 +905,6 @@
           <widget class="pqDoubleRangeWidget" name="interactiveViewLinkOpacity" native="true">
            <property name="toolTip">
             <string>Define the view link opacity.</string>
-           </property>
-           <property name="StrictRange" stdset="0">
-            <bool>true</bool>
            </property>
           </widget>
          </item>

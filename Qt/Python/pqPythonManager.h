@@ -60,6 +60,11 @@ public:
   ~pqPythonManager() override;
 
   /**
+   * Convienience method to call `vtkPythonInterpreter::Initialize()`.
+   */
+  bool initializeInterpreter();
+
+  /**
    * Returns true if the interpreter has been initialized.
    * Same as calling `vtkPythonInterpreter::IsInitialized()`.
    */
@@ -87,7 +92,7 @@ public:
    */
   void updateMacroList();
 
-public slots:
+public Q_SLOTS:
   /**
    * Executes the given script.  If the python interpreter hasn't been initialized
    * yet it will be initialized.

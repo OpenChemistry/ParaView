@@ -1,4 +1,4 @@
-/* Copyright 2019 NVIDIA Corporation. All rights reserved.
+/* Copyright 2020 NVIDIA Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,7 +28,6 @@
 #ifndef vtknvindex_performance_values_h
 #define vtknvindex_performance_values_h
 
-#include <fstream>
 #include <string>
 
 #include "vtksys/SystemInformation.hxx"
@@ -48,7 +47,8 @@ public:
   ~vtknvindex_performance_values();
 
   // Print performance values to a file.
-  void print_perf_values(mi::base::Handle<nv::index::IFrame_results> frame_results);
+  void print_perf_values(
+    mi::base::Handle<nv::index::IFrame_results> frame_results, mi::Uint32 time_step = 0);
 
 private:
   vtknvindex_performance_values(const vtknvindex_performance_values&) = delete;

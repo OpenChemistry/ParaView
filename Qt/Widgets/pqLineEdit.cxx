@@ -34,6 +34,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // Server Manager Includes.
 
 // Qt Includes.
+#include <QFocusEvent>
+#include <QTimer>
 
 // ParaView Includes.
 
@@ -73,7 +75,7 @@ void pqLineEdit::onEditingFinished()
 {
   if (this->EditingFinishedPending)
   {
-    emit this->textChangedAndEditingFinished();
+    Q_EMIT this->textChangedAndEditingFinished();
     this->EditingFinishedPending = false;
   }
   if (this->ResetCursorPositionOnEditingFinished)
@@ -101,4 +103,28 @@ void pqLineEdit::triggerTextChangedAndEditingFinished()
   // issue, the playback manually calls this method.
   this->onTextEdited();
   this->onEditingFinished();
+}
+
+//-----------------------------------------------------------------------------
+void pqLineEdit::focusInEvent(QFocusEvent* evt)
+{
+  // First let the base class process the event
+  this->Superclass::focusInEvent(evt);
+
+  if (evt)
+  {
+    switch (evt->reason())
+    {
+      case Qt::MouseFocusReason:
+      case Qt::TabFocusReason:
+      case Qt::BacktabFocusReason:
+      case Qt::ShortcutFocusReason:
+        // Then select the text by a single shot timer, so that everything will
+        // be processed before (calling selectAll() directly won't work)
+        QTimer::singleShot(0, this, &QLineEdit::selectAll);
+        break;
+      default:
+        break;
+    }
+  }
 }

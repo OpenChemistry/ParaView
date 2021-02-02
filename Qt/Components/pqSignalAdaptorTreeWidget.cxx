@@ -100,9 +100,9 @@ QList<QVariant> pqSignalAdaptorTreeWidget::values() const
 void pqSignalAdaptorTreeWidget::appendItem(QTreeWidgetItem* item)
 {
   this->TreeWidget->addTopLevelItem(item);
-  // no need to emit valuesChanged() since this->TreeWidget->model() fires
+  // no need to Q_EMIT valuesChanged() since this->TreeWidget->model() fires
   // rowsInserted() which results in valuesChanged() being fired.
-  // emit this->valuesChanged();
+  // Q_EMIT this->valuesChanged();
 }
 
 //-----------------------------------------------------------------------------
@@ -186,7 +186,7 @@ void pqSignalAdaptorTreeWidget::setValues(const QList<QVariant>& new_values)
   }
   this->TreeWidget->addTopLevelItems(items);
   this->blockSignals(false);
-  emit this->valuesChanged();
+  Q_EMIT this->valuesChanged();
 }
 
 //-----------------------------------------------------------------------------
@@ -196,11 +196,7 @@ void pqSignalAdaptorTreeWidget::updateSortingLinks()
   {
     QObject::connect(
       this->TreeWidget->header(), SIGNAL(sectionClicked(int)), this, SLOT(sort(int)));
-#if QT_VERSION >= 0x050000
     this->TreeWidget->header()->setSectionsClickable(true);
-#else
-    this->TreeWidget->header()->setClickable(true);
-#endif
   }
   else
   {
@@ -214,7 +210,7 @@ void pqSignalAdaptorTreeWidget::sort(int column)
   if (!this->TreeWidget->isSortingEnabled())
   {
     this->TreeWidget->setSortingEnabled(this->Sortable);
-    this->TreeWidget->sortByColumn(column);
+    this->TreeWidget->sortByColumn(column, Qt::AscendingOrder);
   }
 }
 
@@ -252,13 +248,13 @@ QTreeWidgetItem* pqSignalAdaptorTreeWidget::growTable()
   this->blockSignals(prev);
 
   // Give the listeners a chance to change item default values.
-  emit this->tableGrown(item);
+  Q_EMIT this->tableGrown(item);
 
   // This ensures that when the user is finished editing the value, it suddenly
   // doesn't move about due to sorting. The user can sort columns again once
   // he's done filling values by clicking on the header.
   this->updateSortingLinks();
-  emit this->valuesChanged();
+  Q_EMIT this->valuesChanged();
 
   return item;
 }

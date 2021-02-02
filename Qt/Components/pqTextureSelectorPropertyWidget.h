@@ -55,10 +55,10 @@ public:
   pqTextureSelectorPropertyWidget(vtkSMProxy* proxy, vtkSMProperty* property, QWidget* parent = 0);
   ~pqTextureSelectorPropertyWidget() override = default;
 
-protected slots:
+protected Q_SLOTS:
   void onTextureChanged(vtkSMProxy* texture);
   void onPropertyChanged();
-  void checkTCoords();
+  void checkAttributes(bool tcoords, bool tangents);
 
 private:
   vtkNew<vtkEventQtSlotConnect> VTKConnector;

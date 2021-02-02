@@ -50,6 +50,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QtCore/QDebug>
 #include <QtCore/QStringList>
 
+#include <algorithm>
 #include <map>
 #include <string>
 
@@ -69,12 +70,11 @@ public:
   struct InputGui
   {
     InputType type;
-    vtkStdString role;
+    std::string role;
     QComboBox* combo;
   };
 
-  void AddInput(
-    QWidget* parent, InputType type, const vtkStdString& role, const vtkStdString& name);
+  void AddInput(QWidget* parent, InputType type, const std::string& role, const std::string& name);
   QList<InputGui> Inputs;
 
   QStringList AnalogNames;
@@ -150,9 +150,9 @@ pqVRAddStyleDialog::pqVRAddStyleDialog(QWidget* parentObject, Qt::WindowFlags f)
     }
   }
 
-  qSort(this->Internals->AnalogNames);
-  qSort(this->Internals->ButtonNames);
-  qSort(this->Internals->TrackerNames);
+  std::sort(this->Internals->AnalogNames.begin(), this->Internals->AnalogNames.end());
+  std::sort(this->Internals->ButtonNames.begin(), this->Internals->ButtonNames.end());
+  std::sort(this->Internals->TrackerNames.begin(), this->Internals->TrackerNames.end());
 }
 
 //-----------------------------------------------------------------------------
@@ -172,23 +172,23 @@ void pqVRAddStyleDialog::setInteractorStyle(vtkVRInteractorStyle* style, const Q
   style->GetAnalogRoles(roles.GetPointer());
   for (int i = 0; i < roles->GetNumberOfStrings(); ++i)
   {
-    vtkStdString role(roles->GetString(i));
-    vtkStdString name(style->GetAnalogName(role));
-    this->Internals->AddInput(this, pqInternals::Analog, role, name);
+    std::string role(roles->GetString(i));
+    std::string analogName(style->GetAnalogName(role));
+    this->Internals->AddInput(this, pqInternals::Analog, role, analogName);
   }
   style->GetButtonRoles(roles.GetPointer());
   for (int i = 0; i < roles->GetNumberOfStrings(); ++i)
   {
-    vtkStdString role(roles->GetString(i));
-    vtkStdString name(style->GetButtonName(role));
-    this->Internals->AddInput(this, pqInternals::Button, role, name);
+    std::string role(roles->GetString(i));
+    std::string buttonName(style->GetButtonName(role));
+    this->Internals->AddInput(this, pqInternals::Button, role, buttonName);
   }
   style->GetTrackerRoles(roles.GetPointer());
   for (int i = 0; i < roles->GetNumberOfStrings(); ++i)
   {
-    vtkStdString role(roles->GetString(i));
-    vtkStdString name(style->GetTrackerName(role));
-    this->Internals->AddInput(this, pqInternals::Tracker, role, name);
+    std::string role(roles->GetString(i));
+    std::string trackerName(style->GetTrackerName(role));
+    this->Internals->AddInput(this, pqInternals::Tracker, role, trackerName);
   }
 
   this->Internals->CanConfigure = (this->Internals->Inputs.size() != 0);
@@ -204,8 +204,8 @@ void pqVRAddStyleDialog::updateInteractorStyle()
 
   foreach (const pqInternals::InputGui& gui, this->Internals->Inputs)
   {
-    const vtkStdString& role = gui.role;
-    const vtkStdString& name = gui.combo->currentText().toStdString();
+    const std::string& role = gui.role;
+    const std::string& name = gui.combo->currentText().toStdString();
     switch (gui.type)
     {
       case pqInternals::Analog:
@@ -231,7 +231,7 @@ bool pqVRAddStyleDialog::isConfigurable()
 
 //-----------------------------------------------------------------------------
 void pqVRAddStyleDialog::pqInternals::AddInput(
-  QWidget* parent, InputType type, const vtkStdString& role, const vtkStdString& name)
+  QWidget* parent, InputType type, const std::string& role, const std::string& name)
 {
   this->Inputs.push_back(InputGui());
   InputGui& gui = this->Inputs.back();

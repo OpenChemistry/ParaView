@@ -35,24 +35,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "pqCompositeDataInformationTreeModel.h"
 #include "pqHelpWindow.h"
+#include "pqMultiQueryClauseWidget.h"
 #include "pqOutputPort.h"
-#include "pqPipelineSource.h"
 #include "pqServer.h"
 #include "vtkDataObject.h"
 #include "vtkPVArrayInformation.h"
-#include "vtkPVDataInformation.h"
 #include "vtkPVDataSetAttributesInformation.h"
-#include "vtkQuerySelectionSource.h"
 #include "vtkSMCompositeTreeDomain.h"
 #include "vtkSMCoreUtilities.h"
 #include "vtkSMPropertyHelper.h"
-#include "vtkSMProxyManager.h"
-#include "vtkSMSelectionHelper.h"
-#include "vtkSMSessionProxyManager.h"
-#include "vtkSMSourceProxy.h"
-#include "vtkSelectionNode.h"
-
-#include <QDebug>
 #include <QMap>
 
 #include <cassert>
@@ -82,33 +73,11 @@ public:
     }
   }
 };
-
-bool isAMR(vtkPVDataInformation* dinfo)
-{
-  switch (dinfo->GetCompositeDataSetType())
-  {
-    case VTK_HIERARCHICAL_BOX_DATA_SET:
-    case VTK_HIERARCHICAL_DATA_SET:
-    case VTK_UNIFORM_GRID_AMR:
-    case VTK_NON_OVERLAPPING_AMR:
-    case VTK_OVERLAPPING_AMR:
-      return true;
-  }
-  return false;
-}
-
-bool isMultiBlock(vtkPVDataInformation* dinfo)
-{
-  return dinfo->GetCompositeDataSetType() == VTK_MULTIBLOCK_DATA_SET;
-}
 }
 
 // BUG #13806, remove collective operations temporarily since they don't work
 // for composite datasets (esp. in parallel) as expected.
 //#define REMOVE_COLLECTIVE_CLAUSES
-
-// Disable PROCESSID. This was cause major issues with collective operations.
-#define REMOVE_PROCESSID
 
 class pqQueryClauseWidget::pqInternals : public Ui::pqQueryClauseWidget
 {
@@ -137,27 +106,27 @@ public:
 };
 
 //-----------------------------------------------------------------------------
-pqQueryClauseWidget::pqQueryClauseWidget(QWidget* parentObject, Qt::WindowFlags _flags)
+pqQueryClauseWidget::pqQueryClauseWidget(
+  pqMultiQueryClauseWidget* multiQueryWidget, QWidget* parentObject, Qt::WindowFlags _flags)
   : Superclass(parentObject, _flags)
 {
   this->AsQualifier = false;
+  this->MultiQueryWidget = multiQueryWidget;
+
   this->Internals = new pqInternals();
   this->Internals->setupUi(this);
+
+  this->setAndLabelVisible(false);
 
   this->connect(this->Internals->showCompositeTree, SIGNAL(clicked()), SLOT(showCompositeTree()));
 
   this->connect(this->Internals->criteria, SIGNAL(currentIndexChanged(int)),
     SLOT(populateSelectionCondition()));
-  this->connect(this->Internals->criteria, SIGNAL(currentIndexChanged(int)),
-    SLOT(updateDependentClauseWidgets()));
   this->connect(
     this->Internals->condition, SIGNAL(currentIndexChanged(int)), SLOT(updateValueWidget()));
 
-  if (qobject_cast<pqQueryClauseWidget*>(parentObject))
-  {
-    // don't show the separator line for sub-clauses.
-    this->Internals->line->hide();
-  }
+  this->connect(this->Internals->removeQuery, SIGNAL(clicked()), SLOT(deleteQuery()));
+  this->connect(this->Internals->addQuery, SIGNAL(clicked()), SIGNAL(addQueryRequested()));
 }
 
 //-----------------------------------------------------------------------------
@@ -167,10 +136,10 @@ pqQueryClauseWidget::~pqQueryClauseWidget()
 }
 
 //-----------------------------------------------------------------------------
-vtkPVDataSetAttributesInformation* pqQueryClauseWidget::getChosenAttributeInfo() const
+void pqQueryClauseWidget::deleteQuery()
 {
-  vtkPVDataInformation* dataInfo = this->producer()->getDataInformation();
-  return dataInfo->GetAttributeInformation(this->attributeType());
+  this->setParent(nullptr);
+  this->deleteLater();
 }
 
 //-----------------------------------------------------------------------------
@@ -186,7 +155,29 @@ void pqQueryClauseWidget::initialize(
   this->populateSelectionCriteria(type_flags);
   this->populateSelectionCondition();
   this->updateValueWidget();
-  this->updateDependentClauseWidgets();
+  if (type_flags != ANY)
+  {
+    this->Internals->removeQuery->hide();
+    this->Internals->addQuery->hide();
+  }
+}
+
+//-----------------------------------------------------------------------------
+void pqQueryClauseWidget::setAddButtonVisible(bool show)
+{
+  this->Internals->addQuery->setVisible(show);
+}
+
+//-----------------------------------------------------------------------------
+void pqQueryClauseWidget::setRemoveButtonVisible(bool show)
+{
+  this->Internals->removeQuery->setVisible(show);
+}
+
+//-----------------------------------------------------------------------------
+void pqQueryClauseWidget::setAndLabelVisible(bool show)
+{
+  this->Internals->andLabel->setVisible(show);
 }
 
 //-----------------------------------------------------------------------------
@@ -224,7 +215,7 @@ void pqQueryClauseWidget::populateSelectionCriteria(pqQueryClauseWidget::Criteri
     this->Internals->criteria->addItem("ID", INDEX);
   }
 
-  vtkPVDataSetAttributesInformation* attrInfo = this->getChosenAttributeInfo();
+  vtkPVDataSetAttributesInformation* attrInfo = this->MultiQueryWidget->getChosenAttributeInfo();
   if (type_flags & GLOBALID)
   {
     // Do we have global ids?
@@ -272,31 +263,29 @@ void pqQueryClauseWidget::populateSelectionCriteria(pqQueryClauseWidget::Criteri
     }
   }
 
-  if (type_flags & POINTS_NEAR && this->attributeType() == vtkDataObject::POINT)
+  if (type_flags & POINTS_NEAR && this->MultiQueryWidget->attributeType() == vtkDataObject::POINT)
   {
     this->Internals->criteria->addItem("Point", POINTS_NEAR);
   }
 
-  if (type_flags & POINT_IN_CELL && this->attributeType() == vtkDataObject::CELL)
+  if (type_flags & POINT_IN_CELL && this->MultiQueryWidget->attributeType() == vtkDataObject::CELL)
   {
     this->Internals->criteria->addItem("Cell", POINT_IN_CELL);
   }
-
-  vtkPVDataInformation* dataInfo = this->producer()->getDataInformation();
 
   if (type_flags & QUERY)
   {
     this->Internals->criteria->addItem("Query", QUERY);
   }
 
-  if (isMultiBlock(dataInfo))
+  if (this->MultiQueryWidget->isMultiBlock())
   {
     if (type_flags & BLOCK)
     {
       this->Internals->criteria->addItem("Block ID", BLOCK);
     }
   }
-  else if (isAMR(dataInfo))
+  else if (this->MultiQueryWidget->isAMR())
   {
     if (type_flags & AMR_LEVEL)
     {
@@ -310,7 +299,7 @@ void pqQueryClauseWidget::populateSelectionCriteria(pqQueryClauseWidget::Criteri
 
   if (type_flags & PROCESSID)
   {
-    pqServer* server = this->producer()->getServer();
+    pqServer* server = this->MultiQueryWidget->producer()->getServer();
     if (server->getNumberOfPartitions() > 1)
     {
       this->Internals->criteria->addItem("Process ID", -1);
@@ -346,6 +335,7 @@ void pqQueryClauseWidget::populateSelectionCondition()
 #ifndef REMOVE_COLLECTIVE_CLAUSES
       this->Internals->condition->addItem("is min", pqQueryClauseWidget::SINGLE_VALUE_MIN);
       this->Internals->condition->addItem("is max", pqQueryClauseWidget::SINGLE_VALUE_MAX);
+      this->Internals->condition->addItem("is NaN", pqQueryClauseWidget::SINGLE_VALUE_NAN);
       this->Internals->condition->addItem(
         "is less than mean", pqQueryClauseWidget::SINGLE_VALUE_LE_MEAN);
       this->Internals->condition->addItem(
@@ -390,10 +380,13 @@ void pqQueryClauseWidget::populateSelectionCondition()
 //-----------------------------------------------------------------------------
 void pqQueryClauseWidget::updateValueWidget()
 {
+  this->Internals->valueStackedWidget->currentWidget()->setSizePolicy(
+    QSizePolicy::Ignored, QSizePolicy::Ignored);
   switch (this->currentConditionType())
   {
     case SINGLE_VALUE_MIN:
     case SINGLE_VALUE_MAX:
+    case SINGLE_VALUE_NAN:
     case SINGLE_VALUE_LE_MEAN:
     case SINGLE_VALUE_GE_MEAN:
       this->Internals->valueStackedWidget->setCurrentIndex(4);
@@ -430,106 +423,9 @@ void pqQueryClauseWidget::updateValueWidget()
       this->Internals->valueStackedWidget->setCurrentIndex(5);
       break;
   }
-}
-
-//-----------------------------------------------------------------------------
-void pqQueryClauseWidget::updateDependentClauseWidgets()
-{
-  if (qobject_cast<pqQueryClauseWidget*>(this->parentWidget()))
-  {
-    return;
-  }
-
-  CriteriaType criteria_type = this->currentCriteriaType();
-  if (criteria_type == INVALID)
-  {
-    return;
-  }
-
-  foreach (pqQueryClauseWidget* child, this->findChildren<pqQueryClauseWidget*>())
-  {
-    delete child;
-  }
-
-  pqServer* server = this->producer()->getServer();
-  bool multi_process = (server->getNumberOfPartitions() > 1);
-  bool multi_block = false;
-  bool amr = false;
-#ifdef REMOVE_PROCESSID
-  multi_process = false;
-#endif
-
-  vtkPVDataInformation* dataInfo = this->producer()->getDataInformation();
-  multi_block = isMultiBlock(dataInfo);
-  amr = isAMR(dataInfo);
-
-  QVBoxLayout* vbox = qobject_cast<QVBoxLayout*>(this->layout());
-
-  QList<CriteriaTypes> sub_widgets;
-
-  if (multi_block)
-  {
-    switch (criteria_type)
-    {
-      case INDEX:
-      case QUERY:
-      case THRESHOLD:
-        sub_widgets.push_back(BLOCK);
-        break;
-      case GLOBALID:
-      default:
-        break;
-    }
-  }
-
-  if (amr)
-  {
-    switch (criteria_type)
-    {
-      case INDEX:
-      case THRESHOLD:
-        sub_widgets.push_back(AMR_LEVEL);
-        sub_widgets.push_back(AMR_BLOCK);
-        break;
-      case GLOBALID:
-      // for now, when selecting Global ids, we don't allow the users to pick the
-      // block to extract the array from. We can support this if needed in
-      // future.
-      case AMR_LEVEL:
-        sub_widgets.push_back(AMR_BLOCK);
-        break;
-
-      case AMR_BLOCK:
-        sub_widgets.push_back(AMR_LEVEL);
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  if (multi_process)
-  {
-    sub_widgets.push_back(PROCESSID);
-  }
-
-  foreach (CriteriaTypes t_flag, sub_widgets)
-  {
-    pqQueryClauseWidget* sub_widget = new pqQueryClauseWidget(this);
-    sub_widget->setProducer(this->producer());
-    sub_widget->setAttributeType(this->attributeType());
-    sub_widget->initialize(t_flag, true);
-    vbox->addWidget(sub_widget);
-  }
-
-  if (criteria_type == QUERY)
-  {
-    this->Internals->value->setText(this->LastQuery);
-  }
-  else
-  {
-    this->Internals->value->setText("");
-  }
+  this->Internals->valueStackedWidget->currentWidget()->setSizePolicy(
+    QSizePolicy::Expanding, QSizePolicy::Expanding);
+  this->Internals->valueStackedWidget->adjustSize();
 }
 
 //-----------------------------------------------------------------------------
@@ -559,7 +455,7 @@ void pqQueryClauseWidget::showCompositeTree()
   }
 
   ui.Blocks->setModel(&dmodel);
-  dmodel.reset(this->producer()->getDataInformation());
+  dmodel.reset(this->MultiQueryWidget->producer()->getDataInformation());
   ui.Blocks->expandAll();
   if (dialog.exec() != QDialog::Accepted)
   {
@@ -623,54 +519,6 @@ void pqQueryClauseWidget::showCompositeTree()
 }
 
 //-----------------------------------------------------------------------------
-vtkSMProxy* pqQueryClauseWidget::newSelectionSource()
-{
-  // Find the proper Proxy manager
-  vtkSMSessionProxyManager* pxm =
-    vtkSMProxyManager::GetProxyManager()->GetActiveSessionProxyManager();
-
-  // Create a new selection source proxy based on the criteria_type.
-  vtkSMProxy* selSource = pxm->NewProxy("sources", "SelectionQuerySource");
-
-  // * Determine FieldType.
-  int field_type = 0;
-  switch (this->attributeType())
-  {
-    case vtkDataObject::POINT:
-      field_type = vtkSelectionNode::POINT;
-      break;
-
-    case vtkDataObject::CELL:
-      field_type = vtkSelectionNode::CELL;
-      break;
-
-    case vtkDataObject::ROW:
-      field_type = vtkSelectionNode::ROW;
-      break;
-
-    case vtkDataObject::VERTEX:
-      field_type = vtkSelectionNode::VERTEX;
-      break;
-
-    case vtkDataObject::EDGE:
-      field_type = vtkSelectionNode::EDGE;
-      break;
-  }
-  vtkSMPropertyHelper(selSource, "FieldType").Set(field_type);
-
-  // Pass on qualifiers and values from this and sub widgets.
-  this->addSelectionQualifiers(selSource);
-  foreach (pqQueryClauseWidget* child, this->findChildren<pqQueryClauseWidget*>())
-  {
-    child->addSelectionQualifiers(selSource);
-  }
-
-  selSource->UpdateVTKObjects();
-
-  return selSource;
-}
-
-//-----------------------------------------------------------------------------
 void pqQueryClauseWidget::addSelectionQualifiers(vtkSMProxy* selSource)
 {
   CriteriaType criteria_type = this->currentCriteriaType();
@@ -702,9 +550,11 @@ void pqQueryClauseWidget::addSelectionQualifiers(vtkSMProxy* selSource)
       fieldName = "id";
       break;
     case GLOBALID:
-      fieldName = this->getChosenAttributeInfo()
-                    ->GetAttributeInformation(vtkDataSetAttributes::GLOBALIDS)
-                    ->GetName();
+      fieldName = vtkSMCoreUtilities::SanitizeName(
+                    this->MultiQueryWidget->getChosenAttributeInfo()
+                      ->GetAttributeInformation(vtkDataSetAttributes::GLOBALIDS)
+                      ->GetName())
+                    .c_str();
       break;
     case THRESHOLD:
       pqInternals::ArrayInfo info =
@@ -870,6 +720,12 @@ void pqQueryClauseWidget::addSelectionQualifiers(vtkSMProxy* selSource)
       query = query.arg(fieldName);
       ok_no_value = true;
       break;
+    case SINGLE_VALUE_NAN:
+      if (query.isEmpty())
+        query = "isnan(%1)";
+      query = query.arg(fieldName);
+      ok_no_value = true;
+      break;
     case SINGLE_VALUE_LE_MEAN:
       if (query.isEmpty())
         query = "%1  <= mean(%1)";
@@ -902,11 +758,6 @@ void pqQueryClauseWidget::addSelectionQualifiers(vtkSMProxy* selSource)
 
   switch (criteria_type)
   {
-    case QUERY:
-      vtkSMPropertyHelper(selSource, "QueryString")
-        .Set(values[0].toString().toLocal8Bit().constData());
-      break;
-
     case BLOCK:
       if (this->AsQualifier)
       {
@@ -916,14 +767,29 @@ void pqQueryClauseWidget::addSelectionQualifiers(vtkSMProxy* selSource)
       VTK_FALLTHROUGH;
     // break; -- don't break
 
+    case QUERY:
+      query = this->Internals->value->text();
+      VTK_FALLTHROUGH;
+
     case INDEX:
     case GLOBALID:
     case THRESHOLD:
     case POINTS_NEAR:
     case POINT_IN_CELL:
+    {
+      query = QString("(%1)").arg(query);
+      QString currentQuery(vtkSMPropertyHelper(selSource, "QueryString").GetAsString());
+      if (!currentQuery.isEmpty())
+      {
+        query = QString("%1 & %2").arg(currentQuery, query);
+      }
       this->LastQuery = query;
-      vtkSMPropertyHelper(selSource, "QueryString").Set(query.toLocal8Bit().constData());
-      break;
+      if (!query.isEmpty())
+      {
+        vtkSMPropertyHelper(selSource, "QueryString").Set(query.toLocal8Bit().constData());
+      }
+    }
+    break;
     case AMR_LEVEL:
     {
       vtkSMPropertyHelper(selSource, "HierarchicalLevel").Set(values[0].toInt());

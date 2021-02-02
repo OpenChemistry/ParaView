@@ -26,6 +26,7 @@
 
 #include "vtkNew.h" // needed for vtkNew.
 #include "vtkPVDataRepresentation.h"
+#include "vtkSmartPointer.h"      //  for vtkSmartPointer
 #include "vtkStreamLinesModule.h" // for export macro
 
 class vtkColorTransferFunction;
@@ -33,10 +34,8 @@ class vtkExtentTranslator;
 class vtkImageData;
 class vtkInformation;
 class vtkInformationRequestKey;
-class vtkPExtentTranslator;
 class vtkPolyDataMapper;
 class vtkProperty;
-class vtkPVCacheKeeper;
 class vtkPVLODActor;
 class vtkScalarsToColors;
 class vtkStreamLinesMapper;
@@ -55,14 +54,6 @@ public:
    * PrepareForRendering.
    */
   int ProcessViewRequest(vtkInformationRequestKey*, vtkInformation*, vtkInformation*) override;
-
-  /**
-   * This needs to be called on all instances of vtkGeometryRepresentation when
-   * the input is modified. This is essential since the geometry filter does not
-   * have any real-input on the client side which messes with the Update
-   * requests.
-   */
-  void MarkModified() override;
 
   /**
    * Get/Set the visibility for this representation. When the visibility of
@@ -176,11 +167,6 @@ protected:
   bool RemoveFromView(vtkView* view) override;
 
   /**
-   * Overridden to check with the vtkPVCacheKeeper to see if the key is cached.
-   */
-  bool IsCached(double cache_key) override;
-
-  /**
    * Passes on parameters to the active mapper
    */
   void UpdateMapperParameters();
@@ -190,22 +176,14 @@ protected:
    */
   virtual vtkPVLODActor* GetRenderedProp() { return this->Actor; };
 
-  vtkImageData* Cache;
+  vtkSmartPointer<vtkDataObject> Cache;
   vtkAlgorithm* MBMerger;
-  vtkPVCacheKeeper* CacheKeeper;
   vtkStreamLinesMapper* StreamLinesMapper;
   vtkProperty* Property;
   vtkPVLODActor* Actor;
 
   unsigned long DataSize;
   double DataBounds[6];
-
-  // meta-data about the input image to pass on to render view for hints
-  // when redistributing data.
-  vtkNew<vtkPExtentTranslator> PExtentTranslator;
-  double Origin[3];
-  double Spacing[3];
-  int WholeExtent[6];
 
 private:
   vtkStreamLinesRepresentation(const vtkStreamLinesRepresentation&) = delete;

@@ -53,14 +53,8 @@ public:
 
   virtual pqSMProxy selection() { return this->SelectionSource; }
 
-public slots:
+public Q_SLOTS:
   virtual void setSelection(pqSMProxy selection);
-
-  // If a selection hasn't already been set, we call
-  // copyActiveSelection(). This ensures that the active selection is copied
-  // only when the panel is created for a clean source (not the one loaded from
-  // state or undo-redo).
-  void initializeDefaultValueIfNeeded();
 
   /**
   * This must be connected to the panel-accept signal to ensure that the new
@@ -70,13 +64,13 @@ public slots:
   virtual void preAccept();
   virtual void postAccept();
 
-signals:
+Q_SIGNALS:
   /**
   * Signal that the selection proxy changed.
   */
   void selectionChanged(pqSMProxy);
 
-protected slots:
+protected Q_SLOTS:
   // Copy active selection.
   void copyActiveSelection();
 

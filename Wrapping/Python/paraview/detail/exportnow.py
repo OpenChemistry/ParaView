@@ -14,14 +14,14 @@ class CinemaDHelper(object):
     def __init__(self, mcd, rd):
         self.__EnableCinemaDTable = mcd
         self.__RootDirectory = rd
-        if rd is not '' and not rd.endswith("/"):
+        if rd and not rd.endswith("/"):
             self.__RootDirectory = rd + "/"
         self.Keys = set()
         self.Contents = []
         self.KeysWritten = None
 
     def __StripRootDir(self, filename):
-        if self.__RootDirectory is not '':
+        if self.__RootDirectory:
             return filename[filename.startswith(self.__RootDirectory) and len(self.__RootDirectory):]
         return filename
 
@@ -29,7 +29,7 @@ class CinemaDHelper(object):
         """ filename wrangling for root directory placement """
         indexfilename = 'data.csv'
         datafilename = filename
-        if self.__RootDirectory is not '':
+        if self.__RootDirectory:
             indexfilename = self.__RootDirectory + "data.csv"
             # strip leading root directory from filename if present
             datafilename = self.__StripRootDir(filename)
@@ -73,7 +73,7 @@ class CinemaDHelper(object):
         if not self.__EnableCinemaDTable:
             return
         indexfilename, datafilename = self.__MakeCinDFileNamesUnderRootDir()
-        if self.__RootDirectory is not '' and not os.path.exists(self.__RootDirectory):
+        if self.__RootDirectory and not os.path.exists(self.__RootDirectory):
             os.makedirs(self.__RootDirectory)
         f = open(indexfilename, "w")
         # write the header line
@@ -167,7 +167,15 @@ class __CinemaACHelper(object):
       def ExportNow(self, time):
           pass
 
-def ExportNow(root_directory,
+def _fixup_and_makedir_if_needed(rootdir):
+    if rootdir and not rootdir.endswith("/"):
+        rootdir = rootdir + "/"
+    if rootdir and not os.path.exists(rootdir):
+        os.makedirs(rootdir)
+    return rootdir
+
+def ExportNow(image_root_directory,
+              data_root_directory,
               file_name_padding,
               make_cinema_table,
               cinema_tracks,
@@ -175,11 +183,9 @@ def ExportNow(root_directory,
               rendering_info):
     """The user facing entry point. Here we get a hold of ParaView's animation controls, step through the animation, and export the things we've been asked to be the caller."""
 
-    CIND = CinemaDHelper(make_cinema_table, root_directory)
-    if root_directory is not '' and not root_directory.endswith("/"):
-        root_directory = root_directory + "/"
-    if root_directory is not '' and not os.path.exists(root_directory):
-        os.makedirs(root_directory)
+    CIND = CinemaDHelper(make_cinema_table, image_root_directory)
+    image_root_directory = _fixup_and_makedir_if_needed(image_root_directory)
+    data_root_directory = _fixup_and_makedir_if_needed(data_root_directory)
 
     # get a hold of the scene
     spm = servermanager.vtkSMProxyManager.GetProxyManager().GetActiveSessionProxyManager()
@@ -201,6 +207,7 @@ def ExportNow(root_directory,
     # export loop
     for tstep in timesteps:
         padded_tstep = str(tstep).rjust(file_name_padding, '0')
+        helpers = []
 
         # loop through the configured writers and export at the requested times
         ed.InitNextWriterProxy()
@@ -217,30 +224,49 @@ def ExportNow(root_directory,
                 proxyname = spm.GetProxyName("export_writers", wp)
                 inputname = proxyname[0:proxyname.find("|")]
                 inputproxy = FindSource(inputname)
+                if wp.GetProperty("ChooseArraysToWrite").GetElement(0) == 1:
+                    point_arrays = []
+                    cell_arrays = []
+                    arrays_property = wp.GetProperty("PointDataArrays")
+                    for i in range(arrays_property.GetNumberOfElements()):
+                        point_arrays.append(arrays_property.GetElement(i))
+                    arrays_property = wp.GetProperty("CellDataArrays")
+                    for i in range(arrays_property.GetNumberOfElements()):
+                        cell_arrays.append(arrays_property.GetElement(i))
+                    if not point_arrays:
+                        point_arrays = [' ']
+                    if not cell_arrays:
+                        cell_arrays = [' ']
+                    # create a temporary array culling filter
+                    pass_arrays = PassArrays(Input=inputproxy, \
+                        PointDataArrays=point_arrays, CellDataArrays=cell_arrays)
+                    inputproxy = pass_arrays
+                    helpers.append(inputproxy)
                 fname = wp.GetProperty("CatalystFilePattern").GetElement(0)
                 if wp.GetXMLName() == "ExodusIIWriter":
-                    fnamefilled = root_directory+fname+padded_tstep
+                    fnamefilled = data_root_directory+fname+padded_tstep
                 else:
-                    fnamefilled = root_directory+fname.replace("%t", padded_tstep)
+                    fnamefilled = data_root_directory+fname.replace("%t", padded_tstep)
 
+                kwargs = {}
                 DataMode = wp.GetProperty("DataMode")
                 if DataMode is not None:
-                    DataMode = wp.GetProperty("DataMode").GetElement(0)
+                    kwargs["DataMode"] = wp.GetProperty("DataMode").GetElement(0)
                 HeaderType = wp.GetProperty("HeaderType")
                 if HeaderType is not None:
-                    HeaderType = wp.GetProperty("HeaderType").GetElement(0)
-                EncodeAppendedData=wp.GetProperty("EncodeAppendedData")
+                    kwargs["HeaderType"] = wp.GetProperty("HeaderType").GetElement(0)
+                EncodeAppendedData = wp.GetProperty("EncodeAppendedData")
                 if EncodeAppendedData is not None:
-                    EncodeAppendedData = wp.GetProperty("EncodeAppendedData").GetElement(0)
+                    kwargs["EncodeAppendedData"] = wp.GetProperty("EncodeAppendedData").GetElement(0)
                 CompressorType = wp.GetProperty("CompressorType")
                 if CompressorType is not None:
-                    CompressorType = wp.GetProperty("CompressorType").GetElement(0)
+                    kwargs["CompressorType"] = wp.GetProperty("CompressorType").GetElement(0)
                 CompressionLevel = wp.GetProperty("CompressionLevel")
                 if CompressionLevel is not None:
-                    CompressionLevel = wp.GetProperty("CompressionLevel").GetElement(0)
+                    kwargs["CompressionLevel"] = wp.GetProperty("CompressionLevel").GetElement(0)
 
                 # finally after all of the finageling above, save the data
-                SaveData(fnamefilled, inputproxy, DataMode=DataMode, HeaderType=HeaderType, EncodeAppendedData=EncodeAppendedData, CompressorType=CompressorType, CompressionLevel=CompressionLevel)
+                SaveData(fnamefilled, inputproxy, **kwargs)
                 # don't forget to tell cinema D about it
                 CIND.AppendToCinemaDTable(tnow, "writer_%s" % writercnt, fnamefilled)
             wp = ed.GetNextWriterProxy()
@@ -251,11 +277,14 @@ def ExportNow(root_directory,
         ssp = ed.GetNextScreenshotProxy()
         viewcnt = 0
         while ssp:
+            if not ssp.HasAnnotation("enabled") or not (ssp.GetAnnotation("enabled") == '1'):
+                ssp= ed.GetNextScreenshotProxy()
+                continue
             freq = ssp.GetProperty("WriteFrequency").GetElement(0)
             if tstep % freq==0:
                 fname = ssp.GetProperty("CatalystFilePattern").GetElement(0)
                 if fname.endswith("cdb"):
-                    CINAC = __CinemaACHelper(root_directory,
+                    CINAC = __CinemaACHelper(image_root_directory,
                               rendering_info,
                               cinema_tracks,
                               cinema_arrays)
@@ -264,7 +293,7 @@ def ExportNow(root_directory,
                     # don't forget to tell cinema D about it
                     CIND.AppendCViewToCinemaDTable(tnow, "cview_%s"%viewcnt, CINAC.NewFiles)
                 else:
-                    fnamefilled = root_directory+fname.replace("%t", padded_tstep)
+                    fnamefilled = image_root_directory+fname.replace("%t", padded_tstep)
                     # save the screenshot
                     ssp.WriteImage(fnamefilled)
                     # don't forget to tell cinema D about it
@@ -274,6 +303,10 @@ def ExportNow(root_directory,
         tstep = tstep + 1
         s.GoToNext()
         tnow = s.AnimationTime
+
+        # destroy array culling filters
+        for x in helpers:
+          Delete(x)
 
     # defer actual cinema D output until the end because we only know now what the full set of cinema D columns actually are
     CIND.Finalize()

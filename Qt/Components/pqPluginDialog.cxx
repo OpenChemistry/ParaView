@@ -254,18 +254,13 @@ void pqPluginDialog::refreshRemote()
 void pqPluginDialog::setupTreeWidget(QTreeWidget* pluginTree)
 {
   pluginTree->setColumnCount(2);
-#if QT_VERSION >= 0x050000
   pluginTree->header()->setSectionResizeMode(NameCol, QHeaderView::ResizeToContents);
   pluginTree->header()->setSectionResizeMode(ValueCol, QHeaderView::Custom);
-#else
-  pluginTree->header()->setResizeMode(NameCol, QHeaderView::ResizeToContents);
-  pluginTree->header()->setResizeMode(ValueCol, QHeaderView::Custom);
-#endif
 
   pluginTree->setHeaderLabels(QStringList() << tr("Name") << tr("Property"));
 
   pluginTree->setSortingEnabled(true);
-  pluginTree->sortByColumn(-1);
+  pluginTree->sortByColumn(-1, Qt::AscendingOrder);
 
   QObject::connect(pluginTree, SIGNAL(itemChanged(QTreeWidgetItem*, int)), this,
     SLOT(onPluginItemChanged(QTreeWidgetItem*, int)) /*, Qt::QueuedConnection*/);

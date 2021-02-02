@@ -3,11 +3,11 @@ project(Clone2)
 
 find_package(ParaView REQUIRED)
 
-if (NOT PARAVIEW_BUILD_QT_GUI)
+if (NOT PARAVIEW_USE_QT)
   message(STATUS
-    "${CMAKE_PROJECT_NAME} example requires PARAVIEW_BUILD_QT_GUI to be "
-    "enabled. Please rebuild ParaView (or point to a different build of "
-    "ParaView) with PARAVIEW_BUILD_QT_GUI set to TRUE")
+    "Skipping example: ${CMAKE_PROJECT_NAME} example requires PARAVIEW_USE_QT "
+    "to be enabled. Please rebuild ParaView (or point to a different build of "
+    "ParaView) with PARAVIEW_USE_QT set to TRUE")
   return ()
 endif()
 
@@ -30,7 +30,7 @@ set(xml_files
   ParaViewSources.xml)
 
 paraview_client_add(
-  NAME paraview_revised
+  NAME paraview_clone2
   VERSION "1.1.1"
   SOURCES ${sources} ${ui_files}
   APPLICATION_XMLS ${xml_files}
@@ -39,6 +39,6 @@ paraview_client_add(
 
   ORGANIZATION "Kitware, Inc."
   TITLE "ParaView (ReVisEd)")
-target_link_libraries(paraview_revised
+target_link_libraries(paraview_clone2
   PRIVATE
     ParaView::pqApplicationComponents)
