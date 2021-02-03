@@ -41,18 +41,37 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QWidgetAction>
 #include <QtDebug>
 
+#include <QTableView>
+#include <QTreeView>
+
 namespace
 {
-void updateFilter(QTreeView* tree, int section, const QString& txt)
+int genericColumnAt(QAbstractItemView* item, int x)
+{
+  auto treeView = dynamic_cast<QTreeView*>(item);
+  auto tableView = dynamic_cast<QTableView*>(item);
+
+  return treeView ? treeView->columnAt(x) : tableView ? tableView->columnAt(x) : -1;
+}
+
+QHeaderView* genericHeader(QAbstractItemView* item)
+{
+  auto treeView = dynamic_cast<QTreeView*>(item);
+  auto tableView = dynamic_cast<QTableView*>(item);
+
+  return treeView ? treeView->header() : tableView ? tableView->horizontalHeader() : nullptr;
+}
+
+void updateFilter(QAbstractItemView* tree, int section, const QString& txt)
 {
   auto model = tree->model();
-  auto header = tree->header();
+  auto header = genericHeader(tree);
   auto pqheader = qobject_cast<pqHeaderView*>(header);
   auto sfmodel = qobject_cast<QSortFilterProxyModel*>(model);
 
   if (sfmodel)
   {
-    sfmodel->setFilterRegExp(QRegExp(txt, Qt::CaseInsensitive, QRegExp::Wildcard));
+    sfmodel->setFilterRegExp(QRegExp(txt, Qt::CaseInsensitive));
     sfmodel->setFilterKeyColumn(section);
   }
   if (pqheader && sfmodel)
@@ -63,14 +82,14 @@ void updateFilter(QTreeView* tree, int section, const QString& txt)
     }
     else
     {
-      pqheader->addCustomIndicatorIcon(QIcon(":/QtWidgets/Icons/pqDelete24.png"), "remove-filter");
+      pqheader->addCustomIndicatorIcon(QIcon(":/QtWidgets/Icons/pqDelete.svg"), "remove-filter");
     }
   }
 }
 }
 
 //-----------------------------------------------------------------------------
-pqTreeViewSelectionHelper::pqTreeViewSelectionHelper(QTreeView* tree)
+pqTreeViewSelectionHelper::pqTreeViewSelectionHelper(QAbstractItemView* tree, bool customIndicator)
   : Superclass(tree)
   , TreeView(tree)
   , Filterable(true)
@@ -78,11 +97,11 @@ pqTreeViewSelectionHelper::pqTreeViewSelectionHelper(QTreeView* tree)
   tree->setSelectionMode(QAbstractItemView::ExtendedSelection);
   tree->setContextMenuPolicy(Qt::CustomContextMenu);
 
-  if (auto pqheader = qobject_cast<pqHeaderView*>(tree->header()))
+  auto pqheader = qobject_cast<pqHeaderView*>(genericHeader(tree));
+  if (customIndicator && pqheader)
   {
     pqheader->setCustomIndicatorShown(true);
-    pqheader->addCustomIndicatorIcon(
-      QIcon(":/QtWidgets/Icons/outline_arrow_drop_down_circle_black_24dp.png"), "menu");
+    pqheader->addCustomIndicatorIcon(QIcon(":/QtWidgets/Icons/pqShowMenu.svg"), "menu");
     QObject::connect(pqheader, &pqHeaderView::customIndicatorClicked,
       [this, tree](int section, const QPoint& pt, const QString& role) {
         if (role == "menu")
@@ -95,8 +114,8 @@ pqTreeViewSelectionHelper::pqTreeViewSelectionHelper(QTreeView* tree)
         }
       });
   }
-  QObject::connect(tree, &QTreeView::customContextMenuRequested,
-    [this, tree](const QPoint& pt) { this->showContextMenu(tree->columnAt(pt.x()), pt); });
+  QObject::connect(tree, &QAbstractItemView::customContextMenuRequested,
+    [this, tree](const QPoint& pt) { this->showContextMenu(genericColumnAt(tree, pt.x()), pt); });
 }
 
 //-----------------------------------------------------------------------------
@@ -125,7 +144,7 @@ void pqTreeViewSelectionHelper::showContextMenu(int section, const QPoint& pos)
 {
   auto tree = this->TreeView;
   auto model = tree->model();
-  auto header = tree->header();
+  auto header = genericHeader(tree);
   auto sfmodel = qobject_cast<QSortFilterProxyModel*>(model);
 
   QList<QModelIndex> selectedIndexes;
@@ -149,7 +168,7 @@ void pqTreeViewSelectionHelper::showContextMenu(int section, const QPoint& pos)
     if (auto filterActn = new QWidgetAction(&menu))
     {
       auto ledit = new QLineEdit(&menu);
-      ledit->setPlaceholderText("Filter items");
+      ledit->setPlaceholderText("Filter items (regex)");
       ledit->setClearButtonEnabled(true);
       ledit->setText(sfmodel->filterRegExp().pattern());
 
@@ -171,14 +190,16 @@ void pqTreeViewSelectionHelper::showContextMenu(int section, const QPoint& pos)
 
   if (user_checkable)
   {
-    if (auto actn = menu.addAction("Check highlighted items"))
+    if (auto actn =
+          menu.addAction(QIcon(":/pqWidgets/Icons/pqChecked.svg"), "Check highlighted items"))
     {
       actn->setEnabled(selectionCount > 0);
       QObject::connect(
         actn, &QAction::triggered, [this](bool) { this->setSelectedItemsCheckState(Qt::Checked); });
     }
 
-    if (auto actn = menu.addAction("Uncheck highlighted items"))
+    if (auto actn =
+          menu.addAction(QIcon(":/pqWidgets/Icons/pqUnchecked.svg"), "Uncheck highlighted items"))
     {
       actn->setEnabled(selectionCount > 0);
       QObject::connect(actn, &QAction::triggered,
@@ -199,8 +220,9 @@ void pqTreeViewSelectionHelper::showContextMenu(int section, const QPoint& pos)
       order = Qt::DescendingOrder;
     }
 
-    if (auto actn =
-          menu.addAction(order == Qt::AscendingOrder ? "Sort (ascending)" : "Sort (descending)"))
+    if (auto actn = order == Qt::AscendingOrder
+        ? menu.addAction(QIcon(":/pqWidgets/Icons/pqSortAscend.svg"), "Sort (ascending)")
+        : menu.addAction(QIcon(":/pqWidgets/Icons/pqSortDescend.svg"), "Sort (descending)"))
     {
       actn->setEnabled(rowCount > 0);
       QObject::connect(actn, &QAction::triggered, [order, section, sfmodel, header](bool) {
@@ -213,7 +235,7 @@ void pqTreeViewSelectionHelper::showContextMenu(int section, const QPoint& pos)
       });
     }
 
-    if (auto actn = menu.addAction("Clear sorting"))
+    if (auto actn = menu.addAction(QIcon(":/pqWidgets/Icons/pqClearSort.svg"), "Clear sorting"))
     {
       actn->setEnabled(sfmodel->sortColumn() != -1);
       QObject::connect(actn, &QAction::triggered, [sfmodel, header](bool) {

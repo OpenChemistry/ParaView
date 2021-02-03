@@ -53,12 +53,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkPiecewiseControlPointsItem.h"
 #include "vtkPiecewiseFunction.h"
 #include "vtkPiecewiseFunctionItem.h"
+#include "vtkRangeHandlesItem.h"
 #include "vtkSMCoreUtilities.h"
 #include "vtkSmartPointer.h"
 #include "vtkVector.h"
+#include "vtkWeakPointer.h"
 
 #include <QColorDialog>
+#include <QMainWindow>
 #include <QPointer>
+#include <QStatusBar>
 #include <QSurfaceFormat>
 #include <QVBoxLayout>
 
@@ -197,9 +201,13 @@ public:
   pqTimer Timer;
   pqTimer RangeTimer;
 
+  vtkSmartPointer<vtkRangeHandlesItem> RangeHandlesItem;
   vtkSmartPointer<vtkScalarsToColorsItem> TransferFunctionItem;
   vtkSmartPointer<vtkControlPointsItem> ControlPointsItem;
   unsigned long CurrentPointEditEventId;
+
+  vtkWeakPointer<vtkScalarsToColors> ScalarsToColors;
+  vtkWeakPointer<vtkPiecewiseFunction> PiecewiseFunction;
 
   pqInternals(pqTransferFunctionWidget* editor)
     : Widget(new QVTKOpenGLNativeWidget(editor))
@@ -256,6 +264,7 @@ public:
       this->CurrentPointEditEventId = 0;
     }
     this->TransferFunctionItem = nullptr;
+    this->RangeHandlesItem = nullptr;
     this->ControlPointsItem = nullptr;
   }
 };
@@ -268,7 +277,7 @@ pqTransferFunctionWidget::pqTransferFunctionWidget(QWidget* parentObject)
   // whenever the rendering timer times out, we render the widget.
   QObject::connect(&this->Internals->Timer, &QTimer::timeout, [this]() {
     auto renWin = this->Internals->ContextView->GetRenderWindow();
-    if (this->isVisible() && renWin->IsDrawable())
+    if (this->isVisible())
     {
       renWin->Render();
     }
@@ -283,10 +292,24 @@ pqTransferFunctionWidget::~pqTransferFunctionWidget()
 }
 
 //-----------------------------------------------------------------------------
+vtkScalarsToColors* pqTransferFunctionWidget::scalarsToColors() const
+{
+  return this->Internals->ScalarsToColors;
+}
+
+//-----------------------------------------------------------------------------
+vtkPiecewiseFunction* pqTransferFunctionWidget::piecewiseFunction() const
+{
+  return this->Internals->PiecewiseFunction;
+}
+
+//-----------------------------------------------------------------------------
 void pqTransferFunctionWidget::initialize(
   vtkScalarsToColors* stc, bool stc_editable, vtkPiecewiseFunction* pwf, bool pwf_editable)
 {
   this->Internals->cleanup();
+  this->Internals->ScalarsToColors = stc;
+  this->Internals->PiecewiseFunction = pwf;
 
   // TODO: If needed, we can support vtkLookupTable.
   vtkColorTransferFunction* ctf = vtkColorTransferFunction::SafeDownCast(stc);
@@ -295,8 +318,12 @@ void pqTransferFunctionWidget::initialize(
   {
     vtkNew<vtkColorTransferFunctionItem> item;
     item->SetColorTransferFunction(ctf);
-
     this->Internals->TransferFunctionItem = item;
+
+    vtkNew<vtkRangeHandlesItem> handlesItem;
+    handlesItem->SetColorTransferFunction(ctf);
+    handlesItem->SetHandleWidth(4.0);
+    this->Internals->RangeHandlesItem = handlesItem;
 
     if (stc_editable)
     {
@@ -336,8 +363,12 @@ void pqTransferFunctionWidget::initialize(
     item->SetOpacityFunction(pwf);
     item->SetColorTransferFunction(ctf);
     item->SetMaskAboveCurve(true);
-
     this->Internals->TransferFunctionItem = item;
+
+    vtkNew<vtkRangeHandlesItem> handlesItem;
+    handlesItem->SetColorTransferFunction(ctf);
+    this->Internals->RangeHandlesItem = handlesItem;
+
     if (pwf_editable && stc_editable)
     {
       // NOTE: this hasn't been tested yet.
@@ -373,6 +404,23 @@ void pqTransferFunctionWidget::initialize(
 
   if (this->Internals->ControlPointsItem)
   {
+    this->Internals->ControlPointsItem->UseAddPointItemOn();
+    this->Internals->ChartXY->AddPlot(this->Internals->ControlPointsItem->GetAddPointItem());
+  }
+
+  if (this->Internals->RangeHandlesItem)
+  {
+    pqCoreUtilities::connect(this->Internals->RangeHandlesItem, vtkCommand::EndInteractionEvent,
+      this, SLOT(onRangeHandlesRangeChanged()));
+    pqCoreUtilities::connect(this->Internals->RangeHandlesItem,
+      vtkCommand::LeftButtonDoubleClickEvent, this, SIGNAL(rangeHandlesDoubleClicked()));
+    pqCoreUtilities::connect(
+      this->Internals->RangeHandlesItem, vtkCommand::HighlightEvent, this, SLOT(showUsageStatus()));
+    this->Internals->ChartXY->AddPlot(this->Internals->RangeHandlesItem);
+  }
+
+  if (this->Internals->ControlPointsItem)
+  {
     this->Internals->ControlPointsItem->SetEndPointsRemovable(false);
     this->Internals->ControlPointsItem->SetShowLabels(true);
     this->Internals->ChartXY->AddPlot(this->Internals->ControlPointsItem);
@@ -394,9 +442,9 @@ void pqTransferFunctionWidget::initialize(
     QObject::connect(&this->Internals->RangeTimer, &QTimer::timeout, [pwf, this]() {
       if (this->Internals->ChartXY->SetTFRange(vtkVector2d(pwf->GetRange())))
       {
-        // The range have actually been changed, rerender and emit the signal
+        // The range have actually been changed, rerender and Q_EMIT the signal
         this->render();
-        emit this->chartRangeModified();
+        Q_EMIT this->chartRangeModified();
       }
     });
     this->Internals->ChartXY->SetTFRange(vtkVector2d(pwf->GetRange()));
@@ -410,13 +458,16 @@ void pqTransferFunctionWidget::initialize(
     QObject::connect(&this->Internals->RangeTimer, &QTimer::timeout, [ctf, this]() {
       if (this->Internals->ChartXY->SetTFRange(vtkVector2d(ctf->GetRange())))
       {
-        // The range has actually been changed, rerender and emit the signal
+        // The range has actually been changed, rerender and Q_EMIT the signal
         this->render();
-        emit this->chartRangeModified();
+        Q_EMIT this->chartRangeModified();
       }
     });
     this->Internals->ChartXY->SetTFRange(vtkVector2d(ctf->GetRange()));
   }
+
+  pqCoreUtilities::connect(
+    this->Internals->ChartXY, vtkCommand::MouseMoveEvent, this, SLOT(showUsageStatus()));
 }
 
 //-----------------------------------------------------------------------------
@@ -449,7 +500,7 @@ void pqTransferFunctionWidget::onCurrentPointEditEvent()
     xrgbms[3] = color.blueF();
     ctf->SetNodeValue(currentIdx, xrgbms);
 
-    emit this->controlPointsModified();
+    Q_EMIT this->controlPointsModified();
   }
 }
 
@@ -458,7 +509,7 @@ void pqTransferFunctionWidget::onCurrentChangedEvent()
 {
   if (this->Internals->ControlPointsItem)
   {
-    emit this->currentPointChanged(this->Internals->ControlPointsItem->GetCurrentPoint());
+    Q_EMIT this->currentPointChanged(this->Internals->ControlPointsItem->GetCurrentPoint());
   }
 }
 
@@ -492,6 +543,20 @@ vtkIdType pqTransferFunctionWidget::numberOfControlPoints() const
   return this->Internals->ControlPointsItem
     ? this->Internals->ControlPointsItem->GetNumberOfPoints()
     : 0;
+}
+
+//-----------------------------------------------------------------------------
+void pqTransferFunctionWidget::SetControlPointsFreehandDrawing(bool use)
+{
+  this->Internals->ControlPointsItem->SetDrawPoints(!use);
+  this->Internals->ControlPointsItem->SetStrokeMode(use);
+  this->render();
+}
+
+//-----------------------------------------------------------------------------
+bool pqTransferFunctionWidget::GetControlPointsFreehandDrawing() const
+{
+  return this->Internals->ControlPointsItem->GetStrokeMode();
 }
 
 //-----------------------------------------------------------------------------
@@ -549,4 +614,27 @@ void pqTransferFunctionWidget::setHistogramTable(vtkTable* table)
 {
   this->Internals->TransferFunctionItem->SetHistogramTable(table);
   this->render();
+}
+
+//-----------------------------------------------------------------------------
+void pqTransferFunctionWidget::onRangeHandlesRangeChanged()
+{
+  if (this->Internals->RangeHandlesItem)
+  {
+    double range[2];
+    this->Internals->RangeHandlesItem->GetHandlesRange(range);
+    Q_EMIT this->rangeHandlesRangeChanged(range[0], range[1]);
+  }
+}
+
+//-----------------------------------------------------------------------------
+void pqTransferFunctionWidget::showUsageStatus()
+{
+  QMainWindow* mainWindow = qobject_cast<QMainWindow*>(pqCoreUtilities::mainWidget());
+  if (mainWindow)
+  {
+    mainWindow->statusBar()->showMessage(tr("Grab and move a handle to interactively change the "
+                                            "range. Double click on it to set custom range."),
+      2000);
+  }
 }

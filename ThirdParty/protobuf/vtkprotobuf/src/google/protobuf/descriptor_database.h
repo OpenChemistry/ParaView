@@ -47,7 +47,7 @@
 #include <google/protobuf/port_def.inc>
 
 #ifdef SWIG
-#define PROTOBUF_EXPORT
+#error "You cannot SWIG proto headers"
 #endif
 
 namespace google {
@@ -116,7 +116,7 @@ class PROTOBUF_EXPORT DescriptorDatabase {
   //
   // This method has a default implementation that always returns
   // false.
-  virtual bool FindAllFileNames(std::vector<std::string>* output) {
+  virtual bool FindAllFileNames(std::vector<std::string>* /*output*/) {
     return false;
   }
 
@@ -199,8 +199,10 @@ class PROTOBUF_EXPORT SimpleDescriptorDatabase : public DescriptorDatabase {
     // to the index.
     bool AddFile(const FileDescriptorProto& file, Value value);
     bool AddSymbol(const std::string& name, Value value);
-    bool AddNestedExtensions(const DescriptorProto& message_type, Value value);
-    bool AddExtension(const FieldDescriptorProto& field, Value value);
+    bool AddNestedExtensions(const std::string& filename,
+                             const DescriptorProto& message_type, Value value);
+    bool AddExtension(const std::string& filename,
+                      const FieldDescriptorProto& field, Value value);
 
     Value FindFile(const std::string& filename);
     Value FindSymbol(const std::string& name);
@@ -264,25 +266,10 @@ class PROTOBUF_EXPORT SimpleDescriptorDatabase : public DescriptorDatabase {
     // That symbol cannot be a super-symbol of the search key since if it were,
     // then it would be a match, and we're assuming the match key doesn't exist.
     // Therefore, step 2 will correctly return no match.
-
-    // Find the last entry in the by_symbol_ map whose key is less than or
-    // equal to the given name.
-    typename std::map<std::string, Value>::iterator FindLastLessOrEqual(
-        const std::string& name);
-
-    // True if either the arguments are equal or super_symbol identifies a
-    // parent symbol of sub_symbol (e.g. "foo.bar" is a parent of
-    // "foo.bar.baz", but not a parent of "foo.barbaz").
-    bool IsSubSymbol(const std::string& sub_symbol,
-                     const std::string& super_symbol);
-
-    // Returns true if and only if all characters in the name are alphanumerics,
-    // underscores, or periods.
-    bool ValidateSymbolName(const std::string& name);
   };
 
   DescriptorIndex<const FileDescriptorProto*> index_;
-  std::vector<const FileDescriptorProto*> files_to_delete_;
+  std::vector<std::unique_ptr<const FileDescriptorProto>> files_to_delete_;
 
   // If file is non-NULL, copy it into *output and return true, otherwise
   // return false.
@@ -327,10 +314,13 @@ class PROTOBUF_EXPORT EncodedDescriptorDatabase : public DescriptorDatabase {
                                    FileDescriptorProto* output) override;
   bool FindAllExtensionNumbers(const std::string& extendee_type,
                                std::vector<int>* output) override;
+  bool FindAllFileNames(std::vector<std::string>* output) override;
 
  private:
-  SimpleDescriptorDatabase::DescriptorIndex<std::pair<const void*, int> >
-      index_;
+  class DescriptorIndex;
+  // Keep DescriptorIndex by pointer to hide the implementation to keep a
+  // cleaner header.
+  std::unique_ptr<DescriptorIndex> index_;
   std::vector<void*> files_to_delete_;
 
   // If encoded_file.first is non-NULL, parse the data into *output and return

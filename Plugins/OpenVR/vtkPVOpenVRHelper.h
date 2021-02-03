@@ -92,6 +92,9 @@ public:
   // if in VR close out the event loop
   void Quit();
 
+  // reset all prop positions
+  void ResetPositions();
+
   // if running update the props to the current props
   // on the View
   void UpdateProps();
@@ -144,7 +147,7 @@ public:
   //@}
 
   // show the billboard with the provided text
-  void ShowBillboard(std::string const& text, bool updatePosition, vtkTexture* t = nullptr);
+  void ShowBillboard(std::string const& text, bool updatePosition, std::string const& tfile);
 
   // add a point to the currently selected source in PV
   // if it accepts points
@@ -166,6 +169,13 @@ public:
 
   // set what the right trigger will do when pressed
   void SetRightTriggerMode(std::string const& mode);
+
+  vtkGetObjectMacro(Renderer, vtkOpenVRRenderer);
+
+  void SaveCameraPose(int loc);
+  void LoadCameraPose(int loc);
+  void SetScaleFactor(float val);
+  void SetMotionFactor(float val);
 
 protected:
   vtkPVOpenVRHelper();
@@ -210,6 +220,7 @@ protected:
   bool EventCallback(vtkObject* object, unsigned long event, void* calldata);
 
   void HideBillboard();
+  void HandleDeleteEvent(vtkObject* caller);
   void HandlePickEvent(vtkObject* caller, void* calldata);
   void MoveToNextImage();
   void MoveToNextCell();

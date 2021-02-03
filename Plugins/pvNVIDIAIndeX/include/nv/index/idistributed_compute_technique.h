@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2019 NVIDIA Corporation. All rights reserved.
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
  *****************************************************************************/
 /// \file
 /// \brief Asynchronous, distributed data generation techniques.
@@ -16,24 +16,24 @@
 namespace nv {
 namespace index {
 
-/// @ingroup nv_index_data_computing
-///
 /// Interface class for user-defined techniques for computing data (2D textures
 /// on plane and heightfield shapes and 3D volume data) on demand.
 ///
 /// An implementation of this class can be assigned as a scene description
 /// attribute to an compute-enabled scene element, such as \c IPlane, 
-/// \c IRegular_heightfield or \c IRegular_volume. When rendering a certain area
+/// \c IRegular_heightfield or \c ISparse_volume_scene_element. When rendering a certain area
 /// of the scene primitive (defined by the renderer), the compute technique is
 /// called and an instance of an \c IDistributed_compute_destination_buffer is passed. The
 /// compute technique fills this buffer for the required subregions of the
 /// distributed dataset. The renderer then maps either uses the generated data
-/// directly (\c IRegular_volume) or uses it as a texture mapped onto the defined
+/// directly (\c ISparse_volume_scene_element) or uses it as a texture mapped onto the defined
 /// 2D area (c IPlane and \c IRegular_heightfield).
 ///
 /// Typical use cases for the compute technique are to visualize data that result
 /// from complex, possibly distributed, computing processes process either as 2D
 /// textures or 3D volumes.
+///
+/// \ingroup nv_index_data_computing
 ///
 class IDistributed_compute_technique :
     public mi::base::Interface_declare<0xfbde8f4c,0x421e,0x4a6e,0x98,0x68,0x6a,0xe2,0x9b,0xac,0x30,0x4d,
@@ -77,9 +77,7 @@ public:
     }
 };
 
-/// @ingroup nv_index_data_computing
-///
-/// Interface class for user-defined techniques for computing 2D LOD-texture data on demand. 
+/// Interface class for user-defined techniques for computing 2D LOD-texture data on demand.
 ///
 /// An implementation of this class can be assigned as a scene description attribute to an compute-enabled \c IPlane
 /// scene element.
@@ -92,18 +90,20 @@ public:
 /// Typical use cases for the compute technique are to visualize data that result from complex, possibly distributed,
 /// computing processes process as 2D textures.
 ///
+/// \ingroup nv_index_data_computing
+///
 class IDistributed_compute_technique_LOD :
     public mi::base::Interface_declare<0x7c8909d5,0x3cc2,0x415b,0x80,0xef,0x65,0x74,0x99,0x38,0xd6,0xff,
                                        nv::index::IDistributed_compute_technique>
 {
 };
 
-/// @ingroup nv_index_data_computing
-///
 /// Mixin class for implementing the IDistributed_compute_technique interface.
 ///
 /// This mixin class provides a default implementation of some of the pure
 /// virtual methods of the IDistributed_compute_technique interface.
+///
+/// \ingroup nv_index_data_computing
 ///
 template <mi::Uint32 i_id1, mi::Uint16 i_id2, mi::Uint16 i_id3,
           mi::Uint8  i_id4, mi::Uint8  i_id5, mi::Uint8  i_id6,  mi::Uint8 i_id7,
@@ -169,9 +169,9 @@ public:
 };
 
 
-/// @ingroup nv_index_data_computing
-///
 /// Mixin class for implementing the IDistributed_compute_technique_LOD interface.
+///
+/// \ingroup nv_index_data_computing
 ///
 template <mi::Uint32 i_id1, mi::Uint16 i_id2, mi::Uint16 i_id3,
           mi::Uint8  i_id4, mi::Uint8  i_id5, mi::Uint8  i_id6,  mi::Uint8 i_id7,

@@ -136,6 +136,8 @@ pqInteractivePropertyWidget::pqInteractivePropertyWidget(const char* widget_smgr
 
   pqCoreUtilities::connect(
     wdgProxy, vtkCommand::StartInteractionEvent, this, SIGNAL(startInteraction()));
+  pqCoreUtilities::connect(
+    wdgProxy, vtkCommand::StartInteractionEvent, this, SIGNAL(changeAvailable()));
   pqCoreUtilities::connect(wdgProxy, vtkCommand::InteractionEvent, this, SIGNAL(interaction()));
   pqCoreUtilities::connect(
     wdgProxy, vtkCommand::EndInteractionEvent, this, SIGNAL(endInteraction()));
@@ -248,7 +250,7 @@ void pqInteractivePropertyWidget::setWidgetVisible(bool val)
 
     internals.WidgetVisibility = val;
     this->updateWidgetVisibility();
-    emit this->widgetVisibilityToggled(val);
+    Q_EMIT this->widgetVisibilityToggled(val);
   }
 }
 
@@ -263,7 +265,7 @@ void pqInteractivePropertyWidget::updateWidgetVisibility()
   vtkSMPropertyHelper(wdgProxy, "Enabled", true).Set(visible);
   wdgProxy->UpdateVTKObjects();
   this->render();
-  emit this->widgetVisibilityUpdated(visible);
+  Q_EMIT this->widgetVisibilityUpdated(visible);
 }
 
 //-----------------------------------------------------------------------------

@@ -35,6 +35,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "pqPropertiesPanel.h"
 #include "vtkSMPropertyGroup.h"
+#include "vtkSMPropertyHelper.h"
 #include "vtkSMProxy.h"
 
 // Qt includes
@@ -47,11 +48,18 @@ public:
   Ui::TextLocationWidget Ui;
 
   pqInternals(pqTextLocationWidget* self)
-    : windowLocation(QString("AnyLocation"))
   {
     this->Ui.setupUi(self);
     this->Ui.gridLayout->setMargin(pqPropertiesPanel::suggestedMargin());
     this->Ui.gridLayout->setSpacing(pqPropertiesPanel::suggestedHorizontalSpacing());
+
+    // Add location enum values to the buttons
+    this->Ui.toolButtonLL->setProperty("location", QVariant("LowerLeftCorner"));
+    this->Ui.toolButtonLR->setProperty("location", QVariant("LowerRightCorner"));
+    this->Ui.toolButtonLC->setProperty("location", QVariant("LowerCenter"));
+    this->Ui.toolButtonUL->setProperty("location", QVariant("UpperLeftCorner"));
+    this->Ui.toolButtonUR->setProperty("location", QVariant("UpperRightCorner"));
+    this->Ui.toolButtonUC->setProperty("location", QVariant("UpperCenter"));
   }
 
   QString windowLocation;
@@ -70,31 +78,34 @@ pqTextLocationWidget::pqTextLocationWidget(
   {
     this->addPropertyLink(
       this, "windowLocation", SIGNAL(windowLocationChanged(QString&)), smproperty);
+    QObject::connect(this, SIGNAL(windowLocationChanged(QString&)), this, SLOT(updateUI()));
     QObject::connect(
-      ui.groupBoxLocation, SIGNAL(toggled(bool)), this, SLOT(groupBoxLocationClicked(bool)));
+      ui.radioButtonLocation, SIGNAL(clicked()), this, SLOT(radioButtonLocationClicked()));
     QObject::connect(ui.buttonGroupLocation, SIGNAL(buttonClicked(QAbstractButton*)), this,
-      SLOT(emitWindowLocationChangedSignal()));
+      SLOT(radioButtonLocationClicked()));
   }
   else
   {
-    ui.groupBoxLocation->hide();
-    ui.groupBoxPosition->setCheckable(false);
+    ui.radioButtonLocation->hide();
+    ui.radioButtonPosition->setCheckable(false);
   }
 
   smproperty = smgroup->GetProperty("Position");
   if (smproperty)
   {
     QObject::connect(
-      ui.groupBoxPosition, SIGNAL(toggled(bool)), this, SLOT(groupBoxPositionClicked(bool)));
+      ui.radioButtonPosition, SIGNAL(clicked()), this, SLOT(radioButtonPositionClicked()));
     this->addPropertyLink(
-      ui.doubleSpinBox_Pos1X, "value", SIGNAL(valueChanged(double)), smproperty, 0);
+      ui.pos1X, "text2", SIGNAL(textChangedAndEditingFinished()), smproperty, 0);
     this->addPropertyLink(
-      ui.doubleSpinBox_Pos1Y, "value", SIGNAL(valueChanged(double)), smproperty, 1);
+      ui.pos1Y, "text2", SIGNAL(textChangedAndEditingFinished()), smproperty, 1);
   }
   else
   {
-    ui.groupBoxPosition->hide();
+    ui.radioButtonPosition->hide();
   }
+
+  this->updateUI();
 }
 
 //-----------------------------------------------------------------------------
@@ -112,7 +123,8 @@ void pqTextLocationWidget::setWindowLocation(QString& str)
     return;
   }
   this->Internals->windowLocation = str;
-  emit this->windowLocationChanged(str);
+
+  Q_EMIT this->windowLocationChanged(str);
 }
 
 //-----------------------------------------------------------------------------
@@ -122,71 +134,53 @@ QString pqTextLocationWidget::windowLocation() const
 }
 
 //-----------------------------------------------------------------------------
-void pqTextLocationWidget::groupBoxLocationClicked(bool enable)
+void pqTextLocationWidget::radioButtonLocationClicked()
 {
-  this->Internals->Ui.groupBoxPosition->blockSignals(true);
-  this->Internals->Ui.groupBoxPosition->setChecked(!enable);
-  this->Internals->Ui.groupBoxPosition->blockSignals(false);
-  if (!enable)
-  {
-    QString str("AnyLocation");
-    this->setWindowLocation(str);
-  }
-  else
-  {
-    this->emitWindowLocationChangedSignal();
-  }
+  auto button = this->Internals->Ui.buttonGroupLocation->checkedButton();
+  QString locationStr(button->property("location").toString());
+  this->setWindowLocation(locationStr);
 }
 
 //-----------------------------------------------------------------------------
-void pqTextLocationWidget::groupBoxPositionClicked(bool enable)
+void pqTextLocationWidget::radioButtonPositionClicked()
 {
-  this->Internals->Ui.groupBoxLocation->blockSignals(true);
-  this->Internals->Ui.groupBoxLocation->setChecked(!enable);
-  this->Internals->Ui.groupBoxLocation->blockSignals(false);
-  if (enable)
-  {
-    QString str("AnyLocation");
-    this->setWindowLocation(str);
-  }
-  else
-  {
-    this->emitWindowLocationChangedSignal();
-  }
+  QString str("AnyLocation");
+  this->setWindowLocation(str);
 }
 
 //-----------------------------------------------------------------------------
-void pqTextLocationWidget::emitWindowLocationChangedSignal()
+void pqTextLocationWidget::updateUI()
 {
-  Ui::TextLocationWidget& ui = this->Internals->Ui;
-  if (ui.toolButtonLL->isChecked())
+  auto& ui = this->Internals->Ui;
+  QAbstractButton* buttonToCheck = nullptr;
+  const QString& windowLocation = this->Internals->windowLocation;
+
+  bool anyLocation = (windowLocation == "AnyLocation");
+  ui.radioButtonPosition->blockSignals(true);
+  ui.radioButtonPosition->setChecked(anyLocation);
+  ui.radioButtonPosition->blockSignals(false);
+  ui.radioButtonLocation->blockSignals(true);
+  ui.radioButtonLocation->setChecked(!anyLocation);
+  ui.radioButtonLocation->blockSignals(false);
+
+  // Check the selected location button if location is anything other than "AnyLocation"
+  if (!anyLocation)
   {
-    QString str("LowerLeftCorner");
-    this->setWindowLocation(str);
-  }
-  else if (ui.toolButtonLC->isChecked())
-  {
-    QString str("LowerCenter");
-    this->setWindowLocation(str);
-  }
-  else if (ui.toolButtonLR->isChecked())
-  {
-    QString str("LowerRightCorner");
-    this->setWindowLocation(str);
-  }
-  else if (ui.toolButtonUL->isChecked())
-  {
-    QString str("UpperLeftCorner");
-    this->setWindowLocation(str);
-  }
-  else if (ui.toolButtonUC->isChecked())
-  {
-    QString str("UpperCenter");
-    this->setWindowLocation(str);
-  }
-  else if (ui.toolButtonUR->isChecked())
-  {
-    QString str("UpperRightCorner");
-    this->setWindowLocation(str);
+    QList<QAbstractButton*> toolButtons = this->Internals->Ui.buttonGroupLocation->buttons();
+    for (QAbstractButton* toolButton : toolButtons)
+    {
+      if (toolButton->property("location") == windowLocation)
+      {
+        buttonToCheck = toolButton;
+        break;
+      }
+    }
+
+    if (buttonToCheck)
+    {
+      bool blocked = buttonToCheck->blockSignals(true);
+      buttonToCheck->setChecked(true);
+      buttonToCheck->blockSignals(blocked);
+    }
   }
 }

@@ -93,7 +93,8 @@ pqPreviewMenuManager::pqPreviewMenuManager(QMenu* menu)
   , FirstCustomAction(nullptr)
 {
   QStringList defaultItems;
-  defaultItems << "1280 x 800 (WXGA)"
+  defaultItems << "1280 x 720 (HD)"
+               << "1280 x 800 (WXGA)"
                << "1280 x 1024 (SXGA)"
                << "1600 x 900 (HD+)"
                << "1920 x 1080 (FHD)"
@@ -122,8 +123,11 @@ void pqPreviewMenuManager::init(const QStringList& defaultItems, QMenu* menu)
     menu->addSeparator();
   }
   menu->addAction("Custom ...", this, SLOT(addCustom()));
-  this->connect(
-    &pqActiveObjects::instance(), SIGNAL(viewChanged(pqView*)), SLOT(updateEnabledState()));
+
+  this->Timer.setSingleShot(true);
+  this->Timer.setInterval(500);
+  this->Timer.connect(&pqActiveObjects::instance(), SIGNAL(viewChanged(pqView*)), SLOT(start()));
+  this->connect(&this->Timer, SIGNAL(timeout()), SLOT(updateEnabledState()));
   this->updateEnabledState();
 }
 

@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2019 NVIDIA Corporation. All rights reserved.
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
  *****************************************************************************/
 /// \file
 /// \brief Interface for a scene
@@ -16,9 +16,9 @@
 #include <nv/index/idistributed_data_import_callback.h>
 #include <nv/index/iheight_field_scene_element.h>
 #include <nv/index/iirregular_volume_scene_element.h>
+#include <nv/index/iparticle_volume_scene_element.h>
 #include <nv/index/ipipe_set.h>
 #include <nv/index/iregular_heightfield.h>
-#include <nv/index/iregular_volume.h>
 #include <nv/index/iscene_group.h>
 #include <nv/index/ishape.h>
 #include <nv/index/isparse_volume_scene_element.h>
@@ -28,7 +28,6 @@ namespace nv
 {
 namespace index
 {
-/// @ingroup nv_index_scene_description
 
 /// The abstract interface class representing the entire scene. The scene is
 /// also the root node of the scene description and therefore implements the
@@ -42,6 +41,8 @@ namespace index
 /// of datasets. A scene defines a <em>global region of interest</em>
 /// which is the bounding box that can be used to confine rendering to a subset
 /// of the entire world space.
+///
+/// \ingroup nv_index_scene_description
 ///
 class IScene :
     public mi::base::Interface_declare<0xaab98430,0xd6c5,0x49c5,0xbf,0x06,0x12,0xae,0xe5,0x17,0x71,0x8c,
@@ -112,18 +113,21 @@ public:
     ///@}
 
     ///////////////////////////////////////////////////////////////////////////////////
-    /// \name Creating shapes.
+    /// \name Creating higher-level object space shapes and image space shapes.
     ///@{
 
-    /// Creates a new shape of the given type, but does not yet add it to the
-    /// scene description.
+    /// Creates a new shape of the given type, but does not yet add it to the scene description.
+    ///
     /// \param[in] class_id Identifier of the type of shape
-    /// \return The new \c IScene
+    ///
+    /// \return     Returns an instance of \c IShape.
+    ///
     virtual IShape* create_shape(const mi::base::Uuid& class_id) const = 0;
 
-    /// Creates a new shape of the given type, but does not yet add it to the
-    /// scene description.
-    /// \return The new \c IScene
+    /// Creates a new shape of the given type, but does not yet add it to the scene description.
+    ///
+    /// \return     Returns an instance of \c IShape.
+    ///
     template<class T>
     T* create_shape() const
     {
@@ -151,32 +155,9 @@ public:
     }
     ///@}
 
-    /// Creates a new volume scene element from the given import configuration,
-    /// but does not yet add it to the scene description.
-    ///
-    /// The scene element can be transformed by specifying scaling, a rotation
-    /// around its local K-axis, and a translation. These transformations
-    /// generate the matrix that will be returned by \c
-    /// IRegular_volume::get_transform() and is applied to transform the scene
-    /// element from IJK to XYZ space.
-    ///
-    /// \param[in] scaling            Scaling; use (1, 1, 1) to disable.
-    /// \param[in] rotation_k         Rotation around the K-axis (in radians).
-    /// \param[in] translation        Translation; use (0, 0, 0) to remain at the origin.
-    /// \param[in] size               Size of the entire volume data in each dimension
-    ///                                 (in voxels).
-    /// \param[in] importer_callback  Distributed data import callback function.
-    /// \param[in] dice_transaction   The DiCE transaction.
-    ///
-    /// \return The new \c IRegular_volume instance.
-    ///
-    virtual IRegular_volume* create_volume(
-        const mi::math::Vector_struct<mi::Float32, 3>&          scaling,
-        mi::Float32                                             rotation_k,
-        const mi::math::Vector_struct<mi::Float32, 3>&          translation,
-        const mi::math::Vector_struct<mi::Uint32, 3>&           size,
-        nv::index::IDistributed_data_import_callback*           importer_callback,
-        mi::neuraylib::IDice_transaction*                       dice_transaction) const = 0;
+    ///////////////////////////////////////////////////////////////////////////////////
+    /// \name Creating higher-level object space shapes and image space shapes.
+    ///@{
 
     /// Creates a new irregular volume scene element from the given import configuration, but does not yet
     /// add it to the scene description.
@@ -223,7 +204,7 @@ public:
     /// \param[in] importer_callback            Distributed data import callback function.
     /// \param[in] dice_transaction             The DiCE transaction.
     ///
-    /// \return                                 The new \c ISparse_volume_scene_element instance.
+    /// \return                                 The new \c ICorner_point_grid instance.
     ///
     virtual ICorner_point_grid* create_corner_point_grid(
         const mi::math::Vector_struct<mi::Uint32, 3>&           grid_dims,
@@ -232,6 +213,31 @@ public:
         nv::index::IDistributed_data_import_callback*           importer_callback,
         mi::neuraylib::IDice_transaction*                       dice_transaction) const = 0;
 
+    /// Creates a new particle volume scene element from the given import configuration, but does not yet
+    /// add it to the scene description.
+    ///
+    /// \param[in] ijk_bbox                     The local space bounding box.
+    /// \param[in] transform_matrix             Transformation matrix from IJK (local) to XYZ (global) space.
+    /// \param[in] importer_callback            Distributed data import callback function.
+    /// \param[in] dice_transaction             The DiCE transaction.
+    ///
+    /// \return                                 The new \c IParticle_volume_scene_element instance.
+    ///
+    virtual IParticle_volume_scene_element* create_particle_volume(
+        const mi::math::Bbox_struct<mi::Float32, 3> &           ijk_bbox,
+        const mi::math::Matrix_struct<mi::Float32, 4, 4>&       transform_matrix,
+        nv::index::IDistributed_data_import_callback*           importer_callback,
+        mi::neuraylib::IDice_transaction*                       dice_transaction) const = 0;
+
+    /// Creates a new pipe set scene element from the given import configuration, but does not yet
+    /// add it to the scene description.
+    ///
+    /// \param[in] bbox                         The object space bounding box.
+    /// \param[in] importer_callback            Distributed data import callback function.
+    /// \param[in] dice_transaction             The DiCE transaction.
+    ///
+    /// \return                                 Returns a new \c IPipe_set instance.
+    ///
     virtual IPipe_set* create_pipe_set(
         const mi::math::Bbox_struct<mi::Float32, 3>&                bbox,
         nv::index::IDistributed_data_import_callback*               importer_callback,
@@ -336,6 +342,7 @@ public:
         const mi::math::Bbox_struct<mi::Float32, 3> &           ijk_bbox,
         nv::index::IDistributed_data_import_callback*           importer_callback,
         mi::neuraylib::IDice_transaction*                       dice_transaction) const = 0;
+    ///@}
 
     ///////////////////////////////////////////////////////////////////////////////////
     /// \name Bounding boxes and region of interest

@@ -36,6 +36,7 @@ set(classes
   pqAnimatablePropertiesComboBox
   pqAnimatableProxyComboBox
   pqAnimationManager
+  pqAnimationProgressDialog
   pqAnimationTimeWidget
   pqAnimationViewWidget
   pqArrayListDomain
@@ -62,6 +63,7 @@ set(classes
   pqCustomFilterManager
   pqCustomFilterManagerModel
   pqCustomViewpointButtonDialog
+  pqDataAssemblyTreeModel
   pqDataInformationModel
   pqDataInformationWidget
   pqDialog
@@ -99,6 +101,7 @@ set(classes
   pqLiveInsituManager
   pqLiveInsituVisualizationManager
   pqLockViewSizeCustomDialog
+  pqLogViewerDialog
   pqMemoryInspectorPanel
   pqMultiBlockInspectorWidget
   pqMultiQueryClauseWidget
@@ -138,9 +141,8 @@ set(classes
   pqRescaleRange
   pqSILModel
   pqSILWidget
+  pqSingleLogViewerWidget
   pqSMSignalAdaptors
-  pqSampleScalarAddRangeDialog
-  pqSampleScalarWidget
   pqScalarSetModel
   pqScalarValueListPropertyWidget
   pqSearchBox
@@ -218,6 +220,7 @@ set(ui_files
   Resources/UI/pqLinksEditor.ui
   Resources/UI/pqLinksManager.ui
   Resources/UI/pqLockViewSizeCustomDialog.ui
+  Resources/UI/pqLogViewerDialog.ui
   Resources/UI/pqMemoryInspectorPanelForm.ui
   Resources/UI/pqMultiBlockInspectorWidget.ui
   Resources/UI/pqOrbitCreatorDialog.ui
@@ -235,8 +238,6 @@ set(ui_files
   Resources/UI/pqRemoteCommandDialogForm.ui
   Resources/UI/pqRemoteCommandTemplateDialogForm.ui
   Resources/UI/pqRescaleRangeDialog.ui
-  Resources/UI/pqSampleScalarAddRangeDialog.ui
-  Resources/UI/pqSampleScalarWidget.ui
   Resources/UI/pqScalarValueListPropertyWidget.ui
   Resources/UI/pqSearchBox.ui
   Resources/UI/pqSelectReaderDialog.ui
@@ -251,6 +252,15 @@ set(ui_files
 
 set(resource_files
   Resources/pqComponents.qrc)
+
+if (NOT VTK_LEGACY_REMOVE)
+  list(APPEND classes
+    pqSampleScalarAddRangeDialog
+    pqSampleScalarWidget)
+  list(APPEND ui_files
+    Resources/UI/pqSampleScalarAddRangeDialog.ui
+    Resources/UI/pqSampleScalarWidget.ui)
+endif()
 
 vtk_module_find_package(
   PACKAGE     Qt5

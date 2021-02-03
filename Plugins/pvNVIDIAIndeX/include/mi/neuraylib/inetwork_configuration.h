@@ -1,5 +1,5 @@
 /***************************************************************************************************
- * Copyright 2019 NVIDIA Corporation. All rights reserved.
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
  **************************************************************************************************/
 /// \file
 /// \brief API component for networking related settings.
@@ -168,6 +168,9 @@ public:
     /// IPv6 addresses need to be surrounded by brackets but can otherwise be used just like its
     /// IPv4 counterparts mentioned above. The address [::] means the ``any IPv6 interface''
     /// address.
+    ///
+    /// It is also possible to specify an interface name instead of an address. DiCE will
+    /// then take the address from the interface.
     ///
     /// This can only be configured before \NeurayProductName has been started.
     ///

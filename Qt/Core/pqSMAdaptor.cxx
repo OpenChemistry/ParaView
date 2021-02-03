@@ -39,8 +39,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QtDebug>
 
 // vtk includes
-#include "vtkConfigure.h" // for 64-bitness
 #include "vtkNew.h"
+#include "vtkOptions.h" // for 64-bitness
 #include "vtkSmartPointer.h"
 #include "vtkStringList.h"
 
@@ -84,6 +84,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cassert>
 #include <set>
+
+#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+#define QT_ENDL endl
+#else
+#define QT_ENDL Qt::endl
+#endif
 
 namespace
 {
@@ -632,7 +638,7 @@ void pqSMAdaptor::setSelectionProperty(
 
   if (value.size() != 2)
   {
-    qCritical() << "Method expected a list of pairs. Incorrect API." << endl;
+    qCritical() << "Method expected a list of pairs. Incorrect API." << QT_ENDL;
     return;
   }
 
@@ -703,7 +709,7 @@ void pqSMAdaptor::setSelectionProperty(
   {
     if (value.size() != 2)
     {
-      qCritical() << "Method expected a list of pairs. Incorrect API." << endl;
+      qCritical() << "Method expected a list of pairs. Incorrect API." << QT_ENDL;
     }
     QString name = value[0].toString();
     int status = value[1].toInt();
@@ -1752,12 +1758,10 @@ QVariant pqSMAdaptor::convertToQVariant(const vtkVariant& variant)
     case VTK_UNSIGNED___INT64:
       return variant.ToTypeUInt64();
 #endif
-#ifdef VTK_TYPE_USE_LONG_LONG
     case VTK_LONG_LONG:
       return variant.ToLongLong();
     case VTK_UNSIGNED_LONG_LONG:
       return variant.ToUnsignedLongLong();
-#endif
     case VTK_FLOAT:
       return variant.ToFloat();
     case VTK_DOUBLE:

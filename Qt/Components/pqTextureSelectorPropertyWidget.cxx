@@ -46,6 +46,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "vtkPVXMLElement.h"
 #include "vtkSMPropertyHelper.h"
 #include "vtkSMProxyGroupDomain.h"
+#include "vtkSMTrace.h"
 
 // Qt Includes
 #include <QVBoxLayout>
@@ -99,6 +100,9 @@ pqTextureSelectorPropertyWidget::pqTextureSelectorPropertyWidget(
     {
       QObject::connect(this->Representation, &pqDataRepresentation::dataUpdated, this,
         [=] { this->checkAttributes(checkTCoords, checkTangents); });
+
+      QObject::connect(this->Representation, &pqDataRepresentation::attrArrayNameModified, this,
+        [=] { this->checkAttributes(checkTCoords, checkTangents); });
     }
     this->checkAttributes(checkTCoords, checkTangents);
   }
@@ -107,12 +111,13 @@ pqTextureSelectorPropertyWidget::pqTextureSelectorPropertyWidget(
 //-----------------------------------------------------------------------------
 void pqTextureSelectorPropertyWidget::onTextureChanged(vtkSMProxy* texture)
 {
+  SM_SCOPED_TRACE(ChooseTexture).arg(this->proxy()).arg(texture).arg(this->property());
   BEGIN_UNDO_SET("Texture Change");
   vtkSMPropertyHelper(this->property()).Set(texture);
   this->proxy()->UpdateVTKObjects();
   END_UNDO_SET();
-  emit this->changeAvailable();
-  emit this->changeFinished();
+  Q_EMIT this->changeAvailable();
+  Q_EMIT this->changeFinished();
 }
 
 //-----------------------------------------------------------------------------
@@ -148,4 +153,8 @@ void pqTextureSelectorPropertyWidget::checkAttributes(bool tcoords, bool tangent
     }
   }
   this->Selector->setEnabled(enable);
+  if (enable)
+  {
+    this->setToolTip("");
+  }
 }

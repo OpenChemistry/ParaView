@@ -13,8 +13,15 @@
 #include <string>
 #include <vtk_pugixml.h>
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+#define QT_ENDL endl
+#else
+#define QT_ENDL Qt::endl
+#endif
+
 #define pqErrorMacro(estr)                                                                         \
-  qDebug() << "Error in:" << endl << __FILE__ << ", line " << __LINE__ << endl << "" estr << endl;
+  qDebug() << "Error in:" << QT_ENDL << __FILE__ << ", line " << __LINE__ << QT_ENDL << "" estr    \
+           << QT_ENDL;
 
 // User interface
 //=============================================================================
@@ -87,7 +94,7 @@ public:
       {
         arow.DeleteButton = new QToolButton(this->Parent);
         arow.DeleteButton->setObjectName(QString("delete%1").arg(cc));
-        arow.DeleteButton->setIcon(QIcon(":/QtWidgets/Icons/pqDelete24.png"));
+        arow.DeleteButton->setIcon(QIcon(":/QtWidgets/Icons/pqDelete.svg"));
         arow.DeleteButton->setProperty("pqCustomViewpointButtonDialog_INDEX", cc);
         this->gridLayout->addWidget(arow.DeleteButton, cc + 1, 3);
         this->Parent->connect(arow.DeleteButton, SIGNAL(clicked()), SLOT(deleteRow()));

@@ -52,19 +52,19 @@ class PQAPPLICATIONCOMPONENTS_EXPORT pqCustomViewpointsToolbar : public QToolBar
 public:
   pqCustomViewpointsToolbar(const QString& title, QWidget* parentObject = 0)
     : Superclass(title, parentObject)
-    , BasePixmap(30, 30)
+    , BasePixmap(64, 64)
   {
     this->constructor();
   }
   pqCustomViewpointsToolbar(QWidget* parentObject = 0)
     : Superclass(parentObject)
-    , BasePixmap(30, 30)
+    , BasePixmap(64, 64)
   {
     this->constructor();
   }
   ~pqCustomViewpointsToolbar() override = default;
 
-protected slots:
+protected Q_SLOTS:
 
   /**
    * Clear and recreate all custom viewpoint actions

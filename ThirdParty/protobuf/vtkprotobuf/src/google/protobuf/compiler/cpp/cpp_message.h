@@ -141,10 +141,10 @@ class MessageGenerator {
   void GenerateMergeFromCodedStream(io::Printer* printer);
   void GenerateSerializeWithCachedSizes(io::Printer* printer);
   void GenerateSerializeWithCachedSizesToArray(io::Printer* printer);
-  void GenerateSerializeWithCachedSizesBody(io::Printer* printer,
-                                            bool to_array);
+  void GenerateSerializeWithCachedSizesBody(io::Printer* printer);
   void GenerateByteSize(io::Printer* printer);
   void GenerateMergeFrom(io::Printer* printer);
+  void GenerateClassSpecificMergeFrom(io::Printer* printer);
   void GenerateCopyFrom(io::Printer* printer);
   void GenerateSwap(io::Printer* printer);
   void GenerateIsInitialized(io::Printer* printer);
@@ -155,16 +155,14 @@ class MessageGenerator {
   //   cached_has_bits = _has_bits_[cached_has_bit_index]
   // for cached_has_bit_index >= 0
   void GenerateSerializeOneField(io::Printer* printer,
-                                 const FieldDescriptor* field, bool unbounded,
+                                 const FieldDescriptor* field,
                                  int cached_has_bits_index);
   // Generate a switch statement to serialize 2+ fields from the same oneof.
   // Or, if fields.size() == 1, just call GenerateSerializeOneField().
   void GenerateSerializeOneofFields(
-      io::Printer* printer, const std::vector<const FieldDescriptor*>& fields,
-      bool to_array);
+      io::Printer* printer, const std::vector<const FieldDescriptor*>& fields);
   void GenerateSerializeOneExtensionRange(
-      io::Printer* printer, const Descriptor::ExtensionRange* range,
-      bool unbounded);
+      io::Printer* printer, const Descriptor::ExtensionRange* range);
 
   // Generates has_foo() functions and variables for singular field has-bits.
   void GenerateSingularFieldHasBits(const FieldDescriptor* field,
@@ -183,6 +181,10 @@ class MessageGenerator {
                                bool copy_constructor) const;
 
   size_t HasBitsSize() const;
+  int HasBitIndex(const FieldDescriptor* a) const;
+  int HasByteIndex(const FieldDescriptor* a) const;
+  int HasWordIndex(const FieldDescriptor* a) const;
+  bool SameHasByte(const FieldDescriptor* a, const FieldDescriptor* b) const;
   std::vector<uint32> RequiredFieldsBitMask() const;
 
   const Descriptor* descriptor_;

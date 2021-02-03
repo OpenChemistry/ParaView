@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2019 NVIDIA Corporation. All rights reserved.
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
  *****************************************************************************/
 /// \file
 /// \brief Scene attribute controlling corner-point grid rendering properties.
@@ -14,9 +14,9 @@
 namespace nv {
 namespace index {
 
-/// @ingroup nv_index_scene_description_attribute
-/// 
 /// The interface class representing rendering properties for corner-point grid data.
+///
+/// \ingroup nv_index_scene_description_attribute
 ///
 class ICorner_point_grid_rendering_properties :
     public mi::base::Interface_declare<0x4df63b2c,0x7e24,0x4e16,0xa9,0x64,0x2e,0xbd,0x41,0x9e,0xc4,0x51,
@@ -52,8 +52,11 @@ public:
     /// Returns if the pre-integrated volume rendering is enabled or disabled.
     virtual bool                        get_preintegrated_volume_rendering() const = 0;
 
-    /// Internal debugging options.
+    /// Internal debugging options applied to the visualization.
+    /// \param[in] o                Debug option applied to the visualization.   
     virtual void                        set_debug_visualization_option(mi::Uint32 o) = 0;
+    /// Internal debugging options applied to the visualization.
+    /// \return                     Returns the applied debug option.   
     virtual mi::Uint32                  get_debug_visualization_option() const = 0;
 };
 

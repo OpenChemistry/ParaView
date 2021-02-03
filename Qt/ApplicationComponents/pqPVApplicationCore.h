@@ -88,7 +88,7 @@ public:
 
   /**
   * Provides access to the python manager. This is non-null only when paraview
-  * is compiled with python support i.e. PARAVIEW_ENABLE_PYTHON is ON.
+  * is compiled with python support i.e. PARAVIEW_USE_PYTHON is ON.
   */
   pqPythonManager* pythonManager() const;
 
@@ -102,7 +102,7 @@ public:
 
   void loadStateFromPythonFile(const QString& filename, pqServer* server);
 
-public slots:
+public Q_SLOTS:
   /**
   * Pops-up the quick launch dialog.
   */
@@ -113,7 +113,7 @@ public slots:
   */
   void startSearch();
 
-signals:
+Q_SIGNALS:
   /**
   * Emitted whenever the quickLaunch dialog is about to show.  This can be used
   * to update the menu items (QActions) that will be shown in the quick-launch

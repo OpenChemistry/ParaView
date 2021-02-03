@@ -71,8 +71,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sstream>
 #include <string>
 
+#if QT_VERSION < QT_VERSION_CHECK(5, 14, 0)
+#define QT_ENDL endl
+#else
+#define QT_ENDL Qt::endl
+#endif
+
 #define pqErrorMacro(estr)                                                                         \
-  qDebug() << "Error in:" << endl << __FILE__ << ", line " << __LINE__ << endl << "" estr << endl;
+  qDebug() << "Error in:" << QT_ENDL << __FILE__ << ", line " << __LINE__ << QT_ENDL << "" estr    \
+           << QT_ENDL;
 
 namespace
 {
@@ -153,7 +160,7 @@ public:
     this->PlusButton = new QToolButton();
     this->PlusButton->setObjectName("AddButton");
     this->PlusButton->setToolTip(QToolButton::tr("Add Current Viewpoint"));
-    this->PlusButton->setIcon(QIcon(":/QtWidgets/Icons/pqPlus16.png"));
+    this->PlusButton->setIcon(QIcon(":/QtWidgets/Icons/pqPlus.svg"));
     this->PlusButton->setMinimumSize(QSize(34, 34));
   }
 
@@ -619,7 +626,8 @@ bool pqCameraDialog::configureCustomViewpoints(
   QString currentConfig(os.str().c_str());
 
   // user modifies the configuration
-  pqCustomViewpointButtonDialog dialog(parentWidget, 0, toolTips, configs, currentConfig);
+  pqCustomViewpointButtonDialog dialog(
+    parentWidget, Qt::WindowFlags{}, toolTips, configs, currentConfig);
   if (dialog.exec() == QDialog::Accepted)
   {
     // save the new configuration into the app wide settings.

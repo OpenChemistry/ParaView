@@ -37,9 +37,7 @@ paraview_client_add(
   [FORCE_UNIX_LAYOUT    <ON|OFF>]
   [BUNDLE_DESTINATION   <directory>]
   [RUNTIME_DESTINATION  <directory>]
-  [LIBRARY_DESTINATION  <directory>]
-
-  [PLUGINS_TARGET   <target>])
+  [LIBRARY_DESTINATION  <directory>])
 ```
 
   * `NAME`: (Required) The name of the application. This is used as the target
@@ -53,8 +51,6 @@ paraview_client_add(
   * `MAIN_WINDOW_INCLUDE`: (Defaults to `QMainWindow` or
     `<MAIN_WINDOW_CLASS>.h` if it is specified) The include file for the main
     window.
-  * `PLUGINS_TARGET`: (Deprecated for `PLUGINS_TARGETS`.) The target for static
-    plugins. The associated function will be called upon startup.
   * `PLUGINS_TARGETS`: The targets for plugins. The associated functions
     will be called upon startup.
   * `REQUIRED_PLUGINS`: Plugins to load upon startup.
@@ -64,7 +60,7 @@ paraview_client_add(
   * `ORGANIZATION`: (Defaults to `Anonymous`) The organization for the
     application. This is used for the macOS GUI identifier.
   * `TITLE`: The window title for the application.
-  * `DEFAULT_STYLE`: The default Qt style for the application (e.g., plastique or windows).
+  * `DEFAULT_STYLE`: The default Qt style for the application.
   * `APPLICATION_ICON`: The path to the icon for the Windows application.
   * `BUNDLE_ICON`: The path to the icon for the macOS bundle.
   * `BUNDLE_PLIST`: The path to the `Info.plist.in` template.
@@ -210,14 +206,14 @@ IDI_ICON1 ICON \"${_paraview_client_APPLICATION_ICON}\"\n")
         "${_paraview_client_appicon_file}")
     endif ()
 
-    set(_paraview_client_executable_flags
+    list(APPEND _paraview_client_executable_flags
       WIN32)
   elseif (APPLE)
     # TODO: nib files
 
-    set(_paraview_client_bundle_args
+    list(APPEND _paraview_client_bundle_args
       BUNDLE DESTINATION "${_paraview_client_BUNDLE_DESTINATION}")
-    set(_paraview_client_executable_flags
+    list(APPEND _paraview_client_executable_flags
       MACOSX_BUNDLE)
   endif ()
 
@@ -374,17 +370,17 @@ IDI_ICON1 ICON \"${_paraview_client_APPLICATION_ICON}\"\n")
     PRIVATE
       "${CMAKE_CURRENT_SOURCE_DIR}"
       "${CMAKE_CURRENT_BINARY_DIR}"
-      # https://gitlab.kitware.com/cmake/cmake/issues/18049
+      # https://gitlab.kitware.com/cmake/cmake/-/issues/18049
       "$<TARGET_PROPERTY:VTK::vtksys,INTERFACE_INCLUDE_DIRECTORIES>")
   target_link_libraries("${_paraview_client_NAME}"
     PRIVATE
-      Qt5::Widgets
       ParaView::pqApplicationComponents
+      Qt5::Widgets
       VTK::vtksys)
 
   set(_paraview_client_export)
   if (DEFINED _paraview_client_EXPORT)
-    set(_paraview_client_export
+    list(APPEND _paraview_client_export
       EXPORT "${_paraview_client_EXPORT}")
   endif ()
 
@@ -405,8 +401,8 @@ IDI_ICON1 ICON \"${_paraview_client_APPLICATION_ICON}\"\n")
     set(_paraview_client_conf_destination
       "${_paraview_client_binary_destination}")
     if (APPLE)
-      set(_paraview_client_binary_destination
-        "${_paraview_client_RUNTIME_DESTINATION}/${_paraview_client_NAME}.app/Contents/Resources")
+      string(APPEND _paraview_client_binary_destination
+        "/${_paraview_client_NAME}.app/Contents/Resources")
       set(_paraview_client_conf_destination
         "${_paraview_client_BUNDLE_DESTINATION}/${_paraview_client_NAME}.app/Contents/Resources")
     endif ()
@@ -535,9 +531,12 @@ function (paraview_client_documentation)
       "${_paraview_client_doc_xml}")
   endforeach ()
 
-  # Escaping in order to pass as an argument.
-  set(_paraview_client_doc_xmls_list "${_paraview_client_doc_xmls}")
-  _paraview_client_escape_cmake_list(_paraview_client_doc_xmls)
+  # Save xmls to a temporary file.
+  set (_paraview_client_doc_xmls_file
+    "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_paraview_client_doc_TARGET}-xmls.txt")
+  file(GENERATE
+    OUTPUT "${_paraview_client_doc_xmls_file}"
+    CONTENT "${_paraview_client_doc_xmls}")
 
   add_custom_command(
     OUTPUT  "${_paraview_client_doc_OUTPUT_DIR}/${_paraview_client_doc_TARGET}.xslt"
@@ -546,10 +545,11 @@ function (paraview_client_documentation)
             "-Dxmlpatterns=${qt_xmlpatterns_executable}"
             "-Doutput_dir=${_paraview_client_doc_OUTPUT_DIR}"
             "-Doutput_file=${_paraview_client_doc_OUTPUT_DIR}/${_paraview_client_doc_TARGET}.xslt"
-            "-Dxmls=${_paraview_client_doc_xmls}"
+            "-Dxmls_file=${_paraview_client_doc_xmls_file}"
             -D_paraview_generate_proxy_documentation_run=ON
             -P "${_ParaViewClient_script_file}"
     DEPENDS ${_paraview_client_doc_xmls_list}
+            "${_paraview_client_doc_xmls_file}"
             "${_ParaViewClient_script_file}"
             "${_ParaViewClient_cmake_dir}/paraview_servermanager_convert_xml.xsl"
             "${_ParaViewClient_cmake_dir}/paraview_servermanager_convert_categoryindex.xsl"
@@ -565,7 +565,8 @@ endfunction ()
 
 # Generate proxy documentation.
 if (_paraview_generate_proxy_documentation_run AND CMAKE_SCRIPT_MODE_FILE)
-  _paraview_client_unescape_cmake_list(xmls)
+
+  file(READ "${xmls_file}" xmls)
 
   set(_paraview_gpd_to_xml "${CMAKE_CURRENT_LIST_DIR}/paraview_servermanager_convert_xml.xsl")
   set(_paraview_gpd_to_catindex "${CMAKE_CURRENT_LIST_DIR}/paraview_servermanager_convert_categoryindex.xsl")
@@ -801,7 +802,7 @@ function (paraview_client_generate_help)
   set(_paraview_client_help_copy_sources)
   set(_paraview_client_help_copied_sources)
   if (DEFINED _paraview_client_help_SOURCE_DIR)
-    set(_paraview_client_help_copy_sources
+    list(APPEND _paraview_client_help_copy_sources
       COMMAND "${CMAKE_COMMAND}" -E copy_directory
               "${_paraview_client_help_SOURCE_DIR}"
               "${_paraview_client_help_OUTPUT_DIR}")
@@ -836,7 +837,8 @@ function (paraview_client_generate_help)
             -D_paraview_generate_help_run=ON
             -P "${_ParaViewClient_script_file}"
     VERBATIM
-    COMMAND Qt5::qhelpgenerator
+    COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR}
+            $<TARGET_FILE:Qt5::qhelpgenerator>
             "${_paraview_client_help_qhp}"
             -s
             -o "${_paraview_client_help_output}"

@@ -39,25 +39,31 @@
 #define vtkResampleToHyperTreeGrid_h
 
 #include "vtkAlgorithm.h"
+#include "vtkBoundingBox.h"                   // To store the bounding box of local process
 #include "vtkFiltersHyperTreeGridADRModule.h" // For export macro
-#include "vtkTuple.h"
+#include "vtkSmartPointer.h"                  // For BroadcastHyperTreeOwnership
+#include "vtkTuple.h"                         // For internal methods
 
+#include <queue>
 #include <unordered_map>
 #include <vector>
 
-class vtkAbstractArrayMeasurement;
 class vtkAbstractAccumulator;
+class vtkAbstractArrayMeasurement;
 class vtkBitArray;
 class vtkCell;
 class vtkCell3D;
 class vtkDataArray;
+class vtkDataArraySelection;
 class vtkDataSet;
 class vtkDoubleArray;
 class vtkHyperTreeGrid;
 class vtkHyperTreeGridNonOrientedCursor;
+class vtkHyperTreeGridNonOrientedVonNeumannSuperCursor;
 class vtkInformation;
 class vtkInformationVector;
 class vtkLongArray;
+class vtkMultiProcessController;
 class vtkVoxel;
 
 class VTKFILTERSHYPERTREEGRIDADR_EXPORT vtkResampleToHyperTreeGrid : public vtkAlgorithm
@@ -66,7 +72,14 @@ public:
   static vtkResampleToHyperTreeGrid* New();
   vtkTypeMacro(vtkResampleToHyperTreeGrid, vtkAlgorithm);
   void PrintSelf(ostream& os, vtkIndent indent) override;
-  virtual vtkMTimeType GetMTime() override;
+
+  //@{
+  /**
+   * Set/Get the multi-process controller.
+   */
+  vtkSetMacro(Controller, vtkMultiProcessController*);
+  vtkGetMacro(Controller, vtkMultiProcessController*);
+  //@}
 
   //@{
   /**
@@ -117,8 +130,8 @@ public:
    * hyper trees.
    * The default is [4, 4, 4].
    */
-  vtkSetVector3Macro(Dimensions, unsigned int);
-  vtkGetVector3Macro(Dimensions, unsigned int);
+  vtkSetVector3Macro(Dimensions, int);
+  vtkGetVector3Macro(Dimensions, int);
   //@}
 
   //@{
@@ -187,8 +200,7 @@ public:
   vtkSetMacro(MinimumNumberOfPointsInSubtree, vtkIdType);
   //@}
 
-  virtual int ProcessRequest(
-    vtkInformation*, vtkInformationVector**, vtkInformationVector*) override;
+  int ProcessRequest(vtkInformation*, vtkInformationVector**, vtkInformationVector*) override;
 
   int RequestDataObject(
     vtkInformation*, vtkInformationVector** inputVector, vtkInformationVector* outputVector);
@@ -203,6 +215,21 @@ public:
   void SetMaxState(bool state);
   void SetMinState(bool state);
   //@}
+
+  //@{
+  /**
+   * Getter / Setter on the boolean flag Extrapolate.
+   * It is set to true by default. If set to true, on point-based scalar input, cells of the
+   * output hyper tree grid intersecting the geometry of the input data set, but not including
+   * any input points, are extrapolated by iterative averages of neighbors with data.
+   */
+  vtkGetMacro(Extrapolate, bool);
+  vtkSetMacro(Extrapolate, bool);
+  vtkBooleanMacro(Extrapolate, bool);
+  //@}
+
+  void AddDataArray(const char* name);
+  void ClearDataArrays();
 
 protected:
   vtkResampleToHyperTreeGrid();
@@ -220,7 +247,7 @@ protected:
   int GenerateTrees(vtkHyperTreeGrid*);
 
   unsigned int BranchFactor;
-  unsigned int Dimensions[3];
+  int Dimensions[3];
   unsigned int MaxDepth;
 
   /**
@@ -259,7 +286,7 @@ protected:
     /**
      * Accumulators used for measuring quantities on subtrees
      */
-    std::vector<vtkAbstractAccumulator*> Accumulators;
+    std::vector<vtkSmartPointer<vtkAbstractArrayMeasurement> > ArrayMeasurements;
 
     vtkIdType NumberOfLeavesInSubtree;
     vtkIdType NumberOfPointsInSubtree;
@@ -279,6 +306,16 @@ protected:
   };
 
   /**
+   * Pointers used to determine what resampling metric is used for the subdivision criterion.
+   */
+  vtkAbstractArrayMeasurement* ArrayMeasurement;
+
+  /**
+   * Pointers used to determine what resampling metric is used for the list of input scalar fields.
+   */
+  vtkAbstractArrayMeasurement* ArrayMeasurementDisplay;
+
+  /**
    * Only needed internally. This draws a multi resolution grid that should have this->MaxDepth+1
    * grids.
    * The resolution of each grid depends on the branch factor and the depth.
@@ -291,6 +328,104 @@ protected:
    * this->CoordinatesToIndex is the inverse function of this->IndexToCoordinates.
    */
   typedef std::vector<std::unordered_map<vtkIdType, GridElement> > MultiResGridType;
+
+  //@{
+  /**
+   * Priority queue / element used for extrapolating empty leaves in the case of point based htg
+   * resampling.
+   * The issue is that if an htg cell does not have any point, i.e. does not have data, the base
+   * algorithm produces a masked cell, which is not what the user might want. If there is geometry
+   * but no data, the user can then trigger data extrapolation on such cells. The algorithm
+   * uses this priority queue to extrapolate the data to those cells. It is implemented in
+   * vtkResampleToHyperTreeGrid::ExtrapolateValuesOnGaps, refer to it for more details.
+   */
+  struct PriorityQueueElement
+  {
+    /**
+     * Constructor
+     */
+    PriorityQueueElement()
+      : Key(0)
+      , Id(0)
+    {
+    }
+    PriorityQueueElement(vtkIdType key, vtkIdType id, const std::vector<double>&& means,
+      const std::vector<double>&& invalidNeighborIds)
+      : Key(key)
+      , Id(id)
+      , Means(means)
+      , InvalidNeighborIds(std::move(invalidNeighborIds))
+    {
+    }
+
+    /**
+     * Key used to sort elements in priority queue. It should be the number of valid neighbors
+     * of a htg cell.
+     */
+    vtkIdType Key;
+
+    /**
+     * Id of corresponding htg cell
+     */
+    vtkIdType Id;
+
+    /**
+     * Accumulated means for each scalar field (not normalized until the end of the algorithm)
+     */
+    std::vector<double> Means;
+
+    /**
+     * Invalid neighbors ids, i.e. neighbors not having data. They will be updated through the
+     * procedure
+     * and will eventually have data at some point.
+     */
+    std::vector<double> InvalidNeighborIds;
+
+    bool operator<(const PriorityQueueElement& el) const { return this->Key < el.Key; }
+  };
+
+  typedef std::priority_queue<PriorityQueueElement> PriorityQueue;
+  //@}
+
+  /**
+   * Method extrapolating data on hyper tree grid leaves lacking data but intersecting the geometry
+   * of the input vtkDataSet. This method is called if the Extrapolate flag is set to true, on
+   * point-based input data only.
+   *
+   * The strategy is the following:
+   * * Given located empty cells intersecting geometry (they are marked with NaN in the
+   * RecursivelyFillGaps
+   * method),
+   * check if every cells in the neighborhood has data (using a Von Neumann cursor). If it has, just
+   * compute the average
+   * on both display and metric scalar fields.
+   * * If at least one neighbor is also invalid, i.e. has no data, add the id to a priority queue
+   * where the priority is the number of valid neighbors.
+   * * The two previous points are done in RecursivelyFillPriorityQueue.
+   * * When the priority queue is completed, iteratively get the top of the queue, check if there is
+   * enough data
+   * to compute an average. If there is not, set the value at this position
+   * to the accumulated mean with the available data and put it back to the queue
+   * (the neighbors will have data by the time we pass over this cell again). Do that until the
+   * queue is empty.
+   *
+   * @note This algorithm is order independent, even if it is not obvious at first sight.
+   */
+  void ExtrapolateValuesOnGaps(vtkHyperTreeGrid* htg);
+
+  /**
+   * Recursive step of ExtrapolateValuesOnGaps.
+   * At the first call of this method, queue should be empty.
+   */
+  void RecursivelyFillPriorityQueue(
+    vtkHyperTreeGridNonOrientedVonNeumannSuperCursor* superCursor, PriorityQueue& queue);
+
+  /**
+   * Flag to tell wether data should be extrapolated on cells intersecting geometry but not having
+   * any data.
+   * This flag is only effective on point-based input scalar.
+   */
+  bool Extrapolate;
 
   /**
    * Method that divides recursively leafs of the output hyper tree grid depending of the
@@ -306,8 +441,17 @@ protected:
    * resolution grids
    * matching the subdivision scheme of the output hyper tree grid.
    */
-  void CreateGridOfMultiResolutionGrids(
-    vtkDataSet* dataSet, vtkDataArray* data, int fieldAssociation);
+  void CreateGridOfMultiResolutionGrids(vtkDataSet* dataSet, int fieldAssociation);
+
+  //@{
+  /**
+   * This method computes the intersection volume between a box and a vtkCell3D.
+   */
+  bool IntersectedVolume(
+    const double boxBounds[6], vtkVoxel* voxel, double volumeUnit, double& volume) const;
+  bool IntersectedVolume(const double boxBounds[6], vtkCell3D* cell3D, double volumeUnit,
+    double& volume, double* weights) const;
+  //@}
 
   /**
    * Helper for easy access to the cells dimensions of the hyper tree grid.
@@ -319,11 +463,13 @@ protected:
    */
   vtkIdType NumberOfChildren;
 
+  //@{
   /**
    * Output scalar/vector field
    */
-  vtkDoubleArray *ScalarField, *DisplayScalarField;
+  std::vector<vtkDoubleArray*> ScalarFields;
   vtkLongArray *NumberOfLeavesInSubtreeField, *NumberOfPointsInSubtreeField;
+  //@}
 
   /**
    * Minimum number of points in a leaf for it to be subdivided.
@@ -345,8 +491,7 @@ protected:
    * Dummy pointer for creating at run-time the proper type of ArrayMeasurement or
    * ArrayMeasurementDisplay.
    */
-  vtkAbstractArrayMeasurement* ArrayMeasurement;
-  vtkAbstractArrayMeasurement* ArrayMeasurementDisplay;
+  std::vector<vtkSmartPointer<vtkAbstractArrayMeasurement> > ArrayMeasurements;
 
   /**
    * Converts indexing at given resolution to a tuple (i,j,k) to navigate in a MultiResolutionGrid.
@@ -374,25 +519,15 @@ protected:
   //@{
   /**
    * 3D grid of multi-resolution grids.
-   * this->GridOfMultiResolutionGrids[this->GridCoordinatesToIndex(i,j,k)][depth][idx] is a
-   * GridElement
-   * in the MultiResGrid at coordinates (i,j,k).
+   * this->GridOfMultiResolutionGrids[this->GridCoordinatesToIndex(i,j,k)][depth][this->MultiResGridCoordinatesToIndex(ii,
+   * jj, kk)] is a
+   * GridElement in the MultiResGrid mapped to tree of coordinates (i,j,k) in the hyper tree grid,
+   * and of
+   * coordinates (ii, jj, kk) relative to the latter tree at depth depth.
    */
   typedef std::vector<MultiResGridType> GridOfMultiResGridsType;
   GridOfMultiResGridsType GridOfMultiResolutionGrids;
   //@}
-
-  /**
-   * Maps from the vector of vtkAbstractAccumulator* of GridElement to their position
-   * in the accumulator needed by either this->ArrayMeasurementDisplay.
-   */
-  std::vector<std::size_t> ArrayMeasurementDisplayAccumulatorMap;
-
-  /**
-   * Accumulators needed to compute the measures. They are used as dummy pointers
-   * to create the correct instances when creating the grid of multi-resolution grids.
-   */
-  std::vector<vtkAbstractAccumulator*> Accumulators;
 
   //@{
   /**
@@ -408,6 +543,8 @@ protected:
    * a cell of the input.
    * inputs x, closestPoint, pcoords and weights are used to call cell->EvaluatePosition.
    * weights should be of size cell->GetNumberOfPoints().
+   * markEmpty will create an empty grid element where htg cells intersect geometry but don't have
+   * point data.
    *
    * (i,j,k) are the hyper tree coordinates in the hyper tree grid. (ii,jj,kk) are the coordinates
    * of a cell
@@ -417,7 +554,24 @@ protected:
    */
   bool RecursivelyFillGaps(vtkCell* cell, const double bounds[6], const double cellBounds[6],
     vtkIdType i, vtkIdType j, vtkIdType k, double x[3], double closestPoint[3], double pcoords[3],
-    double* weights, vtkIdType ii = 0, vtkIdType jj = 0, vtkIdType kk = 0, std::size_t depth = 0);
+    double* weights, bool markEmpty, vtkIdType ii = 0, vtkIdType jj = 0, vtkIdType kk = 0,
+    std::size_t depth = 0);
+
+  /**
+   * Bounds of the input, all processes included
+   */
+  double Bounds[6];
+
+  /**
+   * Union of bounds of the set of hypertrees of local process.
+   */
+  std::vector<vtkBoundingBox> LocalHyperTreeBoundingBox;
+
+  /**
+   * Method retristributing points and cells of the input so hyper trees are not split
+   * between processes.
+   */
+  vtkSmartPointer<vtkDataSet> BroadcastHyperTreeOwnership(vtkDataSet* ds, vtkIdType processId);
 
   /**
    * Cache used to handle SetMaxState(bool) and SetMinState(bool)
@@ -429,6 +583,22 @@ protected:
    * Setting it on will make the filter slightly slower.
    */
   bool NoEmptyCells;
+
+  /**
+   * Collection of input point data arrays to resample, deducted from
+   * InputDataArrayNames.
+   */
+  std::vector<vtkDataArray*> InputPointDataArrays;
+
+  /**
+   * Collection of input scalar field names to resample.
+   */
+  std::vector<std::string> InputDataArrayNames;
+
+  /**
+   *  Multi-controller pointer for multi-process handling.
+   */
+  vtkMultiProcessController* Controller;
 
 private:
   vtkResampleToHyperTreeGrid(vtkResampleToHyperTreeGrid&) = delete;

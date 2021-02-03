@@ -62,6 +62,7 @@ class ModifiedLiveInsituLink;
 class QFont;
 class QPixmap;
 class QString;
+class pqExtractor;
 class pqPipelineModelDataItem;
 class pqPipelineModelInternal;
 class pqPipelineSource;
@@ -90,6 +91,7 @@ public:
     Server = 0,
     Proxy,
     Port,
+    Extractor,
     Link
   };
 
@@ -305,6 +307,11 @@ public:
   void disableFilterAnnotationKey();
 
   /**
+   * Set wether annotation filter should display matching or non matching sources.
+   */
+  void setAnnotationFilterMatching(bool matching);
+
+  /**
   * \brief
   *   Store the session key that will be used when
   *   "this->data( ... , pqPipelineMode::SessionFilterRole)"
@@ -321,7 +328,7 @@ public:
   */
   void disableFilterSession();
 
-public slots:
+public Q_SLOTS:
   /**
   * Called when a new server connection is detected. Adds the connection to the
   * list.
@@ -355,6 +362,22 @@ public slots:
   */
   void removeConnection(pqPipelineSource* source, pqPipelineSource* sink, int);
 
+  //@{
+  /**
+   * Called to update extractor connections.
+   */
+  void addConnection(pqServerManagerModelItem* source, pqExtractor* sink);
+  void removeConnection(pqServerManagerModelItem* source, pqExtractor* sink);
+  //@}
+
+  //@{
+  /**
+   * Add/remove extractor.
+   */
+  void addExtractor(pqExtractor*);
+  void removeExtractor(pqExtractor*);
+  //@}
+
   /**
   * Updates the icons in the current window column.
   * The current window column shows whether or not the source is
@@ -363,10 +386,10 @@ public slots:
   */
   void setView(pqView* module);
 
-signals:
+Q_SIGNALS:
   void firstChildAdded(const QModelIndex& index);
 
-private slots:
+private Q_SLOTS:
   void onInsituConnectionInitiated(pqServer* server);
 
   void serverDataChanged();
@@ -432,6 +455,7 @@ private:
   QMap<QString, QPixmap> PixmapMap;  ///< Stores the item icons.
   QPointer<pqView> View;
   bool Editable;
+  bool FilterAnnotationMatching;
   QString FilterRoleAnnotationKey;
   vtkSession* FilterRoleSession;
   ModifiedLiveInsituLink* LinkCallback;

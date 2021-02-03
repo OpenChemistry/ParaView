@@ -17,6 +17,10 @@ arguments, respectively.
 _vtk_module_wrap_client_server_sources(<module> <sources> <classes>)
 ```
 #]==]
+
+cmake_policy(PUSH)
+cmake_policy(SET CMP0053 NEW)
+
 function (_vtk_module_wrap_client_server_sources module sources classes)
   _vtk_module_get_module_property("${module}"
     PROPERTY  "exclude_wrap"
@@ -52,15 +56,18 @@ $<$<BOOL:${_vtk_client_server_genex_include_directories}>:\n-I\'$<JOIN:${_vtk_cl
   if (_vtk_client_server_is_imported OR CMAKE_GENERATOR MATCHES "Ninja")
     set(_vtk_client_server_command_depend "${_vtk_client_server_hierarchy_file}")
   else ()
-    if (TARGET "${_vtk_client_server_target_name}-hierarchy")
-      set(_vtk_client_server_command_depend "${_vtk_client_server_target_name}-hierarchy")
+    if (TARGET "${_vtk_client_server_library_name}-hierarchy")
+      set(_vtk_client_server_command_depend "${_vtk_client_server_library_name}-hierarchy")
     else ()
       message(FATAL_ERROR
         "The ${module} hierarchy file is attached to a non-imported target "
-        "and a hierarchy target (${_vtk_client_server_target_name}-hierarchy) "
-        "is missing.")
+        "and a hierarchy target "
+        "(${_vtk_client_server_library_name}-hierarchy) is missing.")
     endif ()
   endif ()
+
+  # create directory for wrapped source files
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_vtk_client_server_library_name}CS")
 
   set(_vtk_client_server_sources)
 
@@ -74,13 +81,14 @@ $<$<BOOL:${_vtk_client_server_genex_include_directories}>:\n-I\'$<JOIN:${_vtk_cl
       "${_vtk_client_server_basename}")
 
     set(_vtk_client_server_source_output
-      "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_vtk_client_server_basename}ClientServer.cxx")
+      "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${_vtk_client_server_library_name}CS/${_vtk_client_server_basename}ClientServer.cxx")
     list(APPEND _vtk_client_server_sources
       "${_vtk_client_server_source_output}")
 
     add_custom_command(
       OUTPUT  "${_vtk_client_server_source_output}"
-      COMMAND ParaView::WrapClientServer
+      COMMAND ${CMAKE_CROSSCOMPILING_EMULATOR}
+              "$<TARGET_FILE:ParaView::WrapClientServer>"
               "@${_vtk_client_server_args_file}"
               -o "${_vtk_client_server_source_output}"
               "${_vtk_client_server_header}"
@@ -196,12 +204,12 @@ ${_vtk_client_server_calls}}\n")
   target_link_libraries("${name}"
     PRIVATE
       ${ARGN}
-      ParaView::ClientServer
+      ParaView::RemotingClientServerStream
       VTK::CommonCore)
 
   set(_vtk_client_server_export)
   if (_vtk_client_server_INSTALL_EXPORT)
-    set(_vtk_client_server_export
+    list(APPEND _vtk_client_server_export
       EXPORT "${_vtk_client_server_INSTALL_EXPORT}")
   endif ()
 
@@ -280,6 +288,11 @@ function (vtk_module_wrap_client_server)
   if (NOT DEFINED _vtk_client_server_FUNCTION_NAME)
     set(_vtk_client_server_FUNCTION_NAME "${_vtk_client_server_TARGET}_initialize")
   endif ()
+
+  # Disable CMake's automoc support for these targets.
+  set(CMAKE_AUTOMOC 0)
+  set(CMAKE_AUTORCC 0)
+  set(CMAKE_AUTOUIC 0)
 
   # TODO: Install cmake properties?
 
@@ -365,7 +378,7 @@ ${_vtk_client_server_calls}}
 
     set(_vtk_client_server_export)
     if (_vtk_client_server_INSTALL_EXPORT)
-      set(_vtk_client_server_export
+      list(APPEND _vtk_client_server_export
         EXPORT "${_vtk_client_server_INSTALL_EXPORT}")
     endif ()
 
@@ -417,3 +430,5 @@ function (vtk_module_client_server_exclude)
     PROPERTY  "client_server_exclude"
     VALUE     1)
 endfunction ()
+
+cmake_policy(POP)

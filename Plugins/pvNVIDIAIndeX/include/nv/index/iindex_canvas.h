@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2019 NVIDIA Corporation. All rights reserved.
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
  *****************************************************************************/
 /// \file
 /// \brief User-defined rendering canvas.
@@ -24,12 +24,14 @@ namespace index
 ///
 /// The NVIDIA IndeX library ships the implementation of a main memory buffer and an OpenGL buffer
 /// based canvas classes as source code to ease the integration into a given application.
-/// @ingroup nv_index_rendering
+///
+/// \ingroup nv_index_rendering
 ///
 class IIndex_canvas :
     public mi::base::Interface_declare<0x46c5a5f7,0x31de,0x468d,0x9b,0x6c,0xb0,0x35,0x77,0xed,0xfe,0x61>
 {
 public:
+    /// Frame buffer layer types that are or will be supported by a canvas layer.
     enum Frame_buffer_layer_type
     {
         FB_LAYER_UNDEFINED  = 0u,    ///< Undefined frame buffer.
@@ -214,7 +216,14 @@ public:
         return IIndex_canvas::FB_LAYER_UNDEFINED;
     }
 
-    /// \implements
+    /// Implemented render tile method of the canvas interface.
+    /// 
+    /// \param[in] layer_type       The type of the layer.
+    /// \param[in] area             The 2D bounding box of the tile covered in the screen space.
+    /// \param[in] buffer           The image buffer that contains the rendering inside the tile area.
+    ///
+    /// \implements \c IIndex_canvas::render_tile.
+    ///
     virtual void render_tile(
         mi::Uint32                                      /*layer_id*/,
         Frame_buffer_layer_type                         layer_type,
@@ -237,7 +246,12 @@ public:
         }
     }
 
-    /// \implements
+    /// Returns the canvas that hosts the rendered pixels.
+    ///
+    /// \return     The main memory canvas that contains the rendered image.
+    /// 
+    /// \implements \c IIndex_canvas::get_canvas.
+    ///
     virtual mi::neuraylib::ICanvas* get_canvas() const { return NULL; }
 };
 

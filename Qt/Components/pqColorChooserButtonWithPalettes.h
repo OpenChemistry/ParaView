@@ -38,7 +38,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QPointer>
 
 class QActionGroup;
-class vtkSMGlobalPropertiesProxy;
+class vtkSMSettingsProxy;
 class vtkSMProxy;
 
 //============================================================================
@@ -69,7 +69,7 @@ public:
   pqColorChooserButtonWithPalettes(QWidget* parent = 0);
   ~pqColorChooserButtonWithPalettes() override;
 
-private slots:
+private Q_SLOTS:
   /**
   * Called to rebuild the menu. This is called everytime the popup menu is
   * going to be shown.
@@ -87,7 +87,7 @@ private:
   /**
   * Returns the color palette proxy for the active session.
   */
-  vtkSMGlobalPropertiesProxy* colorPalette() const;
+  vtkSMSettingsProxy* colorPalette() const;
   QPointer<QActionGroup> ActionGroup;
   friend class pqColorPaletteLinkHelper;
 };

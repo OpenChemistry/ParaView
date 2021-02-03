@@ -84,8 +84,7 @@ pqMoleculePropertyWidget::pqMoleculePropertyWidget(
     &pqMoleculePropertyWidget::onResetAtomFactorToggled);
   QAction* resetAtomicRadiusAction = new QAction(ui.resetAtomicRadiusFactor);
   resetAtomicRadiusAction->setToolTip("Reset the range values");
-  resetAtomicRadiusAction->setIcon(
-    ui.resetAtomicRadiusFactor->style()->standardIcon(QStyle::SP_BrowserReload));
+  resetAtomicRadiusAction->setIcon(QIcon(":/pqWidgets/Icons/pqReset.svg"));
   ui.resetAtomicRadiusFactor->addAction(resetAtomicRadiusAction);
   ui.resetAtomicRadiusFactor->setDefaultAction(resetAtomicRadiusAction);
 
@@ -196,7 +195,7 @@ void pqMoleculePropertyWidget::onPresetChanged(int preset)
   if (molProxy)
   {
     molProxy->SetPreset(preset);
-    emit this->changeAvailable();
+    Q_EMIT this->changeAvailable();
   }
 
   this->Internals->updatingFromPreset = false;
@@ -304,7 +303,7 @@ void pqMoleculePropertyWidget::onResetAtomFactorToggled()
   vtkSMProperty* prop = this->propertyGroup()->GetProperty("AtomicRadiusFactor");
   prop->ResetToDefault();
   this->proxy()->UpdateVTKObjects();
-  emit this->changeAvailable();
+  Q_EMIT this->changeAvailable();
   this->resetPreset();
 }
 
@@ -314,6 +313,6 @@ void pqMoleculePropertyWidget::onResetBondRadiusToggled()
   vtkSMProperty* prop = this->propertyGroup()->GetProperty("BondRadius");
   prop->ResetToDefault();
   this->proxy()->UpdateVTKObjects();
-  emit this->changeAvailable();
+  Q_EMIT this->changeAvailable();
   this->resetPreset();
 }

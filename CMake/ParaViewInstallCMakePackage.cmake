@@ -6,6 +6,8 @@ if (NOT (DEFINED paraview_cmake_dir AND
     "ParaViewInstallCMakePackage is missing input variables.")
 endif ()
 
+_vtk_module_write_import_prefix("${paraview_cmake_build_dir}/paraview-prefix.cmake" "${paraview_cmake_destination}")
+
 configure_file(
   "${paraview_cmake_dir}/paraview-config.cmake.in"
   "${paraview_cmake_build_dir}/paraview-config.cmake"
@@ -27,6 +29,11 @@ configure_file(
 
 set(paraview_cmake_module_files
   FindCGNS.cmake
+
+  # Compatibility
+  paraview-use-file-compat.cmake
+  paraview-use-file-deprecated.cmake
+  paraview-use-file-error.cmake
 
   # Client API
   paraview_client_initializer.cxx.in
@@ -80,6 +87,23 @@ foreach (paraview_cmake_module_file IN LISTS paraview_cmake_module_files)
     "${paraview_cmake_module_file}")
 endforeach ()
 
+if (PARAVIEW_ENABLE_VISITBRIDGE)
+  set(paraview_visitbridge_cmake_module_files
+    FindBoxlib.cmake
+    FindGFortran.cmake
+    FindMili.cmake
+    FindRapidJSON.cmake
+    FindSILO.cmake)
+  foreach (paraview_cmake_module_file IN LISTS paraview_visitbridge_cmake_module_files)
+    configure_file(
+      "${ParaView_SOURCE_DIR}/Utilities/VisItBridge/databases/cmake/${paraview_cmake_module_file}"
+      "${paraview_cmake_build_dir}/${paraview_cmake_module_file}"
+      COPYONLY)
+    list(APPEND paraview_cmake_files_to_install
+      "${paraview_cmake_build_dir}/${paraview_cmake_module_file}")
+  endforeach ()
+endif ()
+
 include(ParaViewInstallCMakePackageHelpers)
 if (NOT PARAVIEW_RELOCATABLE_INSTALL)
   list(APPEND paraview_cmake_files_to_install
@@ -104,6 +128,7 @@ endforeach ()
 install(
   FILES       "${paraview_cmake_build_dir}/paraview-config.cmake"
               "${paraview_cmake_build_dir}/paraview-config-version.cmake"
+              "${paraview_cmake_build_dir}/paraview-prefix.cmake"
   DESTINATION "${paraview_cmake_destination}"
   COMPONENT   "development")
 
@@ -112,7 +137,7 @@ vtk_module_export_find_packages(
   FILE_NAME         "ParaView-vtk-module-find-packages.cmake"
   MODULES           ${paraview_modules})
 
-if (PARAVIEW_BUILD_QT_GUI)
+if (PARAVIEW_USE_QT)
   get_property(paraview_client_xml_files GLOBAL
     PROPERTY paraview_client_xml_files)
   get_property(paraview_client_xml_destination GLOBAL

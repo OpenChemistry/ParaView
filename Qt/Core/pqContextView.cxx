@@ -230,34 +230,33 @@ void pqContextView::setSelection(vtkSelection* sel)
     repSource->SetSelectionInput(
       opPort->getPortNumber(), vtkSMSourceProxy::SafeDownCast(selectionSource), 0);
     selectionSource->Delete();
+
+    // Trace the selection
+    if (strcmp(selectionSource->GetXMLName(), "ThresholdSelectionSource") == 0)
+    {
+      SM_SCOPED_TRACE(CallFunction)
+        .arg("SelectThresholds")
+        .arg("Thresholds", vtkSMPropertyHelper(selectionSource, "Thresholds").GetDoubleArray())
+        .arg("ArrayName", vtkSMPropertyHelper(selectionSource, "ArrayName").GetAsString())
+        .arg("FieldType", vtkSMPropertyHelper(selectionSource, "FieldType").GetAsInt());
+    }
+    else
+    {
+      // Map from selection source proxy name to trace function
+      std::string functionName(selectionSource->GetXMLName());
+      functionName.erase(functionName.size() - sizeof("SelectionSource") + 1);
+      functionName.append("s");
+      functionName.insert(0, "Select");
+
+      SM_SCOPED_TRACE(CallFunction)
+        .arg(functionName.c_str())
+        .arg("IDs", vtkSMPropertyHelper(selectionSource, "IDs").GetIntArray())
+        .arg("FieldType", vtkSMPropertyHelper(selectionSource, "FieldType").GetAsInt())
+        .arg("ContainingCells", vtkSMPropertyHelper(selectionSource, "ContainingCells").GetAsInt());
+    }
   }
 
-  // Trace the selection
-
-  if (strcmp(selectionSource->GetXMLName(), "ThresholdSelectionSource") == 0)
-  {
-    SM_SCOPED_TRACE(CallFunction)
-      .arg("SelectThresholds")
-      .arg("Thresholds", vtkSMPropertyHelper(selectionSource, "Thresholds").GetDoubleArray())
-      .arg("ArrayName", vtkSMPropertyHelper(selectionSource, "ArrayName").GetAsString())
-      .arg("FieldType", vtkSMPropertyHelper(selectionSource, "FieldType").GetAsInt());
-  }
-  else
-  {
-    // Map from selection source proxy name to trace function
-    std::string functionName(selectionSource->GetXMLName());
-    functionName.erase(functionName.size() - sizeof("SelectionSource") + 1);
-    functionName.append("s");
-    functionName.insert(0, "Select");
-
-    SM_SCOPED_TRACE(CallFunction)
-      .arg(functionName.c_str())
-      .arg("IDs", vtkSMPropertyHelper(selectionSource, "IDs").GetIntArray())
-      .arg("FieldType", vtkSMPropertyHelper(selectionSource, "FieldType").GetAsInt())
-      .arg("ContainingCells", vtkSMPropertyHelper(selectionSource, "ContainingCells").GetAsInt());
-  }
-
-  emit this->selected(opPort);
+  Q_EMIT this->selected(opPort);
 }
 
 //-----------------------------------------------------------------------------

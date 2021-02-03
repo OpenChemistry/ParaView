@@ -45,9 +45,9 @@
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/compiler/plugin.pb.h>
 #include <google/protobuf/compiler/code_generator.h>
-#include <google/protobuf/io/io_win32.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
 #include <google/protobuf/descriptor.h>
+#include <google/protobuf/io/io_win32.h>
 
 
 namespace google {
@@ -131,6 +131,8 @@ bool GenerateCode(const CodeGeneratorRequest& request,
   std::string error;
   bool succeeded = generator.GenerateAll(parsed_files, request.parameter(),
                                          &context, &error);
+
+  response->set_supported_features(generator.GetSupportedFeatures());
 
   if (!succeeded && error.empty()) {
     error =

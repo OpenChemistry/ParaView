@@ -46,6 +46,7 @@ set(classes
   pqCoreTestUtility
   pqCoreUtilities
   pqDataRepresentation
+  pqExtractor
   pqFileDialog
   pqFileDialogEventPlayer
   pqFileDialogEventTranslator
@@ -61,6 +62,7 @@ set(classes
   pqInterfaceTracker
   pqLinkViewWidget
   pqLinksModel
+  pqLogViewerWidget
   pqMainWindowEventManager
   pqMultiSliceAxisWidget
   pqMultiSliceView
@@ -138,13 +140,14 @@ set_property(SOURCE pqCoreTestUtility.cxx APPEND
 
 set(ui_files
   Resources/UI/pqFileDialog.ui
+  Resources/UI/pqLogViewerWidget.ui
   Resources/UI/pqOutputWidget.ui
   Resources/UI/pqPluginEULADialog.ui)
 
 set(resource_files
   Resources/pqCore.qrc)
 
-if (PARAVIEW_ENABLE_PYTHON)
+if (PARAVIEW_USE_PYTHON)
   # TODO: Split these into a separate module so that there isn't a public
   # optional dependency.
   list(APPEND classes
@@ -161,7 +164,9 @@ endif ()
 
 vtk_module_find_package(
   PACKAGE     Qt5
-  COMPONENTS  ${qt_components})
+  COMPONENTS  ${qt_components}
+  VERSION     5.12
+  FORWARD_VERSION_REQ MINOR)
 
 set(CMAKE_AUTOMOC 1)
 set(CMAKE_AUTORCC 1)
@@ -185,7 +190,7 @@ if (PARAVIEW_USE_QTHELP)
       Qt5::Help)
 endif ()
 
-if (PARAVIEW_ENABLE_PYTHON)
+if (PARAVIEW_USE_PYTHON)
   vtk_module_definitions(ParaView::pqCore
     PRIVATE PARAVIEW_PQCORE_ENABLE_PYTHON=1)
 else ()

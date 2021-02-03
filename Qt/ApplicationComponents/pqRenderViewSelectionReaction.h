@@ -38,10 +38,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <QPointer>
 #include <QTimer>
 
+class pqDataRepresentation;
 class pqRenderView;
 class pqView;
 class vtkIntArray;
 class vtkObject;
+class vtkSMPVRepresentationProxy;
 
 /**
 * pqRenderViewSelectionReaction handles various selection modes available on
@@ -72,6 +74,8 @@ public:
     CLEAR_SELECTION,
     GROW_SELECTION,
     SHRINK_SELECTION,
+    SELECT_SURFACE_POINTDATA_INTERACTIVELY,
+    SELECT_SURFACE_CELLDATA_INTERACTIVELY,
     SELECT_SURFACE_CELLS_INTERACTIVELY,
     SELECT_SURFACE_POINTS_INTERACTIVELY,
     SELECT_SURFACE_POINTS_TOOLTIP,
@@ -86,12 +90,12 @@ public:
     QActionGroup* modifierGroup = NULL);
   ~pqRenderViewSelectionReaction() override;
 
-signals:
+Q_SIGNALS:
   void selectedCustomBox(int xmin, int ymin, int xmax, int ymax);
   void selectedCustomBox(const int region[4]);
   void selectedCustomPolygon(vtkIntArray* polygon);
 
-private slots:
+private Q_SLOTS:
   /**
   * For checkable actions, this calls this->beginSelection() or
   * this->endSelection() is val is true or false, respectively. For
@@ -113,6 +117,11 @@ private slots:
   void setView(pqView* view);
 
   /**
+  * Called when the active representation changes.
+  */
+  void setRepresentation(pqDataRepresentation* representation);
+
+  /**
   * starts the selection i.e. setup render view in selection mode.
   */
   void beginSelection();
@@ -127,6 +136,11 @@ private slots:
   * makes the pre-selection.
   */
   void preSelection();
+
+  /**
+  * makes fast pre-selection.
+  */
+  void fastPreSelection();
 
   /**
   * callback called for mouse stop events when in 'interactive selection'
@@ -165,6 +179,8 @@ private:
 private:
   Q_DISABLE_COPY(pqRenderViewSelectionReaction)
   QPointer<pqRenderView> View;
+  QPointer<pqDataRepresentation> Representation;
+  QMetaObject::Connection RepresentationConnection;
   SelectionMode Mode;
   bool DisableSelectionModifiers;
   int PreviousRenderViewMode;
@@ -173,6 +189,8 @@ private:
   QCursor ZoomCursor;
   QTimer MouseMovingTimer;
   bool MouseMoving;
+  int MousePosition[2];
+  vtkSMPVRepresentationProxy* CurrentRepresentation = nullptr;
 
   static QPointer<pqRenderViewSelectionReaction> ActiveReaction;
 

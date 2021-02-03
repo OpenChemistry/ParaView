@@ -33,12 +33,12 @@
 #include <google/protobuf/compiler/mock_code_generator.h>
 
 #include <stdlib.h>
+
 #include <iostream>
 #include <memory>
 #include <vector>
+
 #include <google/protobuf/stubs/strutil.h>
-
-
 
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/common.h>
@@ -51,8 +51,8 @@
 #include <google/protobuf/descriptor.pb.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/text_format.h>
-#include <google/protobuf/stubs/substitute.h>
 #include <gtest/gtest.h>
+#include <google/protobuf/stubs/substitute.h>
 
 #ifdef major
 #undef major
@@ -86,6 +86,15 @@ static const char* kSecondInsertionPoint =
 MockCodeGenerator::MockCodeGenerator(const std::string& name) : name_(name) {}
 
 MockCodeGenerator::~MockCodeGenerator() {}
+
+uint64_t MockCodeGenerator::GetSupportedFeatures() const {
+  uint64 all_features = CodeGenerator::FEATURE_PROTO3_OPTIONAL;
+  return all_features & ~suppressed_features_;
+}
+
+void MockCodeGenerator::SuppressFeatures(uint64 features) {
+  suppressed_features_ = features;
+}
 
 void MockCodeGenerator::ExpectGenerated(
     const std::string& name, const std::string& parameter,
@@ -149,7 +158,7 @@ void CheckSingleAnnotation(const std::string& expected_file,
 }  // anonymous namespace
 
 void MockCodeGenerator::CheckGeneratedAnnotations(
-    const string& name, const std::string& file,
+    const std::string& name, const std::string& file,
     const std::string& output_directory) {
   std::string file_content;
   GOOGLE_CHECK_OK(
@@ -320,7 +329,7 @@ std::string MockCodeGenerator::GetOutputFileContent(
     const std::string& file, const std::string& parsed_file_list,
     const std::string& first_message_name) {
   return strings::Substitute("$0: $1, $2, $3, $4\n", generator_name, parameter,
-                             file, first_message_name, parsed_file_list);
+                          file, first_message_name, parsed_file_list);
 }
 
 }  // namespace compiler

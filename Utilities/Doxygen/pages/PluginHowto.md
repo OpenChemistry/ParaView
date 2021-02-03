@@ -81,7 +81,9 @@ There are four ways for loading plugins:
       on startup to load plugins. This environment variable needs to be set on
       both the client and server sides to load their respective plugins. Note
       that plugins in PV_PLUGIN_PATH are always auto-loaded irrespective of the
-      status of the `Auto Load` checkbox in the `Plugin Manager`.
+      status of the `Auto Load` checkbox in the `Plugin Manager`. Paths in this
+      list may also be of the structure created by the ParaView plugin macros
+      (e.g., `MyPlugin/MyPlugin.so`).
     - Finer control can be used using the `PV_PLUGIN_CONFIG_FILE` environment
       variable. `PV_PLUGIN_CONFIG_FILE` can be used to list a set of XML plugin
       configuration files (separated by colon (`:`) on Unix platforms or
@@ -93,6 +95,8 @@ There are four ways for loading plugins:
 <?xml version="1.0"?>
 <Plugins>
   <Plugin name="MyPlugin" filename="/absolute/path/to/libMyPlugin.so"/>
+  <!-- Note that relative paths are calculated from the directory of this XML file. -->
+  <Plugin name="MyPluginRel" filename="relative/path/to/libMyPlugin.so"/>
 </Plugins>
 ```
 
@@ -113,7 +117,6 @@ There are four ways for loading plugins:
   <Plugin name="PrismPlugin" auto_load="0"/>
   <Plugin name="PointSprite_Plugin" auto_load="0"/>
   <Plugin name="pvblot" auto_load="0"/>
-  <Plugin name="SierraPlotTools" auto_load="0"/>
   <Plugin name="H5PartReader" auto_load="1"/>
 </Plugins>
 ```
@@ -163,13 +166,18 @@ following code:
 ```cmake
 # ParaView requires CMake 3.8 in order to be used.
 cmake_minimum_required(VERSION 3.8)
-project(myplugin)
+project(myplugin C CXX)
 
 find_package(ParaView REQUIRED)
 ```
 
 Where CMake will ask for the `ParaView_DIR` which you point to the ParaView
 build or install tree you would to build your with.
+
+Note that the `C` and `CXX` languages are required in general because ParaView
+may need to find other packages which are written with only C in mind (MPI is
+the usual culprit here) and need to know about the C compiler that is
+available.
 
 ## Exposing an Existing Filter
 
@@ -392,14 +400,19 @@ PRIVATE_DEPENDS
 ```
 
 And then the module is built with its associated server manager XML file
-attached to the module.
+attached to the module. Note that the module name cannot be the same as the
+plugin name due to the way the library targets are managed internally.
 
 ```cmake
 set(classes
   vtkMyElevationFilter)
 
+# Find external packages here using `find_package`.
+
 vtk_module_add_module(ElevationFilters
   CLASSES ${classes})
+
+# Link to external packages here using `vtk_module_link(ElevationFilters)`.
 
 paraview_add_server_manager_xmls(
   XMLS  MyElevationFilter.xml)
@@ -1245,6 +1258,7 @@ The code below shows how the `PV_PLUGIN` macros would be used to statically load
 plugins in custom applications:
 
 ```cpp
+#define PARAVIEW_BUILDING_PLUGIN
 #include "vtkPVPlugin.h"
 
 // Adds required forward declarations.
@@ -1363,7 +1377,7 @@ configuration type, which may look something like
 `C:\Users\MyUser\ParaView-v4.2.0-build\lib\Release\vtkPVAnimation-pv4.2.lib`.
 
 [ParaView Guide]: http://www.kitware.com/products/books/paraview.html
-[core readers]: https://gitlab.kitware.com/paraview/paraview/blob/87babdbeab6abe20aac6f8b2692788abc6bb20ac/ParaViewCore/ServerManager/SMApplication/Resources/readers.xml#L158-179
+[core readers]: https://gitlab.kitware.com/paraview/paraview/-/blob/87babdbeab6abe20aac6f8b2692788abc6bb20ac/ParaViewCore/ServerManager/SMApplication/Resources/readers.xml#L158-179
 [pqPropertyWidget]: https://kitware.github.io/paraview-docs/nightly/cxx/classpqPropertyWidget.html
 [pqPropertyWidgetDecorator]: https://kitware.github.io/paraview-docs/nightly/cxx/classpqPropertyWidgetDecorator.html
 [QActionGroup]: https://doc.qt.io/qt-5/qactiongroup.html

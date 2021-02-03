@@ -72,6 +72,8 @@ pqSampleScalarWidget::pqSampleScalarWidget(bool preserveOrder, QWidget* Parent)
   : Superclass(Parent)
   , Implementation(new pqImplementation())
 {
+  VTK_LEGACY_BODY(pqSampleScalarWidget, "ParaView 5.8");
+
   this->Implementation->PropertyObserver.TakeReference(
     vtkMakeMemberFunctionCommand(*this, &pqSampleScalarWidget::onControlledPropertyChanged));
 
@@ -267,7 +269,7 @@ void pqSampleScalarWidget::onDelete()
   this->Implementation->UI->Values->selectionModel()->clear();
 
   this->onSamplesChanged();
-  emit samplesChanged();
+  Q_EMIT samplesChanged();
 }
 void pqSampleScalarWidget::onDeleteAll()
 {
@@ -276,7 +278,7 @@ void pqSampleScalarWidget::onDeleteAll()
   this->Implementation->UI->Values->selectionModel()->clear();
 
   this->onSamplesChanged();
-  emit samplesChanged();
+  Q_EMIT samplesChanged();
 }
 void pqSampleScalarWidget::onNewValue()
 {
@@ -344,7 +346,7 @@ void pqSampleScalarWidget::onNewRange()
   }
 
   this->onSamplesChanged();
-  emit samplesChanged();
+  Q_EMIT samplesChanged();
 }
 
 void pqSampleScalarWidget::onSelectAll()

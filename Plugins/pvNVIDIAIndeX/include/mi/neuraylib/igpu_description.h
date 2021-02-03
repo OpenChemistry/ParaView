@@ -1,5 +1,5 @@
 /***************************************************************************************************
- * Copyright 2019 NVIDIA Corporation. All rights reserved.
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
  **************************************************************************************************/
 /// \file
 /// \brief Provides information about GPUs.
@@ -67,6 +67,9 @@ public:
     ///
     /// Returns \c true if the GPU is attached to a display (Windows only), and \c false otherwise.
     virtual bool is_attached_to_display() const = 0;
+
+    /// Returns \c true if the GPU is part of an Optimus/mixed internal+discrete GPU setup (Windows only), and \c false otherwise.
+    virtual bool get_optimus_flag() const = 0;
 };
 
 /*@}*/ // end group mi_neuray_configuration

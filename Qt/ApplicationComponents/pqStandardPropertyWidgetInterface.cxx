@@ -40,6 +40,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqCTHArraySelectionDecorator.h"
 #include "pqCalculatorWidget.h"
 #include "pqCameraManipulatorWidget.h"
+#include "pqCheckableProperty.h"
 #include "pqColorAnnotationsPropertyWidget.h"
 #include "pqColorEditorPropertyWidget.h"
 #include "pqColorOpacityEditorWidget.h"
@@ -48,6 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqCommandButtonPropertyWidget.h"
 #include "pqCompositePropertyWidgetDecorator.h"
 #include "pqCylinderPropertyWidget.h"
+#include "pqDataAssemblyPropertyWidget.h"
 #include "pqDisplayRepresentationWidget.h"
 #include "pqDoubleRangeSliderPropertyWidget.h"
 #include "pqEnableWidgetDecorator.h"
@@ -67,9 +69,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "pqListPropertyWidget.h"
 #include "pqMoleculePropertyWidget.h"
 #include "pqMultiComponentsDecorator.h"
+#include "pqOMETransferFunctionsPropertyWidget.h"
 #include "pqOSPRayHidingDecorator.h"
 #include "pqPauseLiveSourcePropertyWidget.h"
-#include "pqPropertyGroupButton.h"
+#include "pqPropertyCollectionWidget.h"
 #include "pqProxyEditorPropertyWidget.h"
 #include "pqSeriesEditorPropertyWidget.h"
 #include "pqShaderReplacementsSelectorPropertyWidget.h"
@@ -202,6 +205,10 @@ pqPropertyWidget* pqStandardPropertyWidgetInterface::createWidgetForProperty(
   {
     return new pqPauseLiveSourcePropertyWidget(smProxy, smProperty, parentWidget);
   }
+  else if (name == "data_assembly_editor")
+  {
+    return new pqDataAssemblyPropertyWidget(smProxy, smProperty, parentWidget);
+  }
 
   // *** NOTE: When adding new types, please update the header documentation ***
   return NULL;
@@ -224,7 +231,11 @@ pqPropertyWidget* pqStandardPropertyWidgetInterface::createWidgetForPropertyGrou
   }
   else if (panelWidget == "BackgroundEditor")
   {
-    return new pqBackgroundEditorWidget(proxy, group, parentWidget);
+    return new pqBackgroundEditorWidget(proxy, group, parentWidget, false);
+  }
+  else if (panelWidget == "EnvironmentalBGEditor")
+  {
+    return new pqBackgroundEditorWidget(proxy, group, parentWidget, true);
   }
   else if (panelWidget == "ArrayStatus")
   {
@@ -293,6 +304,22 @@ pqPropertyWidget* pqStandardPropertyWidgetInterface::createWidgetForPropertyGrou
   else if (panelWidget == "InteractiveLight")
   {
     return new pqLightPropertyWidget(proxy, group, parentWidget);
+  }
+  else if (panelWidget == "OMETransferFunctions")
+  {
+    return new pqOMETransferFunctionsPropertyWidget(proxy, group, parentWidget);
+  }
+  else if (panelWidget == "PropertyCollection")
+  {
+    return new pqPropertyCollectionWidget(proxy, group, parentWidget);
+  }
+  else if (panelWidget == "DataAssemblyEditor")
+  {
+    return new pqDataAssemblyPropertyWidget(proxy, group, parentWidget);
+  }
+  else if (panelWidget == "CheckableProperty")
+  {
+    return new pqCheckableProperty(proxy, group, parentWidget);
   }
   // *** NOTE: When adding new types, please update the header documentation ***
 

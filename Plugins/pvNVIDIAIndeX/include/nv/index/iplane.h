@@ -1,5 +1,5 @@
 /******************************************************************************
- * Copyright 2019 NVIDIA Corporation. All rights reserved.
+ * Copyright 2020 NVIDIA Corporation. All rights reserved.
  *****************************************************************************/
 /// \file
 /// \brief Plane shape with texturing functionality.
@@ -16,8 +16,7 @@ namespace nv
 {
 namespace index
 {
-/// @ingroup nv_index_scene_description_shape
-///
+
 /// Interface class representing a rectangular cutout of an infinite plane as part of the scene
 /// description.
 ///
@@ -27,11 +26,10 @@ namespace index
 /// right vector (which is perpendicular to normal and up). The x-component of the extent specifies
 /// the size in the direction of the right vector and the y-component corresponds to the up vector.
 /// 
-/// A texture may be assigned to a plane. The texture can be defined by
-/// volume data or an arbitrary bitmap. The plane's texture is
-/// implemented by assigning one of following attributes to the plane:
-/// \c IRegular_volume_texture (for volumes) or \c IDistributed_compute_technique (for bitmaps).
+/// The texture implemented by a \c IDistributed_compute_technique attribute may be assigned to the
+/// plane.
 ///
+/// \ingroup nv_index_scene_description_object_shape
 ///
 class IPlane :
     public mi::base::Interface_declare<0x70c0a5e0,0x2ce2,0x4bd8,0xbe,0x4b,0xb0,0x34,0x32,0x83,0x11,0xd8,

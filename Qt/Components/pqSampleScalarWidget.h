@@ -35,7 +35,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "pqComponentsModule.h"
 #include "pqSMProxy.h"
+#include "vtkSetGet.h" // for VTK_LEGACY_REMOVE
 
+#if !defined(VTK_LEGACY_REMOVE)
 #include <QList>
 #include <QModelIndex>
 #include <QVariant>
@@ -45,7 +47,13 @@ class QItemSelection;
 
 class vtkSMDoubleVectorProperty;
 
-/** Provides a standard user interface component for manipulating a list of
+/**
+ * @class pqSampleScalarWidget
+ *
+ * @deprecated in ParaView 5.8. This class is left over from old properties
+ * panel.
+ *
+ * Provides a standard user interface component for manipulating a list of
 scalar samples.  Current uses include: specifying the set of "slices" for
 the Cut filter, and specifying the set of contour values for the Contour filter.
 */
@@ -84,13 +92,13 @@ public:
 
   // Set the current value of the widget.
   void setSamples(QList<QVariant> samples);
-signals:
+Q_SIGNALS:
   /**
   * Signal emitted whenever the set of samples changes.
   */
   void samplesChanged();
 
-private slots:
+private Q_SLOTS:
   void onSamplesChanged();
   void onSelectionChanged(const QItemSelection&, const QItemSelection&);
 
@@ -116,4 +124,5 @@ private:
   bool eventFilter(QObject* object, QEvent* e) override;
 };
 
+#endif // !defined(VTK_LEGACY_REMOVE)
 #endif // !_pqSampleScalarWidget_h

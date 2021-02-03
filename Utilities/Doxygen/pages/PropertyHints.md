@@ -92,6 +92,21 @@ vtkSMParaViewPipelineController::PostInitializeProxy() looks for (settings, Rend
 proxy, it will find one and then be able to setup a property link to ensure that the property
 on the RenderView proxy is kept in sync with the property on the RenderViewSettings proxy.
 
+The optional attribute `unlink_if_modified` can be set to 1 if the link should
+be broken if the user explicitly modifies the property. This is useful when
+linking color-related properties with the active color palette, for example:
+
+    <DoubleVectorProperty command="SetBackground"
+                          default_values="0.329 0.349 0.427"
+                          name="Background"
+                          panel_widget="color_selector_with_palette"
+                          number_of_elements="3">
+      <Hints>
+        <PropertyLink group="settings" proxy="ColorPalette" property="BackgroundColor" unlink_if_modified="1" />
+      </Hints>
+    </DoubleVectorProperty>
+
+
 SelectionInput
 --------------
 Mark a input as a one that accepts a vtkSelection.
@@ -167,7 +182,9 @@ specified to show multiple extensions with different description texts.
 
 By default, the file chooser widget will accept only existing files.
 It is possible to add `<UseDirectoryName/>` in the `<Hints>` section to accept only directories,
-or `<AcceptAnyFile/>` to accept any filename to export data.
+`<AcceptAnyFile/>` to accept any filename to export data, or
+`<BrowseLocalFileSystem/>` to browse local file-system irrespective of the
+connection type.
 
     <StringVectorProperty animateable="0"
                           command="SetQFileName"
@@ -263,3 +280,31 @@ use for the arrays listed using this hint. See
           </Hints>
       </StringVectorProperty>
     </SourceProxy>
+
+DoubleRangeSliderPropertyWidget
+-------------------------------
+
+Customize the `pqDoubleRangeSliderPropertyWidget` with these hints:
+
+* `HideResetButton` - when an XML element with this name is present, the reset range button will not be shown
+* `MinimumLabel` - the `text` attribute in this element will be used for the minimum slider widget label
+* `MaximumLabel` - the `text` attribute in this element will be used for the maximum slider widget label
+
+The snippet below shows these hints in use.
+
+    <DoubleVectorProperty command="SetClippingLimits"
+        default_values="0.8 1.2"
+        name="ClippingLimits"
+        panel_visibility="advanced"
+        number_of_elements="2"
+        panel_widget="double_range">
+        <DoubleRangeDomain
+            max="2.0"
+            min="0.65"
+            name="range" />
+        <Hints>
+          <MinimumLabel text="Near Clipping Limit"/>
+          <MaximumLabel text="Far Clipping Limit" />
+          <HideResetButton/>
+        </Hints>
+    </DoubleVectorProperty>
